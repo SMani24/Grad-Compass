@@ -6,6 +6,69 @@ let currentBaseZoom = 3.0;
 let universityMarkers = [];
 let isMapInteractive = false;
 
+// Worldwide ISO3 to Flag & 2-letter mapping
+const COUNTRY_LOOKUP = {
+  CHE: { flag: "🇨🇭", name: "Switzerland" },
+  DEU: { flag: "🇩🇪", name: "Germany" },
+  FRA: { flag: "🇫🇷", name: "France" },
+  GBR: { flag: "🇬🇧", name: "United Kingdom" },
+  USA: { flag: "🇺🇸", name: "United States" },
+  CAN: { flag: "🇨🇦", name: "Canada" },
+  NLD: { flag: "🇳🇱", name: "Netherlands" },
+  SWE: { flag: "🇸🇪", name: "Sweden" },
+  AUS: { flag: "🇦🇺", name: "Australia" },
+  JPN: { flag: "🇯🇵", name: "Japan" },
+  SGP: { flag: "🇸🇬", name: "Singapore" },
+  IRL: { flag: "🇮🇪", name: "Ireland" },
+  DNK: { flag: "🇩🇰", name: "Denmark" },
+  FIN: { flag: "🇫🇮", name: "Finland" },
+  NOR: { flag: "🇳🇴", name: "Norway" },
+  ITA: { flag: "🇮🇹", name: "Italy" },
+  ESP: { flag: "🇪🇸", name: "Spain" },
+  AUT: { flag: "🇦🇹", name: "Austria" },
+  BEL: { flag: "🇧🇪", name: "Belgium" },
+  NZL: { flag: "🇳🇿", name: "New Zealand" },
+  KOR: { flag: "🇰🇷", name: "South Korea" },
+  CHN: { flag: "🇨🇳", name: "China" },
+  HKG: { flag: "🇭🇰", name: "Hong Kong" },
+  TWN: { flag: "🇹🇼", name: "Taiwan" },
+  BRA: { flag: "🇧🇷", name: "Brazil" },
+  IND: { flag: "🇮🇳", name: "India" },
+  ISR: { flag: "🇮🇱", name: "Israel" },
+  CZE: { flag: "🇨🇿", name: "Czech Republic" },
+  POL: { flag: "🇵🇱", name: "Poland" },
+  PRT: { flag: "🇵🇹", name: "Portugal" }
+};
+
+const NAME_TO_ISO3 = {
+  "switzerland": "CHE", "germany": "DEU", "france": "FRA",
+  "united states of america": "USA", "united states": "USA",
+  "united kingdom": "GBR", "canada": "CAN", "netherlands": "NLD",
+  "sweden": "SWE", "australia": "AUS", "japan": "JPN",
+  "singapore": "SGP", "ireland": "IRL", "denmark": "DNK",
+  "finland": "FIN", "norway": "NOR", "italy": "ITA",
+  "spain": "ESP", "austria": "AUT", "belgium": "BEL",
+  "new zealand": "NZL", "south korea": "KOR", "china": "CHN",
+  "hong kong": "HKG", "taiwan": "TWN", "india": "IND", "brazil": "BRA"
+};
+
+function extractCountryProps(feature) {
+  const p = feature.properties || {};
+  let name = p.ADMIN || p.admin || p.name || p.NAME || p.name_en || "Unknown";
+  let code = p.ISO_A3 || p.iso_a3 || p.ISO3 || p.iso3 || p.ADM0_A3 || p.adm0_a3 || feature.id;
+
+  if (!code || code === "-99" || typeof code !== "string" || code.length !== 3) {
+    const norm = name.toLowerCase().trim();
+    code = NAME_TO_ISO3[norm] || (feature.id && String(feature.id).length === 3 ? String(feature.id) : "UNK");
+  }
+
+  code = code.toUpperCase();
+  const info = COUNTRY_LOOKUP[code];
+  const flag = info ? info.flag : "🌐";
+
+  return { name, code, flag };
+}
+
 window.setMapInteractive = function(val) {
   isMapInteractive = val;
 };
@@ -43,8 +106,9 @@ async function loadMapData() {
     if (!rawGeoData) return;
 
     const filteredFeatures = rawGeoData.features.filter(f => {
-      const code = f.properties.ISO_A3 || f.properties.iso_a3;
-      const name = (f.properties.ADMIN || f.properties.name || "").toLowerCase();
+      const p = f.properties || {};
+      const code = (p.ISO_A3 || p.iso_a3 || f.id || "").toUpperCase();
+      const name = (p.ADMIN || p.name || "").toLowerCase();
       return code !== "ATA" && name !== "antarctica";
     });
 
@@ -54,11 +118,11 @@ async function loadMapData() {
         layer.on({
           mouseover: e => {
             if (!isMapInteractive) return;
-            highlightCountry(e.target, feature);
+            highlightCountry(e.target);
           },
           mouseout: e => {
             if (!isMapInteractive) return;
-            resetCountryHighlight(e.target, feature);
+            resetCountryHighlight(e.target);
           },
           click: e => {
             if (!isMapInteractive) return;
@@ -75,7 +139,7 @@ async function loadMapData() {
 }
 
 function getCountryStyle(feature) {
-  const code = feature.properties.ISO_A3 || feature.properties.iso_a3;
+  const { code } = extractCountryProps(feature);
   const hasItems = activeCountryCodes.has(code);
 
   return {
@@ -87,20 +151,39 @@ function getCountryStyle(feature) {
   };
 }
 
-function highlightCountry(layer, feature) {
+function highlightCountry(layer) {
   if (layer !== activeCountryLayer) {
-    layer.setStyle({ fillColor: "#38bdf8", color: "#0369a1", weight: 1.8 });
+    layer.setStyle({
+      fillColor: "#38bdf8",
+      color: "#0369a1",
+      weight: 1.8
+    });
   }
 }
 
-function resetCountryHighlight(layer, feature) {
+function resetCountryHighlight(layer) {
   if (layer !== activeCountryLayer) {
     geojsonLayer.resetStyle(layer);
   }
 }
 
 function selectCountry(feature, layer, recordHistory = true) {
+  if (activeCountryLayer && geojsonLayer) {
+    geojsonLayer.resetStyle(activeCountryLayer);
+  }
+
   activeCountryLayer = layer;
+
+  layer.setStyle({
+    fillColor: "#7dd3fc",
+    fillOpacity: 0.95,
+    weight: 2.5,
+    color: "#0284c7"
+  });
+
+  if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+    layer.bringToFront();
+  }
 
   map.fitBounds(layer.getBounds(), {
     paddingTopLeft: [460, 40],
@@ -108,18 +191,16 @@ function selectCountry(feature, layer, recordHistory = true) {
     duration: 1.2
   });
 
-  const countryName = feature.properties.ADMIN || feature.properties.name;
-  const countryCode = feature.properties.ISO_A3 || feature.properties.iso_a3;
-
-  window.onCountrySelected(countryName, countryCode, recordHistory);
+  const { name, code, flag } = extractCountryProps(feature);
+  window.onCountrySelected(name, code, flag, recordHistory);
 }
 
 function resetToWorldView() {
   clearUniversityMarkers();
-  activeCountryLayer = null;
-  if (geojsonLayer) {
-    geojsonLayer.eachLayer(l => geojsonLayer.resetStyle(l));
+  if (activeCountryLayer && geojsonLayer) {
+    geojsonLayer.resetStyle(activeCountryLayer);
   }
+  activeCountryLayer = null;
   map.flyTo([32.0, 15.0], currentBaseZoom, { duration: 1.0 });
 }
 

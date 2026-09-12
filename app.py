@@ -8,7 +8,10 @@ from core.database import (
     init_db, DB_PATH,
     db_add_university, db_get_universities_by_country,
     db_add_professor, db_get_professors,
-    db_add_attachment, db_get_attachments, db_delete_attachment
+    db_add_attachment, db_get_attachments, db_delete_attachment,
+    db_get_pipeline_universities, db_update_university_status,
+    db_get_outreach_professors, db_update_professor_status,
+    db_get_tasks, db_add_task, db_toggle_task, db_delete_task
 )
 from core.geocoder import geocode_institution
 from core.vault import store_file, open_system_file
@@ -21,6 +24,18 @@ DEFAULT_CONFIG = {
     "window_height": 860,
     "font_scale": "Normal",
     "map_zoom": 3.0
+}
+
+# Fallback dictionary for country names to ISO3
+NAME_FALLBACK_CODES = {
+    "switzerland": "CHE", "germany": "DEU", "france": "FRA",
+    "united states of america": "USA", "united states": "USA",
+    "united kingdom": "GBR", "canada": "CAN", "netherlands": "NLD",
+    "sweden": "SWE", "australia": "AUS", "japan": "JPN",
+    "singapore": "SGP", "ireland": "IRL", "denmark": "DNK",
+    "finland": "FIN", "norway": "NOR", "italy": "ITA",
+    "spain": "ESP", "austria": "AUT", "belgium": "BEL",
+    "new zealand": "NZL", "south korea": "KOR", "china": "CHN"
 }
 
 def load_config() -> dict:
@@ -62,6 +77,7 @@ class GradCompassAPI:
         if main_window:
             on_window_closing()
             main_window.destroy()
+        os._exit(0)
 
     def get_active_countries(self):
         conn = sqlite3.connect(DB_PATH)
@@ -79,6 +95,11 @@ class GradCompassAPI:
             return json.load(f)
 
     def add_university(self, country_code, country_name, name, city, deadline, portal_url):
+        # Fallback if country code is missing or -99
+        if not country_code or country_code.strip() in ("-99", "undefined", "null", ""):
+            norm_name = (country_name or "").strip().lower()
+            country_code = NAME_FALLBACK_CODES.get(norm_name, "CHE" if "switz" in norm_name else "UNK")
+
         lat, lng = geocode_institution(name, country_name, city)
         uni_id = db_add_university(country_code, name, city, lat, lng, deadline, portal_url)
         return {
@@ -93,12 +114,24 @@ class GradCompassAPI:
     def get_universities(self, country_code):
         return db_get_universities_by_country(country_code)
 
+    def get_pipeline_universities(self):
+        return db_get_pipeline_universities()
+
+    def update_university_status(self, uni_id, status):
+        return db_update_university_status(uni_id, status)
+
     def add_professor(self, uni_id, name, email, research, status):
         prof_id = db_add_professor(uni_id, name, email, research, status)
         return {"id": prof_id, "name": name, "outreach_status": status}
 
     def get_professors(self, uni_id):
         return db_get_professors(uni_id)
+
+    def get_outreach_professors(self):
+        return db_get_outreach_professors()
+
+    def update_professor_status(self, prof_id, status):
+        return db_update_professor_status(prof_id, status)
 
     def pick_and_attach_file(self, parent_type, parent_id):
         global main_window
@@ -120,11 +153,24 @@ class GradCompassAPI:
     def delete_attachment(self, attachment_id):
         return db_delete_attachment(attachment_id)
 
+    def get_tasks(self):
+        return db_get_tasks()
+
+    def add_task(self, title, due_date=None, uni_id=None, prof_id=None):
+        task_id = db_add_task(title, due_date, uni_id, prof_id)
+        return {"id": task_id, "title": title}
+
+    def toggle_task(self, task_id, is_completed):
+        return db_toggle_task(task_id, is_completed)
+
+    def delete_task(self, task_id):
+        return db_delete_task(task_id)
+
     def log(self, msg):
         print(f"[UI]: {msg}")
         return True
 
-def on_window_closing():
+def on_window_closing(*args, **kwargs):
     global main_window
     if main_window:
         try:
@@ -135,15 +181,25 @@ def on_window_closing():
         except Exception:
             pass
 
-def on_window_resized(width, height):
-    save_config({
-        "window_width": width,
-        "window_height": height
-    })
+def on_window_closed(*args, **kwargs):
+    # Hard exit terminates all Qt background helper threads immediately
+    os._exit(0)
+
+def on_window_resized(*args, **kwargs):
+    global main_window
+    if main_window:
+        try:
+            save_config({
+                "window_width": main_window.width,
+                "window_height": main_window.height
+            })
+        except Exception:
+            pass
 
 def main():
     global main_window
     init_db()
+
     cfg = load_config()
     api = GradCompassAPI()
     ui_entry = Path(__file__).resolve().parent / "ui" / "index.html"
@@ -159,9 +215,11 @@ def main():
     )
 
     main_window.events.closing += on_window_closing
+    main_window.events.closed += on_window_closed
     main_window.events.resized += on_window_resized
 
     webview.start(debug=False)
+    os._exit(0)
 
 if __name__ == "__main__":
     main()

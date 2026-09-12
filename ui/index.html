@@ -199,3 +199,83 @@
   <script src="js/app.js"></script>
 </body>
 </html>
+
+<!-- Pipeline & Operational View Container -->
+  <div id="pipeline-view" class="view-panel hidden">
+    <div class="pipeline-header">
+      <div class="pipeline-title-group">
+        <button id="btn-pipeline-back" class="icon-btn" title="Back to Launch Hub (Esc)">←</button>
+        <div>
+          <h2>Work In Progress & Outreach Radar</h2>
+          <span>Track ongoing applications, professor replies, and immediate tasks</span>
+        </div>
+      </div>
+      <div class="pipeline-tab-bar">
+        <button class="tab-btn active" data-tab="tab-tasks">Tasks & To-Dos</button>
+        <button class="tab-btn" data-tab="tab-outreach">Faculty Outreach</button>
+        <button class="tab-btn" data-tab="tab-admissions">Application Tracker</button>
+      </div>
+    </div>
+
+    <div class="pipeline-content">
+      <!-- 1. Tasks & To-Dos Tab -->
+      <section id="tab-tasks" class="tab-pane active">
+        <div class="task-creator-card">
+          <input type="text" id="input-task-title" class="form-input flex-1" placeholder="What needs to be done? (e.g., Draft SOP for ETH, Request letter from Dr. Smith)" />
+          <input type="date" id="input-task-due" class="form-input" style="width: 170px;" />
+          <button id="btn-create-task" class="btn btn-primary" style="padding: 10px 20px; font-size: 13px;">Add Task</button>
+        </div>
+        <div class="task-list-container" id="tasks-container"></div>
+      </section>
+
+      <!-- 2. Faculty Outreach Radar Tab -->
+      <section id="tab-outreach" class="tab-pane">
+        <div class="filter-bar">
+          <span class="filter-label">Filter Status:</span>
+          <select id="filter-outreach-status" class="form-select">
+            <option value="ALL">All Contacts</option>
+            <option value="Follow-up Needed">Follow-up Needed</option>
+            <option value="Cold Emailed">Cold Emailed</option>
+            <option value="Replied / In Touch">Replied / In Touch</option>
+            <option value="Interview Scheduled">Interview Scheduled</option>
+            <option value="Not Contacted">Not Contacted</option>
+          </select>
+        </div>
+        <div class="outreach-grid" id="outreach-grid-container"></div>
+      </section>
+
+      <!-- 3. University Admission Lifecycle Tab -->
+      <section id="tab-admissions" class="tab-pane">
+        <div class="admissions-columns">
+          <div class="kanban-col" data-col="Researching">
+            <div class="kanban-col-header">
+              <h4>Researching</h4>
+              <span class="col-count" id="count-researching">0</span>
+            </div>
+            <div class="kanban-col-body" id="col-researching"></div>
+          </div>
+          <div class="kanban-col" data-col="Applying">
+            <div class="kanban-col-header">
+              <h4>Applying</h4>
+              <span class="col-count" id="count-applying">0</span>
+            </div>
+            <div class="kanban-col-body" id="col-applying"></div>
+          </div>
+          <div class="kanban-col" data-col="Submitted">
+            <div class="kanban-col-header">
+              <h4>Submitted</h4>
+              <span class="col-count" id="count-submitted">0</span>
+            </div>
+            <div class="kanban-col-body" id="col-submitted"></div>
+          </div>
+          <div class="kanban-col" data-col="Decided">
+            <div class="kanban-col-header">
+              <h4>Decided</h4>
+              <span class="col-count" id="count-decided">0</span>
+            </div>
+            <div class="kanban-col-body" id="col-decided"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
