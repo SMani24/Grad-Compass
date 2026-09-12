@@ -1,0 +1,248 @@
+:root {
+  --bg-page: #f8fafc;
+  --ocean-color: #e0f2fe;        /* Crisp, airy sky blue for oceans */
+  --country-empty: #ffffff;      /* Clean white for countries without items */
+  --country-empty-border: #cbd5e1;
+  --country-active: #bae6fd;     /* Noticeable soft blue for countries with saved data */
+  --country-active-border: #0284c7;
+  --country-hover: #38bdf8;
+  
+  --primary-blue: #0284c7;
+  --primary-blue-hover: #0369a1;
+  --secondary-bg: #ffffff;
+  --secondary-border: #e2e8f0;
+  
+  --text-headline: #0f172a;
+  --text-body: #334155;
+  --text-subtle: #64748b;
+  
+  --shadow-elevated: 0 12px 32px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+  --shadow-button: 0 4px 14px 0 rgba(2, 132, 199, 0.28);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-page);
+  color: var(--text-headline);
+}
+
+/* Map Canvas & Hardware-Accelerated Blur */
+#map-container {
+  width: 100%;
+  height: 100%;
+  transition: filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#map-container.blurred {
+  filter: blur(14px) saturate(1.2);
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  background: var(--ocean-color);
+}
+
+/* Borderless Gateway Hub */
+#gateway-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: none;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+#gateway-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.gateway-hero {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 680px;
+}
+
+.compass-badge {
+  font-size: 52px;
+  display: inline-block;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 8px 16px rgba(2, 132, 199, 0.2));
+}
+
+.brand h1 {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-headline);
+}
+
+.brand p {
+  font-size: 16px;
+  color: var(--text-subtle);
+  margin-top: 6px;
+  margin-bottom: 36px;
+}
+
+/* Horizontal Action Button Container */
+.gateway-actions-horizontal {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.btn {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 50px;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-primary {
+  background: var(--primary-blue);
+  color: #ffffff;
+  box-shadow: var(--shadow-button);
+}
+
+.btn-primary:hover {
+  background: var(--primary-blue-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(2, 132, 199, 0.35);
+}
+
+.btn-secondary {
+  background: var(--secondary-bg);
+  color: var(--text-headline);
+  border: 1px solid var(--secondary-border);
+  box-shadow: var(--shadow-elevated);
+}
+
+.btn-secondary:hover {
+  background: #f1f5f9;
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+}
+
+/* Country Polygon Styles on Map */
+.country-polygon {
+  fill: var(--country-empty);
+  stroke: var(--country-empty-border);
+  stroke-width: 0.75;
+  transition: fill 0.2s ease, stroke 0.2s ease;
+}
+
+/* Distinct Blue for Countries with Content */
+.country-polygon.has-items {
+  fill: var(--country-active);
+  stroke: var(--country-active-border);
+  stroke-width: 1.2;
+}
+
+.country-polygon:hover {
+  fill: var(--country-hover) !important;
+  stroke: var(--primary-blue-hover) !important;
+  stroke-width: 1.8;
+  cursor: pointer;
+}
+
+/* White Glassmorphic Drawer */
+.drawer {
+  position: absolute;
+  top: 0;
+  left: -440px;
+  width: 420px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid var(--secondary-border);
+  box-shadow: var(--shadow-elevated);
+  z-index: 900;
+  transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer.open {
+  left: 0;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 20px 18px;
+  border-bottom: 1px solid var(--secondary-border);
+}
+
+.header-titles h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-headline);
+}
+
+.header-titles span {
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+
+.icon-btn {
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: var(--text-subtle);
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.icon-btn:hover {
+  background: #f1f5f9;
+  color: var(--text-headline);
+}
+
+.btn-action {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  background: #e0f2fe;
+  color: var(--primary-blue);
+  font-weight: 600;
+  border: 1px dashed var(--primary-blue);
+  cursor: pointer;
+}
+
+.btn-action:hover {
+  background: #bae6fd;
+}
+
+.drawer-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}

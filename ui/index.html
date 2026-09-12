@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grad Compass</title>
+  <link rel="stylesheet" href="vendor/leaflet.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- Map Canvas (Blurred on launch) -->
+  <div id="map-container" class="blurred">
+    <div id="map"></div>
+  </div>
+
+  <!-- Minimal Borderless Gateway Hub -->
+  <div id="gateway-overlay">
+    <div class="gateway-hero">
+      <div class="brand">
+        <span class="compass-badge">🧭</span>
+        <h1>Grad Compass</h1>
+        <p>Global Academic & Outreach Manager</p>
+      </div>
+
+      <!-- Horizontal Action Buttons -->
+      <div class="gateway-actions-horizontal">
+        <button id="btn-explore-map" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+          <span>Explore World Map</span>
+        </button>
+        <button id="btn-open-pipeline" class="btn btn-secondary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+          <span>Pipelines & To-Dos</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Relational Sidebar Drawer -->
+  <div id="inspector-drawer" class="drawer">
+    <div class="drawer-header">
+      <div class="header-titles">
+        <h2 id="drawer-title">Country Details</h2>
+        <span id="drawer-subtitle">Select an institution</span>
+      </div>
+      <button id="btn-close-drawer" class="icon-btn" title="Back to World View">✕</button>
+    </div>
+
+    <div id="drawer-content" class="drawer-scrollable">
+      <div class="action-bar">
+        <button id="btn-add-uni" class="btn-action">+ Add University</button>
+      </div>
+      <ul id="university-list" class="entity-list"></ul>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="vendor/leaflet.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
