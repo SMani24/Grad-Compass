@@ -9,12 +9,23 @@
 </head>
 <body>
 
-  <!-- Map Canvas (Blurred on launch) -->
+  <!-- Top Navigation (Dynamically glides when drawer opens) -->
+  <header class="top-nav-bar">
+    <div class="nav-history">
+      <button id="btn-nav-back" class="nav-btn" title="Back (Esc or Alt + ←)" disabled>←</button>
+      <button id="btn-nav-forward" class="nav-btn" title="Forward (Alt + →)" disabled>→</button>
+    </div>
+    <div class="nav-actions">
+      <button id="btn-open-settings" class="nav-btn-icon" title="Preferences">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Map Canvas -->
   <div id="map-container" class="blurred">
     <div id="map"></div>
   </div>
 
-  <!-- Minimal Borderless Gateway Hub -->
+  <!-- Gateway Hub (Acts as a full-screen input blocker until dismissed) -->
   <div id="gateway-overlay">
     <div class="gateway-hero">
       <div class="brand">
@@ -22,40 +33,167 @@
         <h1>Grad Compass</h1>
         <p>Global Academic & Outreach Manager</p>
       </div>
-
-      <!-- Horizontal Action Buttons -->
       <div class="gateway-actions-horizontal">
         <button id="btn-explore-map" class="btn btn-primary">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
           <span>Explore World Map</span>
         </button>
         <button id="btn-open-pipeline" class="btn btn-secondary">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
           <span>Pipelines & To-Dos</span>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Relational Sidebar Drawer -->
-  <div id="inspector-drawer" class="drawer">
+  <!-- Drawer: Country & University Level -->
+  <div id="country-drawer" class="drawer">
     <div class="drawer-header">
+      <button id="btn-country-back" class="icon-btn" title="Back to Map (Esc)">←</button>
       <div class="header-titles">
-        <h2 id="drawer-title">Country Details</h2>
-        <span id="drawer-subtitle">Select an institution</span>
+        <h2 id="country-drawer-title">Country</h2>
+        <span id="country-drawer-subtitle">Universities Logged</span>
       </div>
-      <button id="btn-close-drawer" class="icon-btn" title="Back to World View">✕</button>
+      <button id="btn-close-country-drawer" class="icon-btn" title="Back to Map">✕</button>
     </div>
 
-    <div id="drawer-content" class="drawer-scrollable">
+    <div class="drawer-scrollable">
       <div class="action-bar">
-        <button id="btn-add-uni" class="btn-action">+ Add University</button>
+        <button id="btn-show-add-uni" class="btn-action">+ Add University</button>
       </div>
-      <ul id="university-list" class="entity-list"></ul>
+      <div id="country-uni-list" class="entity-list"></div>
     </div>
   </div>
 
-  <!-- Scripts -->
+  <!-- Drawer: University & Professor Level -->
+  <div id="uni-drawer" class="drawer">
+    <div class="drawer-header">
+      <button id="btn-back-to-country" class="icon-btn" title="Back to Country List">←</button>
+      <div class="header-titles">
+        <h2 id="uni-drawer-title">University Name</h2>
+        <span id="uni-drawer-subtitle">Faculty & Outreach</span>
+      </div>
+      <button id="btn-close-uni-drawer" class="icon-btn" title="Back to Map">✕</button>
+    </div>
+
+    <div class="drawer-scrollable">
+      <div class="section-card">
+        <div class="section-card-header">
+          <h4>Institution Documents</h4>
+          <button id="btn-attach-uni-file" class="btn-text">+ Attach File</button>
+        </div>
+        <div id="uni-attachments-list" class="file-chip-container"></div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-card-header">
+          <h4>Target Faculty & Labs</h4>
+          <button id="btn-show-add-prof" class="btn-action-small">+ Add Professor</button>
+        </div>
+        <div id="professors-container" class="entity-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add University -->
+  <div id="add-uni-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Add University</h3>
+        <button class="icon-btn btn-modal-dismiss">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label>University Name *</label>
+          <input type="text" id="input-uni-name" class="form-input" placeholder="e.g. Technical University of Munich" />
+        </div>
+        <div class="input-group">
+          <label>City (Optional, improves pin accuracy)</label>
+          <input type="text" id="input-uni-city" class="form-input" placeholder="e.g. Munich" />
+        </div>
+        <div class="input-group">
+          <label>Application Deadline</label>
+          <input type="date" id="input-uni-deadline" class="form-input" />
+        </div>
+        <div class="input-group">
+          <label>Application Portal URL</label>
+          <input type="url" id="input-uni-url" class="form-input" placeholder="https://..." />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-submit-uni" class="btn btn-primary">Save & Geocode</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Professor -->
+  <div id="add-prof-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Add Faculty Contact</h3>
+        <button class="icon-btn btn-modal-dismiss">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label>Professor Name *</label>
+          <input type="text" id="input-prof-name" class="form-input" placeholder="e.g. Dr. Jane Doe" />
+        </div>
+        <div class="input-group">
+          <label>Email</label>
+          <input type="email" id="input-prof-email" class="form-input" placeholder="jane.doe@uni.edu" />
+        </div>
+        <div class="input-group">
+          <label>Research Area / Lab Focus</label>
+          <input type="text" id="input-prof-research" class="form-input" placeholder="e.g. Distributed Systems, Robotics" />
+        </div>
+        <div class="input-group">
+          <label>Outreach Status</label>
+          <select id="select-prof-status" class="form-select full-width">
+            <option value="Not Contacted">Not Contacted</option>
+            <option value="Cold Emailed">Cold Emailed</option>
+            <option value="Follow-up Needed">Follow-up Needed</option>
+            <option value="Replied / In Touch">Replied / In Touch</option>
+            <option value="Interview Scheduled">Interview Scheduled</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-submit-prof" class="btn btn-primary">Save Contact</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preferences Modal -->
+  <div id="settings-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Preferences</h3>
+        <button class="icon-btn btn-modal-dismiss">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-row">
+          <label for="select-font-scale">Text Size:</label>
+          <select id="select-font-scale" class="form-select">
+            <option value="Normal">Normal (100%)</option>
+            <option value="Medium">Medium (115%)</option>
+            <option value="Large">Large (130%)</option>
+            <option value="XL">XL (145%)</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label for="input-map-zoom">Initial Map Zoom:</label>
+          <div class="range-wrapper">
+            <input type="range" id="input-map-zoom" min="2.6" max="4.2" step="0.2" value="3.0" />
+            <span id="zoom-value-label">3.0</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="btn btn-primary">Save & Apply</button>
+      </div>
+    </div>
+  </div>
+
   <script src="vendor/leaflet.js"></script>
   <script src="js/map.js"></script>
   <script src="js/app.js"></script>

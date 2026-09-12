@@ -12,21 +12,20 @@ def init_db():
     PRAGMA foreign_keys = ON;
 
     CREATE TABLE IF NOT EXISTS countries (
-        code TEXT PRIMARY KEY,          -- ISO 3166-1 alpha-3 code (e.g., 'DEU', 'USA', 'CHE')
-        name TEXT NOT NULL,
-        notes TEXT
+        code TEXT PRIMARY KEY,
+        name TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS universities (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        country_code TEXT NOT NULL REFERENCES countries(code) ON DELETE CASCADE,
+        country_code TEXT NOT NULL,
         name TEXT NOT NULL,
         city TEXT,
         latitude REAL,
         longitude REAL,
         portal_url TEXT,
         deadline TEXT,
-        status TEXT DEFAULT 'Researching'  -- 'Researching', 'Applying', 'Submitted', 'Accepted', 'Rejected'
+        status TEXT DEFAULT 'Researching'
     );
 
     CREATE TABLE IF NOT EXISTS professors (
@@ -36,31 +35,93 @@ def init_db():
         email TEXT,
         lab_website TEXT,
         research_interests TEXT,
-        outreach_status TEXT DEFAULT 'Not Contacted', -- 'Not Contacted', 'Contacted', 'Follow-up Needed', 'Meeting Scheduled'
-        last_contacted_date TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        university_id INTEGER REFERENCES universities(id) ON DELETE CASCADE,
-        professor_id INTEGER REFERENCES professors(id) ON DELETE CASCADE,
-        title TEXT NOT NULL,
-        due_date TEXT,
-        is_completed INTEGER DEFAULT 0
+        outreach_status TEXT DEFAULT 'Not Contacted'
     );
 
     CREATE TABLE IF NOT EXISTS attachments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        parent_type TEXT NOT NULL,      -- 'country', 'university', 'professor'
-        parent_id TEXT NOT NULL,        -- Matches country code or university/prof ID
+        parent_type TEXT NOT NULL,      -- 'university' or 'professor'
+        parent_id INTEGER NOT NULL,
         file_name TEXT NOT NULL,
         stored_path TEXT NOT NULL
     );
     """)
-
     conn.commit()
     conn.close()
 
-if __name__ == "__main__":
-    init_db()
-    print(f"Database initialized at {DB_PATH}")
+def db_add_university(country_code, name, city, lat, lng, deadline, portal_url):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO universities (country_code, name, city, latitude, longitude, deadline, portal_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (country_code, name, city, lat, lng, deadline, portal_url)
+    )
+    uni_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return uni_id
+
+def db_get_universities_by_country(country_code):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM universities WHERE country_code = ? ORDER BY name ASC", (country_code,))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def db_add_professor(uni_id, name, email, research, status):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO professors (university_id, name, email, research_interests, outreach_status) VALUES (?, ?, ?, ?, ?)",
+        (uni_id, name, email, research, status)
+    )
+    prof_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return prof_id
+
+def db_get_professors(uni_id):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM professors WHERE university_id = ? ORDER BY id DESC", (uni_id,))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def db_add_attachment(parent_type, parent_id, file_name, stored_path):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO attachments (parent_type, parent_id, file_name, stored_path) VALUES (?, ?, ?, ?)",
+        (parent_type, parent_id, file_name, stored_path)
+    )
+    conn.commit()
+    conn.close()
+
+def db_get_attachments(parent_type, parent_id):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM attachments WHERE parent_type = ? AND parent_id = ?", (parent_type, parent_id))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def db_delete_attachment(attachment_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT stored_path FROM attachments WHERE id = ?", (attachment_id,))
+    row = c.fetchone()
+    if row:
+        app_root = DB_PATH.parent.parent
+        target = app_root / row[0]
+        if target.exists():
+            target.unlink()
+        c.execute("DELETE FROM attachments WHERE id = ?", (attachment_id,))
+        conn.commit()
+    conn.close()
+    return True
+
