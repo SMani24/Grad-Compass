@@ -1,9 +1,11 @@
 import json
 import urllib.request
 import urllib.parse
+from pathlib import Path
 from geopy.geocoders import Nominatim
 
 geolocator = Nominatim(user_agent="grad_compass_desktop")
+CACHE_DIR = Path(__file__).resolve().parent.parent / "ui" / "cache" / "images"
 
 def geocode_institution(name: str, country: str, city: str = None):
     """Returns (lat, lng) tuple or (None, None) if unresolved."""
@@ -24,15 +26,21 @@ def geocode_institution(name: str, country: str, city: str = None):
 
     return None, None
 
-def fetch_university_photo(name: str) -> str:
+def fetch_and_cache_university_photo(uni_id: int, name: str) -> str:
     """
-    Fetches a high-quality university image from Wikipedia REST API without API keys.
-    Returns the image URL, or None if not found.
+    Queries Wikipedia API for a campus image, downloads it to ui/cache/images/{uni_id}.jpg,
+    and returns the local relative web path ('cache/images/{uni_id}.jpg').
     """
     if not name:
         return None
 
-    # Clean query: strip degrees or parenthetical additions (e.g., 'EPFL - Computer Science' -> 'EPFL')
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    target_file = CACHE_DIR / f"{uni_id}.jpg"
+
+    # Return immediately if already cached on disk
+    if target_file.exists() and target_file.stat().st_size > 0:
+        return f"cache/images/{uni_id}.jpg"
+
     clean_name = name.split(" - ")[0].split("(")[0].strip()
     encoded_title = urllib.parse.quote(clean_name.replace(" ", "_"))
     url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded_title}"
@@ -46,13 +54,19 @@ def fetch_university_photo(name: str) -> str:
         with urllib.request.urlopen(req, timeout=5) as response:
             if response.status == 200:
                 data = json.loads(response.read().decode("utf-8"))
-                
-                # Check thumbnail or original image
+                img_url = None
                 if "thumbnail" in data and "source" in data["thumbnail"]:
-                    return data["thumbnail"]["source"]
-                if "originalimage" in data and "source" in data["originalimage"]:
-                    return data["originalimage"]["source"]
+                    img_url = data["thumbnail"]["source"]
+                elif "originalimage" in data and "source" in data["originalimage"]:
+                    img_url = data["originalimage"]["source"]
+
+                if img_url:
+                    img_req = urllib.request.Request(img_url, headers=headers)
+                    with urllib.request.urlopen(img_req, timeout=8) as img_resp:
+                        with open(target_file, "wb") as f:
+                            f.write(img_resp.read())
+                    return f"cache/images/{uni_id}.jpg"
     except Exception as e:
-        print(f"[Wikipedia Photo] Could not fetch photo for '{clean_name}': {e}")
+        print(f"[Photo Cache] Could not fetch/cache photo for '{clean_name}': {e}")
 
     return None

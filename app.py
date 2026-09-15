@@ -1,7 +1,9 @@
 import os
 import sys
+import time
 import json
 import sqlite3
+import threading
 import webview
 from pathlib import Path
 from core.database import (
@@ -11,9 +13,10 @@ from core.database import (
     db_add_attachment, db_get_attachments, db_delete_attachment,
     db_get_pipeline_universities, db_update_university_status,
     db_get_outreach_professors, db_update_professor_status,
-    db_get_tasks, db_add_task, db_toggle_task, db_delete_task
+    db_get_tasks, db_add_task, db_toggle_task, db_delete_task,
+    db_get_universities_missing_images, db_update_university_image
 )
-from core.geocoder import geocode_institution, fetch_university_photo
+from core.geocoder import geocode_institution, fetch_and_cache_university_photo
 from core.vault import store_file, open_system_file
 
 CONFIG_PATH = Path(__file__).resolve().parent / "data" / "config.json"
@@ -24,17 +27,6 @@ DEFAULT_CONFIG = {
     "window_height": 860,
     "font_scale": "Normal",
     "map_zoom": 3.0
-}
-
-NAME_FALLBACK_CODES = {
-    "switzerland": "CHE", "germany": "DEU", "france": "FRA",
-    "united states of america": "USA", "united states": "USA",
-    "united kingdom": "GBR", "canada": "CAN", "netherlands": "NLD",
-    "sweden": "SWE", "australia": "AUS", "japan": "JPN",
-    "singapore": "SGP", "ireland": "IRL", "denmark": "DNK",
-    "finland": "FIN", "norway": "NOR", "italy": "ITA",
-    "spain": "ESP", "austria": "AUT", "belgium": "BEL",
-    "new zealand": "NZL", "south korea": "KOR", "china": "CHN"
 }
 
 def load_config() -> dict:
@@ -55,6 +47,21 @@ def save_config(updates: dict):
             json.dump(cfg, f, indent=2)
     except Exception as e:
         print(f"[Config Error] Failed to write config: {e}")
+
+# Background worker: Checks periodically and caches missing photos
+def background_asset_sync():
+    time.sleep(3)  # Initial grace period on launch
+    while True:
+        try:
+            missing = db_get_universities_missing_images()
+            for u in missing:
+                local_path = fetch_and_cache_university_photo(u["id"], u["name"])
+                if local_path:
+                    db_update_university_image(u["id"], local_path)
+                    print(f"[Asset Sync] Cached photo for '{u['name']}' -> {local_path}")
+        except Exception as e:
+            print(f"[Asset Sync Warning] {e}")
+        time.sleep(60)
 
 class GradCompassAPI:
     def get_config(self):
@@ -94,13 +101,21 @@ class GradCompassAPI:
             return json.load(f)
 
     def add_university(self, country_code, country_name, name, city, deadline, portal_url):
-        if not country_code or country_code.strip() in ("-99", "undefined", "null", ""):
-            norm_name = (country_name or "").strip().lower()
-            country_code = NAME_FALLBACK_CODES.get(norm_name, "CHE" if "switz" in norm_name else "UNK")
+        # Guarantee a unique code per country
+        code = country_code
+        if not code or code.strip().upper() in ("-99", "UNK", "UNKNOWN", "UNDEFINED", "NULL", ""):
+            code = (country_name or "UNKNOWN").strip().upper().replace(" ", "_")
 
         lat, lng = geocode_institution(name, country_name, city)
-        image_url = fetch_university_photo(name)
-        uni_id = db_add_university(country_code, name, city, lat, lng, deadline, portal_url, image_url)
+        
+        # Save first to acquire primary key
+        uni_id = db_add_university(code, name, city, lat, lng, deadline, portal_url, None)
+        
+        # Attempt immediate local image download and cache
+        local_img = fetch_and_cache_university_photo(uni_id, name)
+        if local_img:
+            db_update_university_image(uni_id, local_img)
+
         return {
             "id": uni_id,
             "name": name,
@@ -108,7 +123,7 @@ class GradCompassAPI:
             "latitude": lat,
             "longitude": lng,
             "geocoded": lat is not None,
-            "image_url": image_url
+            "image_url": local_img
         }
 
     def get_universities(self, country_code):
@@ -188,6 +203,10 @@ def main():
     global main_window
     init_db()
 
+    # Start background asset worker
+    worker_thread = threading.Thread(target=background_asset_sync, daemon=True)
+    worker_thread.start()
+
     cfg = load_config()
     api = GradCompassAPI()
     ui_entry = Path(__file__).resolve().parent / "ui" / "index.html"
@@ -202,7 +221,6 @@ def main():
         background_color="#f8fafc"
     )
 
-    # Attach only valid pywebview events
     main_window.events.closing += on_window_closing
     main_window.events.closed += on_window_closed
 

@@ -57,18 +57,24 @@ def init_db():
     );
     """)
 
-    # Safe migration: ensure existing databases get the image_url column
     try:
         cursor.execute("ALTER TABLE universities ADD COLUMN image_url TEXT")
     except sqlite3.OperationalError:
         pass
+
+    # Database Healing: Fix any universities corrupted by the UNK bug
+    cursor.execute("""
+        UPDATE universities 
+        SET country_code = 'IRN' 
+        WHERE country_code = 'UNK' AND (name LIKE '%Tehran%' OR name LIKE '%Iran%')
+    """)
 
     conn.commit()
     conn.close()
 
 # University Operations
 def db_add_university(country_code, name, city, lat, lng, deadline, portal_url, image_url=None):
-    code = (country_code or "UNK").strip().upper()
+    code = (country_code or "UNKNOWN").strip().upper()
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
@@ -86,7 +92,7 @@ def db_get_universities_by_country(country_code):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM universities WHERE country_code = ? ORDER BY name ASC", (country_code,))
+    c.execute("SELECT * FROM universities WHERE country_code = ? ORDER BY name ASC", (country_code.upper(),))
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
     return rows
@@ -111,6 +117,24 @@ def db_update_university_status(uni_id, status):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE universities SET status = ? WHERE id = ?", (status, uni_id))
+    conn.commit()
+    conn.close()
+    return True
+
+def db_get_universities_missing_images():
+    """Finds universities needing image download/cache verification."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT id, name, image_url FROM universities WHERE image_url IS NULL OR image_url NOT LIKE 'cache/%'")
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+def db_update_university_image(uni_id, local_path):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE universities SET image_url = ? WHERE id = ?", (local_path, uni_id))
     conn.commit()
     conn.close()
     return True

@@ -6,7 +6,9 @@ let currentBaseZoom = 3.0;
 let universityMarkers = [];
 let isMapInteractive = false;
 
+// Standard lookup map
 const COUNTRY_LOOKUP = {
+  IRN: { flag: "🇮🇷", name: "Iran" },
   CHE: { flag: "🇨🇭", name: "Switzerland" },
   DEU: { flag: "🇩🇪", name: "Germany" },
   FRA: { flag: "🇫🇷", name: "France" },
@@ -39,29 +41,23 @@ const COUNTRY_LOOKUP = {
   PRT: { flag: "🇵🇹", name: "Portugal" }
 };
 
-const NAME_TO_ISO3 = {
-  "switzerland": "CHE", "germany": "DEU", "france": "FRA",
-  "united states of america": "USA", "united states": "USA",
-  "united kingdom": "GBR", "canada": "CAN", "netherlands": "NLD",
-  "sweden": "SWE", "australia": "AUS", "japan": "JPN",
-  "singapore": "SGP", "ireland": "IRL", "denmark": "DNK",
-  "finland": "FIN", "norway": "NOR", "italy": "ITA",
-  "spain": "ESP", "austria": "AUT", "belgium": "BEL",
-  "new zealand": "NZL", "south korea": "KOR", "china": "CHN",
-  "hong kong": "HKG", "taiwan": "TWN", "india": "IND", "brazil": "BRA"
-};
-
 function extractCountryProps(feature) {
   const p = feature.properties || {};
-  let name = p.ADMIN || p.admin || p.name || p.NAME || p.name_en || "Unknown";
-  let code = p.ISO_A3 || p.iso_a3 || p.ISO3 || p.iso3 || p.ADM0_A3 || p.adm0_a3 || feature.id;
-
-  if (!code || code === "-99" || typeof code !== "string" || code.length !== 3) {
-    const norm = name.toLowerCase().trim();
-    code = NAME_TO_ISO3[norm] || (feature.id && String(feature.id).length === 3 ? String(feature.id) : "UNK");
+  let name = (p.ADMIN || p.admin || p.name || p.NAME || p.name_en || "Unknown").trim();
+  
+  // Try finding a clean 3-letter code
+  let candidate = p.ISO_A3 || p.iso_a3 || p.ISO3 || p.iso3 || p.ADM0_A3 || p.adm0_a3 || feature.id;
+  
+  let code = "";
+  if (candidate && typeof candidate === "string" && candidate !== "-99" && candidate.length === 3) {
+    code = candidate.toUpperCase();
+  } else {
+    // If no clean 3-letter code exists, isolate this country by its sanitized name
+    // This prevents countries from ever sharing a generic "UNK" key
+    code = name.toUpperCase().replace(/[^A-Z0-9]/g, "_");
   }
 
-  code = code.toUpperCase();
+  // Flag fallback lookup
   const info = COUNTRY_LOOKUP[code];
   const flag = info ? info.flag : "🌐";
 
@@ -99,15 +95,15 @@ function initMap(initialZoom) {
 async function loadMapData() {
   try {
     const codes = await window.pywebview.api.get_active_countries();
-    activeCountryCodes = new Set(codes || []);
+    activeCountryCodes = new Set((codes || []).map(c => c.toUpperCase()));
 
     const rawGeoData = await window.pywebview.api.get_geojson_data();
     if (!rawGeoData) return;
 
     const filteredFeatures = rawGeoData.features.filter(f => {
       const p = f.properties || {};
-      const code = (p.ISO_A3 || p.iso_a3 || f.id || "").toUpperCase();
       const name = (p.ADMIN || p.name || "").toLowerCase();
+      const code = (p.ISO_A3 || p.iso_a3 || f.id || "").toUpperCase();
       return code !== "ATA" && name !== "antarctica";
     });
 
@@ -250,7 +246,6 @@ function focusUniversityPin(lat, lng) {
   }
 }
 
-// Immediately update the country's color on the map without restarting the app
 function markCountryActive(countryCode) {
   if (!countryCode) return;
   const upper = countryCode.toUpperCase();
