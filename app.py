@@ -13,7 +13,7 @@ from core.database import (
     db_get_outreach_professors, db_update_professor_status,
     db_get_tasks, db_add_task, db_toggle_task, db_delete_task
 )
-from core.geocoder import geocode_institution
+from core.geocoder import geocode_institution, fetch_university_photo
 from core.vault import store_file, open_system_file
 
 CONFIG_PATH = Path(__file__).resolve().parent / "data" / "config.json"
@@ -26,7 +26,6 @@ DEFAULT_CONFIG = {
     "map_zoom": 3.0
 }
 
-# Fallback dictionary for country names to ISO3
 NAME_FALLBACK_CODES = {
     "switzerland": "CHE", "germany": "DEU", "france": "FRA",
     "united states of america": "USA", "united states": "USA",
@@ -95,20 +94,21 @@ class GradCompassAPI:
             return json.load(f)
 
     def add_university(self, country_code, country_name, name, city, deadline, portal_url):
-        # Fallback if country code is missing or -99
         if not country_code or country_code.strip() in ("-99", "undefined", "null", ""):
             norm_name = (country_name or "").strip().lower()
             country_code = NAME_FALLBACK_CODES.get(norm_name, "CHE" if "switz" in norm_name else "UNK")
 
         lat, lng = geocode_institution(name, country_name, city)
-        uni_id = db_add_university(country_code, name, city, lat, lng, deadline, portal_url)
+        image_url = fetch_university_photo(name)
+        uni_id = db_add_university(country_code, name, city, lat, lng, deadline, portal_url, image_url)
         return {
             "id": uni_id,
             "name": name,
             "city": city,
             "latitude": lat,
             "longitude": lng,
-            "geocoded": lat is not None
+            "geocoded": lat is not None,
+            "image_url": image_url
         }
 
     def get_universities(self, country_code):
@@ -182,19 +182,7 @@ def on_window_closing(*args, **kwargs):
             pass
 
 def on_window_closed(*args, **kwargs):
-    # Hard exit terminates all Qt background helper threads immediately
     os._exit(0)
-
-def on_window_resized(*args, **kwargs):
-    global main_window
-    if main_window:
-        try:
-            save_config({
-                "window_width": main_window.width,
-                "window_height": main_window.height
-            })
-        except Exception:
-            pass
 
 def main():
     global main_window
@@ -214,9 +202,9 @@ def main():
         background_color="#f8fafc"
     )
 
+    # Attach only valid pywebview events
     main_window.events.closing += on_window_closing
     main_window.events.closed += on_window_closed
-    main_window.events.resized += on_window_resized
 
     webview.start(debug=False)
     os._exit(0)

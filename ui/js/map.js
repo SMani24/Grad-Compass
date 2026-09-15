@@ -6,7 +6,6 @@ let currentBaseZoom = 3.0;
 let universityMarkers = [];
 let isMapInteractive = false;
 
-// Worldwide ISO3 to Flag & 2-letter mapping
 const COUNTRY_LOOKUP = {
   CHE: { flag: "🇨🇭", name: "Switzerland" },
   DEU: { flag: "🇩🇪", name: "Germany" },
@@ -214,13 +213,28 @@ function renderUniversityPins(universities) {
 
   universities.forEach(u => {
     if (u.latitude && u.longitude) {
+      let pinHtml = "";
+      if (u.image_url) {
+        pinHtml = `<div class="uni-photo-pin" style="background-image: url('${u.image_url}');" title="${u.name}"></div>`;
+      } else {
+        pinHtml = `<div class="uni-photo-pin" title="${u.name}"><span class="uni-pin-fallback-icon">🏛️</span></div>`;
+      }
+
       const pinIcon = L.divIcon({
-        className: "custom-uni-pin",
-        html: `<div class="uni-pin-glow" title="${u.name}"></div>`,
-        iconSize: [16, 16]
+        className: "custom-uni-photo-marker",
+        html: pinHtml,
+        iconSize: [40, 46],
+        iconAnchor: [20, 46],
+        popupAnchor: [0, -44]
       });
 
       const marker = L.marker([u.latitude, u.longitude], { icon: pinIcon }).addTo(map);
+      marker.bindTooltip(`<b>${u.name}</b>${u.city ? '<br>' + u.city : ''}`, { 
+        direction: "top", 
+        offset: [0, -42],
+        opacity: 0.95
+      });
+
       marker.on("click", () => {
         if (!isMapInteractive) return;
         window.onUniversitySelected(u);
@@ -236,9 +250,29 @@ function focusUniversityPin(lat, lng) {
   }
 }
 
+// Immediately update the country's color on the map without restarting the app
 function markCountryActive(countryCode) {
-  activeCountryCodes.add(countryCode);
-  if (geojsonLayer) geojsonLayer.setStyle(getCountryStyle);
+  if (!countryCode) return;
+  const upper = countryCode.toUpperCase();
+  activeCountryCodes.add(upper);
+
+  if (geojsonLayer) {
+    geojsonLayer.eachLayer(layer => {
+      const { code } = extractCountryProps(layer.feature);
+      if (code === upper) {
+        if (layer === activeCountryLayer) {
+          layer.setStyle({
+            fillColor: "#7dd3fc",
+            fillOpacity: 0.95,
+            weight: 2.5,
+            color: "#0284c7"
+          });
+        } else {
+          layer.setStyle(getCountryStyle(layer.feature));
+        }
+      }
+    });
+  }
 }
 
 window.setInitialZoom = function(zoom) {

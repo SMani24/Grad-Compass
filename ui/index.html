@@ -9,7 +9,7 @@
 </head>
 <body>
 
-  <!-- Top Navigation (Dynamically glides when drawer opens) -->
+  <!-- Top Navigation Bar -->
   <header class="top-nav-bar">
     <div class="nav-history">
       <button id="btn-nav-back" class="nav-btn" title="Back (Esc or Alt + ←)" disabled>←</button>
@@ -25,7 +25,7 @@
     <div id="map"></div>
   </div>
 
-  <!-- Gateway Hub (Acts as a full-screen input blocker until dismissed) -->
+  <!-- Gateway Hub -->
   <div id="gateway-overlay">
     <div class="gateway-hero">
       <div class="brand">
@@ -67,6 +67,9 @@
 
   <!-- Drawer: University & Professor Level -->
   <div id="uni-drawer" class="drawer">
+    <!-- Hero Image Banner -->
+    <div id="uni-hero-banner" class="uni-hero-banner hidden"></div>
+
     <div class="drawer-header">
       <button id="btn-back-to-country" class="icon-btn" title="Back to Country List">←</button>
       <div class="header-titles">
@@ -105,11 +108,11 @@
       <div class="modal-body">
         <div class="input-group">
           <label>University Name *</label>
-          <input type="text" id="input-uni-name" class="form-input" placeholder="e.g. Technical University of Munich" />
+          <input type="text" id="input-uni-name" class="form-input" placeholder="e.g. EPFL or Technical University of Munich" />
         </div>
         <div class="input-group">
           <label>City (Optional, improves pin accuracy)</label>
-          <input type="text" id="input-uni-city" class="form-input" placeholder="e.g. Munich" />
+          <input type="text" id="input-uni-city" class="form-input" placeholder="e.g. Lausanne" />
         </div>
         <div class="input-group">
           <label>Application Deadline</label>
@@ -121,7 +124,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button id="btn-submit-uni" class="btn btn-primary">Save & Geocode</button>
+        <button id="btn-submit-uni" class="btn btn-primary">Save & Fetch Info</button>
       </div>
     </div>
   </div>
@@ -140,11 +143,11 @@
         </div>
         <div class="input-group">
           <label>Email</label>
-          <input type="email" id="input-prof-email" class="form-input" placeholder="jane.doe@uni.edu" />
+          <input type="email" id="input-prof-email" class="form-input" placeholder="jane.doe@epfl.ch" />
         </div>
         <div class="input-group">
           <label>Research Area / Lab Focus</label>
-          <input type="text" id="input-prof-research" class="form-input" placeholder="e.g. Distributed Systems, Robotics" />
+          <input type="text" id="input-prof-research" class="form-input" placeholder="e.g. Distributed Systems, ML" />
         </div>
         <div class="input-group">
           <label>Outreach Status</label>
@@ -194,13 +197,7 @@
     </div>
   </div>
 
-  <script src="vendor/leaflet.js"></script>
-  <script src="js/map.js"></script>
-  <script src="js/app.js"></script>
-</body>
-</html>
-
-<!-- Pipeline & Operational View Container -->
+  <!-- Pipeline View Panel -->
   <div id="pipeline-view" class="view-panel hidden">
     <div class="pipeline-header">
       <div class="pipeline-title-group">
@@ -218,17 +215,15 @@
     </div>
 
     <div class="pipeline-content">
-      <!-- 1. Tasks & To-Dos Tab -->
       <section id="tab-tasks" class="tab-pane active">
         <div class="task-creator-card">
-          <input type="text" id="input-task-title" class="form-input flex-1" placeholder="What needs to be done? (e.g., Draft SOP for ETH, Request letter from Dr. Smith)" />
+          <input type="text" id="input-task-title" class="form-input flex-1" placeholder="What needs to be done? (e.g. Draft SOP for EPFL, Request letter from Prof. Smith)" />
           <input type="date" id="input-task-due" class="form-input" style="width: 170px;" />
           <button id="btn-create-task" class="btn btn-primary" style="padding: 10px 20px; font-size: 13px;">Add Task</button>
         </div>
         <div class="task-list-container" id="tasks-container"></div>
       </section>
 
-      <!-- 2. Faculty Outreach Radar Tab -->
       <section id="tab-outreach" class="tab-pane">
         <div class="filter-bar">
           <span class="filter-label">Filter Status:</span>
@@ -244,7 +239,6 @@
         <div class="outreach-grid" id="outreach-grid-container"></div>
       </section>
 
-      <!-- 3. University Admission Lifecycle Tab -->
       <section id="tab-admissions" class="tab-pane">
         <div class="admissions-columns">
           <div class="kanban-col" data-col="Researching">
@@ -279,3 +273,9 @@
       </section>
     </div>
   </div>
+
+  <script src="vendor/leaflet.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

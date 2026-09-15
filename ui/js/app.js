@@ -285,6 +285,18 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadUniversityDetails(uni) {
     uniDrawerTitle.innerHTML = `<span>${uni.name}</span>`;
     uniDrawerSubtitle.innerText = uni.city ? `${uni.city}, ${currentCountry.name}` : currentCountry.name;
+
+    // Toggle Wikipedia hero banner
+    const heroBanner = document.getElementById("uni-hero-banner");
+    if (heroBanner) {
+      if (uni.image_url) {
+        heroBanner.style.backgroundImage = `url('${uni.image_url}')`;
+        heroBanner.classList.remove("hidden");
+      } else {
+        heroBanner.classList.add("hidden");
+      }
+    }
+
     loadAttachments("university", uni.id);
     loadProfessors(uni.id);
   }

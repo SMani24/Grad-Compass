@@ -25,7 +25,8 @@ def init_db():
         longitude REAL,
         portal_url TEXT,
         deadline TEXT,
-        status TEXT DEFAULT 'Researching'
+        status TEXT DEFAULT 'Researching',
+        image_url TEXT
     );
 
     CREATE TABLE IF NOT EXISTS professors (
@@ -55,17 +56,26 @@ def init_db():
         stored_path TEXT NOT NULL
     );
     """)
+
+    # Safe migration: ensure existing databases get the image_url column
+    try:
+        cursor.execute("ALTER TABLE universities ADD COLUMN image_url TEXT")
+    except sqlite3.OperationalError:
+        pass
+
     conn.commit()
     conn.close()
 
 # University Operations
-def db_add_university(country_code, name, city, lat, lng, deadline, portal_url):
+def db_add_university(country_code, name, city, lat, lng, deadline, portal_url, image_url=None):
     code = (country_code or "UNK").strip().upper()
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        "INSERT INTO universities (country_code, name, city, latitude, longitude, deadline, portal_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (code, name, city, lat, lng, deadline, portal_url)
+        """INSERT INTO universities 
+           (country_code, name, city, latitude, longitude, deadline, portal_url, image_url) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (code, name, city, lat, lng, deadline, portal_url, image_url)
     )
     uni_id = c.lastrowid
     conn.commit()
