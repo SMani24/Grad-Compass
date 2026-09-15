@@ -8,9 +8,10 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    cursor.executescript("""
-    PRAGMA foreign_keys = ON;
+    # Disable foreign keys during table creation, migration, and healing
+    cursor.execute("PRAGMA foreign_keys = OFF;")
 
+    cursor.executescript("""
     CREATE TABLE IF NOT EXISTS countries (
         code TEXT PRIMARY KEY,
         name TEXT NOT NULL
@@ -57,17 +58,49 @@ def init_db():
     );
     """)
 
+    # 1. Ensure image_url column exists
     try:
         cursor.execute("ALTER TABLE universities ADD COLUMN image_url TEXT")
     except sqlite3.OperationalError:
         pass
 
-    # Database Healing: Fix any universities corrupted by the UNK bug
-    cursor.execute("""
-        UPDATE universities 
-        SET country_code = 'IRN' 
-        WHERE country_code = 'UNK' AND (name LIKE '%Tehran%' OR name LIKE '%Iran%')
-    """)
+    # 2. Cleanly remove legacy foreign key constraint to countries table if present
+    try:
+        cursor.execute("PRAGMA foreign_key_list(universities)")
+        fks = cursor.fetchall()
+        if any(fk[2] == "countries" for fk in fks):
+            cursor.executescript("""
+                CREATE TABLE universities_clean (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    country_code TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    city TEXT,
+                    latitude REAL,
+                    longitude REAL,
+                    portal_url TEXT,
+                    deadline TEXT,
+                    status TEXT DEFAULT 'Researching',
+                    image_url TEXT
+                );
+                INSERT INTO universities_clean 
+                SELECT id, country_code, name, city, latitude, longitude, portal_url, deadline, status, image_url 
+                FROM universities;
+                DROP TABLE universities;
+                ALTER TABLE universities_clean RENAME TO universities;
+            """)
+    except Exception as e:
+        print(f"[DB Migration Note] {e}")
+
+    # 3. Fix records previously misattributed by the UNK bug
+    try:
+        cursor.execute("INSERT OR IGNORE INTO countries (code, name) VALUES ('IRN', 'Iran')")
+        cursor.execute("""
+            UPDATE universities 
+            SET country_code = 'IRN' 
+            WHERE country_code IN ('UNK', 'UNKNOWN') AND (name LIKE '%Tehran%' OR name LIKE '%Iran%')
+        """)
+    except Exception as e:
+        print(f"[DB Healing Note] {e}")
 
     conn.commit()
     conn.close()
@@ -77,6 +110,7 @@ def db_add_university(country_code, name, city, lat, lng, deadline, portal_url, 
     code = (country_code or "UNKNOWN").strip().upper()
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    c.execute("INSERT OR IGNORE INTO countries (code, name) VALUES (?, ?)", (code, code))
     c.execute(
         """INSERT INTO universities 
            (country_code, name, city, latitude, longitude, deadline, portal_url, image_url) 
@@ -122,7 +156,6 @@ def db_update_university_status(uni_id, status):
     return True
 
 def db_get_universities_missing_images():
-    """Finds universities needing image download/cache verification."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()

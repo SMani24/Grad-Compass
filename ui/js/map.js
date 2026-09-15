@@ -6,62 +6,8 @@ let currentBaseZoom = 3.0;
 let universityMarkers = [];
 let isMapInteractive = false;
 
-// Standard lookup map
-const COUNTRY_LOOKUP = {
-  IRN: { flag: "🇮🇷", name: "Iran" },
-  CHE: { flag: "🇨🇭", name: "Switzerland" },
-  DEU: { flag: "🇩🇪", name: "Germany" },
-  FRA: { flag: "🇫🇷", name: "France" },
-  GBR: { flag: "🇬🇧", name: "United Kingdom" },
-  USA: { flag: "🇺🇸", name: "United States" },
-  CAN: { flag: "🇨🇦", name: "Canada" },
-  NLD: { flag: "🇳🇱", name: "Netherlands" },
-  SWE: { flag: "🇸🇪", name: "Sweden" },
-  AUS: { flag: "🇦🇺", name: "Australia" },
-  JPN: { flag: "🇯🇵", name: "Japan" },
-  SGP: { flag: "🇸🇬", name: "Singapore" },
-  IRL: { flag: "🇮🇪", name: "Ireland" },
-  DNK: { flag: "🇩🇰", name: "Denmark" },
-  FIN: { flag: "🇫🇮", name: "Finland" },
-  NOR: { flag: "🇳🇴", name: "Norway" },
-  ITA: { flag: "🇮🇹", name: "Italy" },
-  ESP: { flag: "🇪🇸", name: "Spain" },
-  AUT: { flag: "🇦🇹", name: "Austria" },
-  BEL: { flag: "🇧🇪", name: "Belgium" },
-  NZL: { flag: "🇳🇿", name: "New Zealand" },
-  KOR: { flag: "🇰🇷", name: "South Korea" },
-  CHN: { flag: "🇨🇳", name: "China" },
-  HKG: { flag: "🇭🇰", name: "Hong Kong" },
-  TWN: { flag: "🇹🇼", name: "Taiwan" },
-  BRA: { flag: "🇧🇷", name: "Brazil" },
-  IND: { flag: "🇮🇳", name: "India" },
-  ISR: { flag: "🇮🇱", name: "Israel" },
-  CZE: { flag: "🇨🇿", name: "Czech Republic" },
-  POL: { flag: "🇵🇱", name: "Poland" },
-  PRT: { flag: "🇵🇹", name: "Portugal" }
-};
-
 function extractCountryProps(feature) {
-  const p = feature.properties || {};
-  let name = (p.ADMIN || p.admin || p.name || p.NAME || p.name_en || "Unknown").trim();
-  
-  // Try finding a clean 3-letter code
-  let candidate = p.ISO_A3 || p.iso_a3 || p.ISO3 || p.iso3 || p.ADM0_A3 || p.adm0_a3 || feature.id;
-  
-  let code = "";
-  if (candidate && typeof candidate === "string" && candidate !== "-99" && candidate.length === 3) {
-    code = candidate.toUpperCase();
-  } else {
-    // If no clean 3-letter code exists, isolate this country by its sanitized name
-    // This prevents countries from ever sharing a generic "UNK" key
-    code = name.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-  }
-
-  // Flag fallback lookup
-  const info = COUNTRY_LOOKUP[code];
-  const flag = info ? info.flag : "🌐";
-
-  return { name, code, flag };
+  return resolveCountryFeature(feature);
 }
 
 window.setMapInteractive = function(val) {
