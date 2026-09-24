@@ -1,0 +1,203 @@
+:root {
+  --font-scale: 1.0;
+  --bg-page: #f8fafc;
+  --ocean-color: #e0f2fe;
+
+  --country-empty: #ffffff;
+  --country-empty-border: #cbd5e1;
+  --country-active: #bae6fd;
+  --country-active-border: #0284c7;
+  --country-hover: #38bdf8;
+  
+  /* Selected Country Accent */
+  --country-selected: #fde68a;
+  --country-selected-border: #d97706;
+  
+  --primary-blue: #0284c7;
+  --primary-blue-hover: #0369a1;
+  --secondary-bg: #ffffff;
+  --secondary-border: #e2e8f0;
+  
+  --danger-red: #ef4444;
+  --danger-red-hover: #dc2626;
+  --danger-red-bg: #fee2e2;
+
+  --text-headline: #0f172a;
+  --text-body: #334155;
+  --text-subtle: #64748b;
+  --shadow-elevated: 0 12px 32px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-page);
+  color: var(--text-headline);
+}
+
+/* Top Navigation Bar */
+.top-nav-bar {
+  position: absolute;
+  top: 14px;
+  left: 18px;
+  right: 18px;
+  z-index: 1100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  transition: left 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.drawer-open .top-nav-bar {
+  left: 458px;
+}
+
+body.in-pipeline-view .top-nav-bar {
+  display: none !important;
+}
+
+.nav-history, .nav-actions {
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.nav-btn, .nav-btn-icon {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--secondary-border);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  font-size: calc(15px * var(--font-scale));
+  transition: all 0.2s ease;
+}
+
+.nav-btn:disabled { 
+  opacity: 0.35; 
+  cursor: not-allowed; 
+}
+
+.nav-btn:not(:disabled):hover, .nav-btn-icon:hover { 
+  background: #ffffff; 
+  transform: translateY(-1px);
+  border-color: #cbd5e1;
+}
+
+/* Gateway Hub */
+#gateway-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: auto;
+  background: rgba(248, 250, 252, 0.01);
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+#gateway-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  display: none;
+}
+
+.gateway-hero {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 680px;
+}
+
+.compass-badge { 
+  font-size: 52px; 
+  display: inline-block; 
+  margin-bottom: 12px; 
+}
+
+.brand h1 { 
+  font-size: calc(36px * var(--font-scale)); 
+  font-weight: 800; 
+  letter-spacing: -0.03em; 
+}
+
+.brand p { 
+  font-size: calc(15px * var(--font-scale)); 
+  color: var(--text-subtle); 
+  margin-top: 6px; 
+  margin-bottom: 34px; 
+}
+
+.gateway-actions-horizontal {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+/* Global Button Styles */
+.btn {
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 26px;
+  font-size: calc(14px * var(--font-scale));
+  font-weight: 600;
+  border-radius: 50px;
+  transition: all 0.22s ease;
+}
+
+.btn-primary { 
+  background: var(--primary-blue); 
+  color: #ffffff; 
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.28); 
+}
+
+.btn-primary:hover { 
+  background: var(--primary-blue-hover); 
+  transform: translateY(-2px); 
+}
+
+.btn-secondary { 
+  background: var(--secondary-bg); 
+  color: var(--text-headline); 
+  border: 1px solid var(--secondary-border); 
+  box-shadow: var(--shadow-elevated); 
+}
+
+.btn-secondary:hover { 
+  background: #f1f5f9; 
+  transform: translateY(-2px); 
+}
+
+.btn-danger {
+  background: var(--danger-red);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.28);
+}
+
+.btn-danger:hover {
+  background: var(--danger-red-hover);
+  transform: translateY(-1px);
+}

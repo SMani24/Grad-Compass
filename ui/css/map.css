@@ -1,0 +1,93 @@
+/* Map Canvas */
+#map-container {
+  width: 100%;
+  height: 100%;
+  transition: filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#map-container.blurred {
+  filter: blur(14px) saturate(1.2);
+  pointer-events: none;
+}
+
+#map { 
+  width: 100%; 
+  height: 100%; 
+  background: var(--ocean-color); 
+}
+
+/* Country Polygons */
+.country-polygon { 
+  fill: var(--country-empty); 
+  stroke: var(--country-empty-border); 
+  stroke-width: 0.75; 
+  transition: fill 0.2s ease, stroke 0.2s ease; 
+}
+
+.country-polygon.has-items { 
+  fill: var(--country-active); 
+  stroke: var(--country-active-border); 
+  stroke-width: 1.2; 
+}
+
+.country-polygon:hover { 
+  fill: var(--country-hover) !important; 
+  stroke: var(--primary-blue-hover) !important; 
+  stroke-width: 1.8; 
+  cursor: pointer; 
+}
+
+.country-polygon.selected-country,
+.country-polygon.selected-country:hover { 
+  fill: var(--country-selected) !important; 
+  stroke: var(--country-selected-border) !important; 
+  stroke-width: 2.8 !important; 
+  fill-opacity: 0.98 !important;
+}
+
+/* Custom Circular Image University Pins */
+.custom-uni-photo-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uni-photo-pin {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.28), 0 0 0 1.5px var(--primary-blue);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #ffffff;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uni-photo-pin:hover { 
+  transform: scale(1.22); 
+  box-shadow: 0 8px 22px rgba(2, 132, 199, 0.45), 0 0 0 2px var(--primary-blue-hover);
+  z-index: 1000 !important;
+}
+
+.uni-photo-pin::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px 5px 0;
+  border-style: solid;
+  border-color: #ffffff transparent transparent;
+}
+
+.uni-pin-fallback-icon {
+  font-size: 19px;
+  line-height: 1;
+}

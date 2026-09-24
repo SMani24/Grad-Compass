@@ -115,21 +115,27 @@ function resetCountryHighlight(layer) {
 }
 
 function selectCountry(feature, layer, recordHistory = true) {
-  // Revert previously selected country back to its normal style & class
-  if (activeCountryLayer) {
+  // Revert previously active country back to its proper empty/active state
+  if (activeCountryLayer && geojsonLayer) {
     if (activeCountryLayer._path) {
-      L.DomUtil.removeClass(activeCountryLayer._path, "selected-country");
+      activeCountryLayer._path.classList.remove("selected-country");
     }
-    if (geojsonLayer) {
-      geojsonLayer.resetStyle(activeCountryLayer);
+    const prevProps = extractCountryProps(activeCountryLayer.feature);
+    const prevHasItems = activeCountryCodes.has(prevProps.code);
+    if (activeCountryLayer._path) {
+      if (prevHasItems) {
+        activeCountryLayer._path.classList.add("has-items");
+      } else {
+        activeCountryLayer._path.classList.remove("has-items");
+      }
     }
+    activeCountryLayer.setStyle(getCountryStyle(activeCountryLayer.feature));
   }
 
   activeCountryLayer = layer;
 
-  // Add the high-priority CSS class directly to the SVG path
   if (layer && layer._path) {
-    L.DomUtil.addClass(layer._path, "selected-country");
+    layer._path.classList.add("selected-country");
   }
 
   layer.setStyle({
@@ -157,11 +163,18 @@ function resetToWorldView() {
   clearUniversityMarkers();
   if (activeCountryLayer) {
     if (activeCountryLayer._path) {
-      L.DomUtil.removeClass(activeCountryLayer._path, "selected-country");
+      activeCountryLayer._path.classList.remove("selected-country");
     }
-    if (geojsonLayer) {
-      geojsonLayer.resetStyle(activeCountryLayer);
+    const { code } = extractCountryProps(activeCountryLayer.feature);
+    const hasItems = activeCountryCodes.has(code);
+    if (activeCountryLayer._path) {
+      if (hasItems) {
+        activeCountryLayer._path.classList.add("has-items");
+      } else {
+        activeCountryLayer._path.classList.remove("has-items");
+      }
     }
+    activeCountryLayer.setStyle(getCountryStyle(activeCountryLayer.feature));
   }
   activeCountryLayer = null;
   map.flyTo([32.0, 15.0], currentBaseZoom, { duration: 1.0 });
@@ -214,7 +227,37 @@ function focusUniversityPin(lat, lng) {
   }
 }
 
-function markCountryActive(countryCode) {
+// Global source-of-truth synchronizer querying SQLite database
+window.refreshActiveCountries = async function() {
+  if (!window.pywebview || !window.pywebview.api || !geojsonLayer) return;
+  try {
+    const codes = await window.pywebview.api.get_active_countries();
+    activeCountryCodes = new Set((codes || []).map(c => c.toUpperCase()));
+
+    geojsonLayer.eachLayer(layer => {
+      const { code } = extractCountryProps(layer.feature);
+      const hasItems = activeCountryCodes.has(code);
+
+      if (layer._path) {
+        if (hasItems) {
+          layer._path.classList.add("has-items");
+        } else {
+          layer._path.classList.remove("has-items");
+        }
+      }
+
+      if (layer === activeCountryLayer) {
+        if (layer._path) layer._path.classList.add("selected-country");
+      } else {
+        layer.setStyle(getCountryStyle(layer.feature));
+      }
+    });
+  } catch (err) {
+    console.error("Failed to refresh active countries:", err);
+  }
+};
+
+window.markCountryActive = function(countryCode) {
   if (!countryCode) return;
   const upper = countryCode.toUpperCase();
   activeCountryCodes.add(upper);
@@ -223,22 +266,32 @@ function markCountryActive(countryCode) {
     geojsonLayer.eachLayer(layer => {
       const { code } = extractCountryProps(layer.feature);
       if (code === upper) {
-        if (layer === activeCountryLayer) {
-          if (layer._path) L.DomUtil.addClass(layer._path, "selected-country");
-          layer.setStyle({
-            fillColor: "#fde68a",
-            fillOpacity: 0.98,
-            weight: 2.8,
-            color: "#d97706"
-          });
-        } else {
-          if (layer._path) L.DomUtil.addClass(layer._path, "has-items");
+        if (layer._path) layer._path.classList.add("has-items");
+        if (layer !== activeCountryLayer) {
           layer.setStyle(getCountryStyle(layer.feature));
         }
       }
     });
   }
-}
+};
+
+window.unmarkCountryActive = function(countryCode) {
+  if (!countryCode) return;
+  const upper = countryCode.toUpperCase();
+  activeCountryCodes.delete(upper);
+
+  if (geojsonLayer) {
+    geojsonLayer.eachLayer(layer => {
+      const { code } = extractCountryProps(layer.feature);
+      if (code === upper) {
+        if (layer._path) layer._path.classList.remove("has-items");
+        if (layer !== activeCountryLayer) {
+          layer.setStyle(getCountryStyle(layer.feature));
+        }
+      }
+    });
+  }
+};
 
 window.selectCountryByCode = function(countryCode) {
   if (!countryCode || !geojsonLayer) return;

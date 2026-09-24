@@ -1,0 +1,90 @@
+/* Modals & Dialogs */
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(6px);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop.hidden { 
+  display: none; 
+}
+
+.modal-card {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 440px;
+  border: 1px solid var(--secondary-border);
+  box-shadow: var(--shadow-elevated);
+  padding: 24px;
+}
+
+.modal-card-sm {
+  width: 380px;
+}
+
+.modal-header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 18px; 
+}
+
+.modal-body { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 14px; 
+}
+
+.input-group { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 5px; 
+}
+
+.input-group label { 
+  font-size: calc(12px * var(--font-scale)); 
+  font-weight: 600; 
+  color: var(--text-body); 
+}
+
+.form-input, .form-select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--secondary-border);
+  font-size: calc(13px * var(--font-scale));
+  outline: none;
+  background: #fff;
+}
+
+.form-input:focus, .form-select:focus { 
+  border-color: var(--primary-blue); 
+}
+
+.full-width { 
+  width: 100%; 
+}
+
+.setting-row { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 18px; 
+}
+
+.range-wrapper { 
+  display: flex; 
+  align-items: center; 
+  gap: 10px; 
+}
+
+.modal-footer { 
+  display: flex; 
+  justify-content: flex-end; 
+  gap: 10px;
+  margin-top: 20px; 
+}

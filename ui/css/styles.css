@@ -17,6 +17,10 @@
   --secondary-bg: #ffffff;
   --secondary-border: #e2e8f0;
   
+  --danger-red: #ef4444;
+  --danger-red-hover: #dc2626;
+  --danger-red-bg: #fee2e2;
+
   --text-headline: #0f172a;
   --text-body: #334155;
   --text-subtle: #64748b;
@@ -57,7 +61,6 @@ body.drawer-open .top-nav-bar {
   left: 458px;
 }
 
-/* Fix: Hide the floating top nav bar entirely when in the full-screen pipeline view */
 body.in-pipeline-view .top-nav-bar {
   display: none !important;
 }
@@ -204,6 +207,17 @@ body.in-pipeline-view .top-nav-bar {
   transform: translateY(-2px); 
 }
 
+.btn-danger {
+  background: var(--danger-red);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.28);
+}
+
+.btn-danger:hover {
+  background: var(--danger-red-hover);
+  transform: translateY(-1px);
+}
+
 /* Polygons */
 .country-polygon { 
   fill: var(--country-empty); 
@@ -225,7 +239,6 @@ body.in-pipeline-view .top-nav-bar {
   cursor: pointer; 
 }
 
-/* Selected Country Accent: Overrides default fill & hover states with high contrast */
 .country-polygon.selected-country,
 .country-polygon.selected-country:hover { 
   fill: var(--country-selected) !important; 
@@ -320,7 +333,7 @@ body.in-pipeline-view .top-nav-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 20px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--secondary-border);
   gap: 12px;
 }
@@ -352,19 +365,47 @@ body.in-pipeline-view .top-nav-bar {
   color: var(--text-subtle); 
 }
 
+.drawer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .icon-btn {
   cursor: pointer;
   background: transparent;
   border: none;
-  font-size: 16px;
+  font-size: 15px;
   color: var(--text-subtle);
-  padding: 6px 10px;
+  padding: 6px 8px;
   border-radius: 6px;
+  transition: all 0.15s ease;
 }
 
 .icon-btn:hover { 
   background: #f1f5f9; 
   color: var(--text-headline); 
+}
+
+.icon-btn-danger:hover {
+  background: var(--danger-red-bg) !important;
+  color: var(--danger-red) !important;
+}
+
+.icon-btn-sm {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: all 0.15s ease;
+}
+
+.icon-btn-sm:hover {
+  opacity: 1;
+  background: #f1f5f9;
 }
 
 .btn-action {
@@ -412,6 +453,14 @@ body.in-pipeline-view .top-nav-bar {
   text-decoration: underline; 
 }
 
+.btn-text-danger {
+  color: var(--danger-red);
+}
+
+.btn-text-danger:hover {
+  color: var(--danger-red-hover);
+}
+
 .drawer-scrollable { 
   flex: 1; 
   overflow-y: auto; 
@@ -433,6 +482,7 @@ body.in-pipeline-view .top-nav-bar {
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0,0,0,0.03);
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .entity-card:hover { 
@@ -450,6 +500,19 @@ body.in-pipeline-view .top-nav-bar {
 .entity-card p { 
   font-size: calc(12px * var(--font-scale)); 
   color: var(--text-subtle); 
+}
+
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.card-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .section-card {
@@ -519,7 +582,7 @@ body.in-pipeline-view .top-nav-bar {
 }
 
 .file-chip-del:hover { 
-  color: #dc2626; 
+  color: var(--danger-red); 
 }
 
 /* Modals */
@@ -545,6 +608,10 @@ body.in-pipeline-view .top-nav-bar {
   border: 1px solid var(--secondary-border);
   box-shadow: var(--shadow-elevated);
   padding: 24px;
+}
+
+.modal-card-sm {
+  width: 380px;
 }
 
 .modal-header { 
@@ -605,6 +672,7 @@ body.in-pipeline-view .top-nav-bar {
 .modal-footer { 
   display: flex; 
   justify-content: flex-end; 
+  gap: 10px;
   margin-top: 20px; 
 }
 

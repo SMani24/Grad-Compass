@@ -8,8 +8,10 @@ import webview
 from pathlib import Path
 from core.database import (
     init_db, DB_PATH,
-    db_add_university, db_get_universities_by_country,
-    db_add_professor, db_get_professors,
+    db_add_university, db_get_university, db_get_universities_by_country,
+    db_update_university, db_delete_university, db_delete_universities_batch,
+    db_batch_update_university_status,
+    db_add_professor, db_get_professors, db_update_professor, db_delete_professor,
     db_add_attachment, db_get_attachments, db_delete_attachment,
     db_get_pipeline_universities, db_update_university_status,
     db_get_outreach_professors, db_update_professor_status,
@@ -48,9 +50,8 @@ def save_config(updates: dict):
     except Exception as e:
         print(f"[Config Error] Failed to write config: {e}")
 
-# Background worker: Checks periodically and caches missing photos
 def background_asset_sync():
-    time.sleep(3)  # Initial grace period on launch
+    time.sleep(3)
     while True:
         try:
             missing = db_get_universities_missing_images()
@@ -100,18 +101,14 @@ class GradCompassAPI:
         with open(geojson_path, "r", encoding="utf-8") as f:
             return json.load(f)
 
+    # University Operations
     def add_university(self, country_code, country_name, name, city, deadline, portal_url):
-        # Guarantee a unique code per country
         code = country_code
         if not code or code.strip().upper() in ("-99", "UNK", "UNKNOWN", "UNDEFINED", "NULL", ""):
             code = (country_name or "UNKNOWN").strip().upper().replace(" ", "_")
 
         lat, lng = geocode_institution(name, country_name, city)
-        
-        # Save first to acquire primary key
         uni_id = db_add_university(code, name, city, lat, lng, deadline, portal_url, None)
-        
-        # Attempt immediate local image download and cache
         local_img = fetch_and_cache_university_photo(uni_id, name)
         if local_img:
             db_update_university_image(uni_id, local_img)
@@ -126,8 +123,50 @@ class GradCompassAPI:
             "image_url": local_img
         }
 
+    def get_university(self, uni_id):
+        return db_get_university(uni_id)
+
     def get_universities(self, country_code):
         return db_get_universities_by_country(country_code)
+
+    def update_university(self, uni_id, name, city, deadline, portal_url, country_name=""):
+        existing = db_get_university(uni_id)
+        if not existing:
+            return False
+
+        lat, lng = existing["latitude"], existing["longitude"]
+        local_img = existing["image_url"]
+
+        if existing["name"].strip().lower() != name.strip().lower() or (existing["city"] or "").strip().lower() != (city or "").strip().lower():
+            n_lat, n_lng = geocode_institution(name, country_name, city)
+            if n_lat is not None:
+                lat, lng = n_lat, n_lng
+            n_img = fetch_and_cache_university_photo(uni_id, name)
+            if n_img:
+                local_img = n_img
+
+        db_update_university(uni_id, name, city, lat, lng, deadline, portal_url, local_img)
+        return {
+            "id": uni_id,
+            "name": name,
+            "city": city,
+            "latitude": lat,
+            "longitude": lng,
+            "deadline": deadline,
+            "portal_url": portal_url,
+            "image_url": local_img
+        }
+
+    def delete_university(self, uni_id):
+        res = db_delete_university(uni_id)
+        return {"success": True, "country_code": res["country_code"], "remaining": res["remaining"]}
+
+    def delete_universities_batch(self, uni_ids):
+        res = db_delete_universities_batch(uni_ids)
+        return {"success": True, "country_code": res["country_code"], "remaining": res["remaining"]}
+
+    def batch_update_university_status(self, uni_ids, status):
+        return db_batch_update_university_status(uni_ids, status)
 
     def get_pipeline_universities(self):
         return db_get_pipeline_universities()
@@ -135,6 +174,7 @@ class GradCompassAPI:
     def update_university_status(self, uni_id, status):
         return db_update_university_status(uni_id, status)
 
+    # Professor Operations
     def add_professor(self, uni_id, name, email, research, status):
         prof_id = db_add_professor(uni_id, name, email, research, status)
         return {"id": prof_id, "name": name, "outreach_status": status}
@@ -142,12 +182,20 @@ class GradCompassAPI:
     def get_professors(self, uni_id):
         return db_get_professors(uni_id)
 
+    def update_professor(self, prof_id, name, email, research, status):
+        db_update_professor(prof_id, name, email, research, status)
+        return {"id": prof_id, "name": name, "email": email, "research_interests": research, "outreach_status": status}
+
+    def delete_professor(self, prof_id):
+        return db_delete_professor(prof_id)
+
     def get_outreach_professors(self):
         return db_get_outreach_professors()
 
     def update_professor_status(self, prof_id, status):
         return db_update_professor_status(prof_id, status)
 
+    # Document Vault
     def pick_and_attach_file(self, parent_type, parent_id):
         global main_window
         file_types = ("All Accepted (*.pdf;*.docx;*.txt;*.png)", "PDF files (*.pdf)", "All files (*.*)")
@@ -168,6 +216,7 @@ class GradCompassAPI:
     def delete_attachment(self, attachment_id):
         return db_delete_attachment(attachment_id)
 
+    # Tasks
     def get_tasks(self):
         return db_get_tasks()
 
@@ -203,7 +252,6 @@ def main():
     global main_window
     init_db()
 
-    # Start background asset worker
     worker_thread = threading.Thread(target=background_asset_sync, daemon=True)
     worker_thread.start()
 
@@ -224,7 +272,7 @@ def main():
     main_window.events.closing += on_window_closing
     main_window.events.closed += on_window_closed
 
-    webview.start(debug=False)
+    webview.start(debug=True)
     os._exit(0)
 
 if __name__ == "__main__":

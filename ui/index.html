@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Grad Compass</title>
   <link rel="stylesheet" href="vendor/leaflet.css" />
-  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/map.css" />
+  <link rel="stylesheet" href="css/drawers.css" />
+  <link rel="stylesheet" href="css/modals.css" />
+  <link rel="stylesheet" href="css/pipeline.css" />
 </head>
 <body>
 
@@ -61,6 +65,27 @@
       <div class="action-bar">
         <button id="btn-show-add-uni" class="btn-action">+ Add University</button>
       </div>
+
+      <!-- Multi-Select Batch Operations Toolbar -->
+      <div id="uni-batch-toolbar" class="batch-toolbar hidden">
+        <div class="batch-left">
+          <input type="checkbox" id="check-select-all-unis" class="card-checkbox" title="Select / Deselect All" />
+          <span id="batch-selected-count">0 selected</span>
+        </div>
+        <div class="batch-right">
+          <select id="select-batch-status" class="form-select" style="font-size: 11px; padding: 4px 8px;">
+            <option value="" disabled selected>Status...</option>
+            <option value="Researching">Researching</option>
+            <option value="Applying">Applying</option>
+            <option value="Submitted">Submitted</option>
+            <option value="Accepted">Accepted</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+          <button id="btn-batch-delete" class="btn-text-danger" title="Delete Selected">🗑️</button>
+          <button id="btn-batch-cancel" class="icon-btn" style="padding: 2px 6px;" title="Cancel">✕</button>
+        </div>
+      </div>
+
       <div id="country-uni-list" class="entity-list"></div>
     </div>
   </div>
@@ -75,7 +100,11 @@
         <h2 id="uni-drawer-title">University Name</h2>
         <span id="uni-drawer-subtitle">Faculty & Outreach</span>
       </div>
-      <button id="btn-close-uni-drawer" class="icon-btn" title="Back to Map">✕</button>
+      <div class="drawer-header-actions">
+        <button id="btn-edit-uni" class="icon-btn" title="Edit University">✏️</button>
+        <button id="btn-delete-uni" class="icon-btn icon-btn-danger" title="Delete University">🗑️</button>
+        <button id="btn-close-uni-drawer" class="icon-btn" title="Back to Map">✕</button>
+      </div>
     </div>
 
     <div class="drawer-scrollable">
@@ -97,14 +126,22 @@
     </div>
   </div>
 
-  <!-- Modal: Add University -->
-  <div id="add-uni-modal" class="modal-backdrop hidden">
+  <!-- University Card Quick Context Menu Popover -->
+  <div id="uni-context-menu" class="context-menu-popover hidden">
+    <button class="context-menu-item" id="cmenu-edit-uni">✏️ Edit Details</button>
+    <button class="context-menu-item" id="cmenu-open-url">🌐 Open Portal</button>
+    <button class="context-menu-item context-menu-item-danger" id="cmenu-delete-uni">🗑️ Delete</button>
+  </div>
+
+  <!-- Modal: University (Add & Edit) -->
+  <div id="uni-modal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Add University</h3>
+        <h3 id="uni-modal-title">Add University</h3>
         <button class="icon-btn btn-modal-dismiss">✕</button>
       </div>
       <div class="modal-body">
+        <input type="hidden" id="input-uni-id" value="" />
         <div class="input-group">
           <label>University Name *</label>
           <input type="text" id="input-uni-name" class="form-input" placeholder="e.g. EPFL or Technical University of Munich" />
@@ -123,19 +160,21 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button id="btn-submit-uni" class="btn btn-primary">Save & Fetch Info</button>
+        <button type="button" class="btn btn-secondary btn-modal-dismiss" style="padding: 10px 20px; font-size: 13px;">Cancel</button>
+        <button id="btn-submit-uni" class="btn btn-primary" style="padding: 10px 22px; font-size: 13px;">Save & Fetch Info</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal: Add Professor -->
-  <div id="add-prof-modal" class="modal-backdrop hidden">
+  <!-- Modal: Professor (Add & Edit) -->
+  <div id="prof-modal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Add Faculty Contact</h3>
+        <h3 id="prof-modal-title">Add Faculty Contact</h3>
         <button class="icon-btn btn-modal-dismiss">✕</button>
       </div>
       <div class="modal-body">
+        <input type="hidden" id="input-prof-id" value="" />
         <div class="input-group">
           <label>Professor Name *</label>
           <input type="text" id="input-prof-name" class="form-input" placeholder="e.g. Dr. Jane Doe" />
@@ -160,7 +199,25 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button id="btn-submit-prof" class="btn btn-primary">Save Contact</button>
+        <button type="button" class="btn btn-secondary btn-modal-dismiss" style="padding: 10px 20px; font-size: 13px;">Cancel</button>
+        <button id="btn-submit-prof" class="btn btn-primary" style="padding: 10px 22px; font-size: 13px;">Save Contact</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirmation Prompt -->
+  <div id="confirm-modal" class="modal-backdrop hidden">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h3 id="confirm-modal-title">Confirm Deletion</h3>
+        <button class="icon-btn btn-modal-dismiss">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-modal-message" style="font-size: calc(13px * var(--font-scale)); color: var(--text-body); line-height: 1.5;"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-modal-dismiss" style="padding: 9px 18px; font-size: 13px;">Cancel</button>
+        <button id="btn-confirm-action" class="btn btn-danger" style="padding: 9px 20px; font-size: 13px;">Delete</button>
       </div>
     </div>
   </div>
@@ -206,7 +263,6 @@
           <span>Track ongoing applications, professor replies, and immediate tasks</span>
         </div>
       </div>
-      <!-- Right group: Tab Bar and Pipeline Settings button -->
       <div class="pipeline-header-right">
         <div class="pipeline-tab-bar">
           <button class="tab-btn active" data-tab="tab-tasks">Tasks & To-Dos</button>
@@ -281,6 +337,9 @@
   <script src="vendor/leaflet.js"></script>
   <script src="js/flags.js"></script>
   <script src="js/map.js"></script>
+  <script src="js/modals.js"></script>
+  <script src="js/country_drawer.js"></script>
+  <script src="js/uni_drawer.js"></script>
   <script src="js/pipeline.js"></script>
   <script src="js/app.js"></script>
 </body>
