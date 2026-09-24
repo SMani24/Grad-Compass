@@ -209,7 +209,7 @@ body.in-pipeline-view .top-nav-bar {
   fill: var(--country-empty); 
   stroke: var(--country-empty-border); 
   stroke-width: 0.75; 
-  transition: fill 0.2s ease; 
+  transition: fill 0.2s ease, stroke 0.2s ease; 
 }
 
 .country-polygon.has-items { 
@@ -223,6 +223,15 @@ body.in-pipeline-view .top-nav-bar {
   stroke: var(--primary-blue-hover) !important; 
   stroke-width: 1.8; 
   cursor: pointer; 
+}
+
+/* Selected Country Accent: Overrides default fill & hover states with high contrast */
+.country-polygon.selected-country,
+.country-polygon.selected-country:hover { 
+  fill: var(--country-selected) !important; 
+  stroke: var(--country-selected-border) !important; 
+  stroke-width: 2.8 !important; 
+  fill-opacity: 0.98 !important;
 }
 
 /* Custom Circular Image University Pins */

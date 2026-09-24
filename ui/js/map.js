@@ -7,7 +7,13 @@ let universityMarkers = [];
 let isMapInteractive = false;
 
 function extractCountryProps(feature) {
-  return resolveCountryFeature(feature);
+  if (typeof resolveCountryFeature === "function") {
+    return resolveCountryFeature(feature);
+  }
+  const p = feature.properties || {};
+  const name = (p.ADMIN || p.admin || p.name || "Unknown").trim();
+  const code = (p.ISO_A3 || p.iso_a3 || feature.id || name).toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  return { name, code, flag: "🌐" };
 }
 
 window.setMapInteractive = function(val) {
@@ -109,18 +115,27 @@ function resetCountryHighlight(layer) {
 }
 
 function selectCountry(feature, layer, recordHistory = true) {
-  // Revert previously selected country back to its normal style
-  if (activeCountryLayer && geojsonLayer) {
-    geojsonLayer.resetStyle(activeCountryLayer);
+  // Revert previously selected country back to its normal style & class
+  if (activeCountryLayer) {
+    if (activeCountryLayer._path) {
+      L.DomUtil.removeClass(activeCountryLayer._path, "selected-country");
+    }
+    if (geojsonLayer) {
+      geojsonLayer.resetStyle(activeCountryLayer);
+    }
   }
 
   activeCountryLayer = layer;
 
-  // Selected Country Accent: Warm Compass Amber / Gold
+  // Add the high-priority CSS class directly to the SVG path
+  if (layer && layer._path) {
+    L.DomUtil.addClass(layer._path, "selected-country");
+  }
+
   layer.setStyle({
     fillColor: "#fde68a",
-    fillOpacity: 0.96,
-    weight: 2.6,
+    fillOpacity: 0.98,
+    weight: 2.8,
     color: "#d97706"
   });
 
@@ -140,8 +155,13 @@ function selectCountry(feature, layer, recordHistory = true) {
 
 function resetToWorldView() {
   clearUniversityMarkers();
-  if (activeCountryLayer && geojsonLayer) {
-    geojsonLayer.resetStyle(activeCountryLayer);
+  if (activeCountryLayer) {
+    if (activeCountryLayer._path) {
+      L.DomUtil.removeClass(activeCountryLayer._path, "selected-country");
+    }
+    if (geojsonLayer) {
+      geojsonLayer.resetStyle(activeCountryLayer);
+    }
   }
   activeCountryLayer = null;
   map.flyTo([32.0, 15.0], currentBaseZoom, { duration: 1.0 });
@@ -204,20 +224,32 @@ function markCountryActive(countryCode) {
       const { code } = extractCountryProps(layer.feature);
       if (code === upper) {
         if (layer === activeCountryLayer) {
-          // Keep selected country in amber while active
+          if (layer._path) L.DomUtil.addClass(layer._path, "selected-country");
           layer.setStyle({
             fillColor: "#fde68a",
-            fillOpacity: 0.96,
-            weight: 2.6,
+            fillOpacity: 0.98,
+            weight: 2.8,
             color: "#d97706"
           });
         } else {
+          if (layer._path) L.DomUtil.addClass(layer._path, "has-items");
           layer.setStyle(getCountryStyle(layer.feature));
         }
       }
     });
   }
 }
+
+window.selectCountryByCode = function(countryCode) {
+  if (!countryCode || !geojsonLayer) return;
+  const upper = countryCode.toUpperCase();
+  geojsonLayer.eachLayer(layer => {
+    const { code } = extractCountryProps(layer.feature);
+    if (code === upper) {
+      selectCountry(layer.feature, layer, false);
+    }
+  });
+};
 
 window.setInitialZoom = function(zoom) {
   currentBaseZoom = zoom;

@@ -1,3 +1,8 @@
+/**
+ * Grad Compass - Core Application Controller
+ * Handles history navigation, drawers, modals, and preferences.
+ */
+
 const navHistory = [];
 let historyIndex = -1;
 
@@ -42,15 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const inputMapZoom = document.getElementById("input-map-zoom");
   const zoomValueLabel = document.getElementById("zoom-value-label");
 
-  const tabButtons = document.querySelectorAll(".pipeline-tab-bar .tab-btn");
-  const tabPanes = document.querySelectorAll(".pipeline-content .tab-pane");
-  const tasksContainer = document.getElementById("tasks-container");
-  const inputTaskTitle = document.getElementById("input-task-title");
-  const inputTaskDue = document.getElementById("input-task-due");
-  const btnCreateTask = document.getElementById("btn-create-task");
-  const outreachContainer = document.getElementById("outreach-grid-container");
-  const filterOutreach = document.getElementById("filter-outreach-status");
-
+  // Synchronous config load from localStorage
   let activeConfig = { font_scale: "Normal", map_zoom: 3.0 };
   const cachedConfig = localStorage.getItem("grad_compass_config");
   if (cachedConfig) {
@@ -131,6 +128,11 @@ document.addEventListener("DOMContentLoaded", () => {
       countryDrawer.classList.add("open");
       countryDrawerTitle.innerHTML = `<span class="country-flag-icon">${currentCountry.flag}</span> <span>${currentCountry.name}</span>`;
       countryDrawerSubtitle.innerText = `Country Code: ${currentCountry.code}`;
+
+      if (window.selectCountryByCode) {
+        window.selectCountryByCode(state.code);
+      }
+
       loadCountryUniversities(state.code, state.name);
     } else if (state.view === "university") {
       document.body.classList.remove("in-pipeline-view");
@@ -144,7 +146,6 @@ document.addEventListener("DOMContentLoaded", () => {
       loadUniversityDetails(state.university);
     } else if (state.view === "pipeline") {
       document.body.classList.remove("drawer-open");
-      // Activate in-pipeline-view class to hide overlapping top-nav-bar
       document.body.classList.add("in-pipeline-view");
       gatewayOverlay.classList.add("hidden");
       pipelineView.classList.remove("hidden");
@@ -152,7 +153,10 @@ document.addEventListener("DOMContentLoaded", () => {
       countryDrawer.classList.remove("open");
       uniDrawer.classList.remove("open");
       if (window.setMapInteractive) window.setMapInteractive(false);
-      loadActiveTabData("tab-tasks");
+      
+      if (window.loadPipelineTab) {
+        window.loadPipelineTab("tab-tasks");
+      }
     }
     updateNavButtons();
   }
@@ -215,25 +219,6 @@ document.addEventListener("DOMContentLoaded", () => {
     pushState({ view: "gateway" });
     applyState({ view: "gateway" });
   });
-
-  tabButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      tabButtons.forEach(b => b.classList.remove("active"));
-      tabPanes.forEach(p => p.classList.remove("active"));
-
-      btn.classList.add("active");
-      const target = document.getElementById(btn.getAttribute("data-tab"));
-      if (target) target.classList.add("active");
-
-      loadActiveTabData(btn.getAttribute("data-tab"));
-    });
-  });
-
-  function loadActiveTabData(tabId) {
-    if (tabId === "tab-tasks") renderTasks();
-    if (tabId === "tab-outreach") renderOutreach();
-    if (tabId === "tab-admissions") renderAdmissionsBoard();
-  }
 
   window.onCountrySelected = (countryName, countryCode, flagEmoji, recordHistory = true) => {
     currentCountry = { name: countryName, code: countryCode, flag: flagEmoji };
@@ -505,151 +490,5 @@ document.addEventListener("DOMContentLoaded", () => {
       inputMapZoom.value = cfg.map_zoom;
       zoomValueLabel.innerText = cfg.map_zoom;
     }
-  }
-
-  async function renderTasks() {
-    if (!window.pywebview || !window.pywebview.api) return;
-    const tasks = await window.pywebview.api.get_tasks();
-    tasksContainer.innerHTML = "";
-
-    if (tasks.length === 0) {
-      tasksContainer.innerHTML = `<p style="font-size:13px; color:#8e8e93; margin-top:10px;">No to-dos yet. Add one above!</p>`;
-      return;
-    }
-
-    tasks.forEach(t => {
-      const item = document.createElement("div");
-      item.className = `task-item ${t.is_completed ? 'completed' : ''}`;
-      item.innerHTML = `
-        <div class="task-left">
-          <input type="checkbox" class="task-checkbox" ${t.is_completed ? 'checked' : ''} />
-          <div>
-            <span class="task-title">${t.title}</span>
-            ${t.due_date ? `<span class="task-due">📅 Due: ${t.due_date}</span>` : ''}
-          </div>
-        </div>
-        <button class="icon-btn task-del" title="Delete Task">✕</button>
-      `;
-
-      item.querySelector(".task-checkbox").addEventListener("change", async e => {
-        await window.pywebview.api.toggle_task(t.id, e.target.checked);
-        renderTasks();
-      });
-
-      item.querySelector(".task-del").addEventListener("click", async () => {
-        await window.pywebview.api.delete_task(t.id);
-        renderTasks();
-      });
-
-      tasksContainer.appendChild(item);
-    });
-  }
-
-  btnCreateTask.addEventListener("click", async () => {
-    const title = inputTaskTitle.value.trim();
-    const due = inputTaskDue.value;
-    if (!title) return;
-
-    await window.pywebview.api.add_task(title, due);
-    inputTaskTitle.value = "";
-    inputTaskDue.value = "";
-    renderTasks();
-  });
-
-  async function renderOutreach() {
-    if (!window.pywebview || !window.pywebview.api) return;
-    const allProfs = await window.pywebview.api.get_outreach_professors();
-    const filter = filterOutreach.value;
-
-    const filtered = filter === "ALL" 
-      ? allProfs 
-      : allProfs.filter(p => p.outreach_status === filter);
-
-    outreachContainer.innerHTML = "";
-    if (filtered.length === 0) {
-      outreachContainer.innerHTML = `<p style="font-size:13px; color:#8e8e93; grid-column:1/-1;">No contacts match the selected status.</p>`;
-      return;
-    }
-
-    filtered.forEach(p => {
-      const card = document.createElement("div");
-      card.className = "outreach-card";
-      card.innerHTML = `
-        <div>
-          <h4>${p.name}</h4>
-          <div class="outreach-card-sub">${p.university_name} (${p.country_code})</div>
-          <p style="font-size:12px; margin-bottom:12px;">${p.research_interests || 'No research specified'}</p>
-        </div>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <select class="form-select prof-status-select" style="font-size:12px; padding:4px 8px;">
-            <option value="Not Contacted" ${p.outreach_status === 'Not Contacted' ? 'selected' : ''}>Not Contacted</option>
-            <option value="Cold Emailed" ${p.outreach_status === 'Cold Emailed' ? 'selected' : ''}>Cold Emailed</option>
-            <option value="Follow-up Needed" ${p.outreach_status === 'Follow-up Needed' ? 'selected' : ''}>Follow-up Needed</option>
-            <option value="Replied / In Touch" ${p.outreach_status === 'Replied / In Touch' ? 'selected' : ''}>Replied / In Touch</option>
-            <option value="Interview Scheduled" ${p.outreach_status === 'Interview Scheduled' ? 'selected' : ''}>Interview Scheduled</option>
-          </select>
-          ${p.email ? `<a href="mailto:${p.email}" class="btn-text" style="font-size:12px;">Email</a>` : ''}
-        </div>
-      `;
-
-      card.querySelector(".prof-status-select").addEventListener("change", async e => {
-        await window.pywebview.api.update_professor_status(p.id, e.target.value);
-      });
-
-      outreachContainer.appendChild(card);
-    });
-  }
-
-  filterOutreach.addEventListener("change", renderOutreach);
-
-  async function renderAdmissionsBoard() {
-    if (!window.pywebview || !window.pywebview.api) return;
-    const unis = await window.pywebview.api.get_pipeline_universities();
-
-    const cols = {
-      "Researching": document.getElementById("col-researching"),
-      "Applying": document.getElementById("col-applying"),
-      "Submitted": document.getElementById("col-submitted"),
-      "Decided": document.getElementById("col-decided")
-    };
-
-    const counts = { "Researching": 0, "Applying": 0, "Submitted": 0, "Decided": 0 };
-    Object.values(cols).forEach(c => c.innerHTML = "");
-
-    unis.forEach(u => {
-      let bucket = u.status || "Researching";
-      if (bucket === "Accepted" || bucket === "Rejected") bucket = "Decided";
-      if (!cols[bucket]) bucket = "Researching";
-
-      counts[bucket]++;
-
-      const card = document.createElement("div");
-      card.className = "kanban-item";
-      card.innerHTML = `
-        <h5>${u.name}</h5>
-        <div class="kanban-meta">${u.country_name || u.country_code} ${u.deadline ? '• 📅 ' + u.deadline : ''}</div>
-        <div class="kanban-actions">
-          <select class="form-select uni-status-select" style="font-size:11px; padding:3px 6px;">
-            <option value="Researching" ${u.status === 'Researching' ? 'selected' : ''}>Researching</option>
-            <option value="Applying" ${u.status === 'Applying' ? 'selected' : ''}>Applying</option>
-            <option value="Submitted" ${u.status === 'Submitted' ? 'selected' : ''}>Submitted</option>
-            <option value="Accepted" ${u.status === 'Accepted' ? 'selected' : ''}>Accepted</option>
-            <option value="Rejected" ${u.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
-          </select>
-        </div>
-      `;
-
-      card.querySelector(".uni-status-select").addEventListener("change", async e => {
-        await window.pywebview.api.update_university_status(u.id, e.target.value);
-        renderAdmissionsBoard();
-      });
-
-      cols[bucket].appendChild(card);
-    });
-
-    document.getElementById("count-researching").innerText = counts["Researching"];
-    document.getElementById("count-applying").innerText = counts["Applying"];
-    document.getElementById("count-submitted").innerText = counts["Submitted"];
-    document.getElementById("count-decided").innerText = counts["Decided"];
   }
 });
