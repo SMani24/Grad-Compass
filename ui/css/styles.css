@@ -8,6 +8,10 @@
   --country-active-border: #0284c7;
   --country-hover: #38bdf8;
   
+  /* Selected Country Theme (Compass Gold / Warm Amber) */
+  --country-selected: #fde68a;
+  --country-selected-border: #d97706;
+  
   --primary-blue: #0284c7;
   --primary-blue-hover: #0369a1;
   --secondary-bg: #ffffff;
@@ -35,7 +39,7 @@ body, html {
   color: var(--text-headline);
 }
 
-/* Top Navigation Bar: z-index 1100 ensures settings is clickable on the main menu */
+/* Top Navigation Bar */
 .top-nav-bar {
   position: absolute;
   top: 14px;
@@ -51,6 +55,11 @@ body, html {
 
 body.drawer-open .top-nav-bar {
   left: 458px;
+}
+
+/* Fix: Hide the floating top nav bar entirely when in the full-screen pipeline view */
+body.in-pipeline-view .top-nav-bar {
+  display: none !important;
 }
 
 .nav-history, .nav-actions {
@@ -247,7 +256,6 @@ body.drawer-open .top-nav-bar {
   z-index: 1000 !important;
 }
 
-/* Teardrop Pointer Tip */
 .uni-photo-pin::after {
   content: '';
   position: absolute;
@@ -285,7 +293,6 @@ body.drawer-open .top-nav-bar {
   left: 0; 
 }
 
-/* University Hero Banner */
 .uni-hero-banner {
   width: 100%;
   height: 145px;
@@ -634,6 +641,12 @@ body.drawer-open .top-nav-bar {
 .pipeline-title-group span {
   font-size: calc(12px * var(--font-scale));
   color: var(--text-subtle);
+}
+
+.pipeline-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .pipeline-tab-bar {

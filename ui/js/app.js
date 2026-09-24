@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnOpenPipeline = document.getElementById("btn-open-pipeline");
   const pipelineView = document.getElementById("pipeline-view");
   const btnPipelineBack = document.getElementById("btn-pipeline-back");
+  const btnPipelineSettings = document.getElementById("btn-pipeline-settings");
 
   const countryDrawer = document.getElementById("country-drawer");
   const uniDrawer = document.getElementById("uni-drawer");
@@ -102,7 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function applyState(state) {
     if (state.view === "gateway") {
-      document.body.classList.remove("drawer-open");
+      document.body.classList.remove("drawer-open", "in-pipeline-view");
       gatewayOverlay.classList.remove("hidden");
       pipelineView.classList.add("hidden");
       mapContainer.classList.add("blurred");
@@ -110,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
       uniDrawer.classList.remove("open");
       if (window.setMapInteractive) window.setMapInteractive(false);
     } else if (state.view === "map") {
-      document.body.classList.remove("drawer-open");
+      document.body.classList.remove("drawer-open", "in-pipeline-view");
       gatewayOverlay.classList.add("hidden");
       pipelineView.classList.add("hidden");
       mapContainer.classList.remove("blurred");
@@ -120,6 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
       resetToWorldView();
     } else if (state.view === "country") {
       currentCountry = { name: state.name, code: state.code, flag: state.flag || "🌐" };
+      document.body.classList.remove("in-pipeline-view");
       document.body.classList.add("drawer-open");
       gatewayOverlay.classList.add("hidden");
       pipelineView.classList.add("hidden");
@@ -131,6 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
       countryDrawerSubtitle.innerText = `Country Code: ${currentCountry.code}`;
       loadCountryUniversities(state.code, state.name);
     } else if (state.view === "university") {
+      document.body.classList.remove("in-pipeline-view");
       document.body.classList.add("drawer-open");
       gatewayOverlay.classList.add("hidden");
       pipelineView.classList.add("hidden");
@@ -141,6 +144,8 @@ document.addEventListener("DOMContentLoaded", () => {
       loadUniversityDetails(state.university);
     } else if (state.view === "pipeline") {
       document.body.classList.remove("drawer-open");
+      // Activate in-pipeline-view class to hide overlapping top-nav-bar
+      document.body.classList.add("in-pipeline-view");
       gatewayOverlay.classList.add("hidden");
       pipelineView.classList.remove("hidden");
       mapContainer.classList.add("blurred");
@@ -286,7 +291,6 @@ document.addEventListener("DOMContentLoaded", () => {
     uniDrawerTitle.innerHTML = `<span>${uni.name}</span>`;
     uniDrawerSubtitle.innerText = uni.city ? `${uni.city}, ${currentCountry.name}` : currentCountry.name;
 
-    // Toggle Wikipedia hero banner
     const heroBanner = document.getElementById("uni-hero-banner");
     if (heroBanner) {
       if (uni.image_url) {
@@ -457,12 +461,17 @@ document.addEventListener("DOMContentLoaded", () => {
     loadProfessors(currentUniversity.id);
   });
 
-  document.getElementById("btn-open-settings").addEventListener("click", () => {
+  function openPreferences() {
     selectFontScale.value = activeConfig.font_scale || "Normal";
     inputMapZoom.value = activeConfig.map_zoom || 3.0;
     zoomValueLabel.innerText = inputMapZoom.value;
     settingsModal.classList.remove("hidden");
-  });
+  }
+
+  document.getElementById("btn-open-settings").addEventListener("click", openPreferences);
+  if (btnPipelineSettings) {
+    btnPipelineSettings.addEventListener("click", openPreferences);
+  }
 
   inputMapZoom.addEventListener("input", e => {
     zoomValueLabel.innerText = e.target.value;

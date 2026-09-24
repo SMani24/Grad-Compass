@@ -109,17 +109,19 @@ function resetCountryHighlight(layer) {
 }
 
 function selectCountry(feature, layer, recordHistory = true) {
+  // Revert previously selected country back to its normal style
   if (activeCountryLayer && geojsonLayer) {
     geojsonLayer.resetStyle(activeCountryLayer);
   }
 
   activeCountryLayer = layer;
 
+  // Selected Country Accent: Warm Compass Amber / Gold
   layer.setStyle({
-    fillColor: "#7dd3fc",
-    fillOpacity: 0.95,
-    weight: 2.5,
-    color: "#0284c7"
+    fillColor: "#fde68a",
+    fillOpacity: 0.96,
+    weight: 2.6,
+    color: "#d97706"
   });
 
   if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
@@ -202,11 +204,12 @@ function markCountryActive(countryCode) {
       const { code } = extractCountryProps(layer.feature);
       if (code === upper) {
         if (layer === activeCountryLayer) {
+          // Keep selected country in amber while active
           layer.setStyle({
-            fillColor: "#7dd3fc",
-            fillOpacity: 0.95,
-            weight: 2.5,
-            color: "#0284c7"
+            fillColor: "#fde68a",
+            fillOpacity: 0.96,
+            weight: 2.6,
+            color: "#d97706"
           });
         } else {
           layer.setStyle(getCountryStyle(layer.feature));
