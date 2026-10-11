@@ -6,6 +6,8 @@ The existing desktop shell uses Python/pywebview, SQLite, Leaflet, and plain HTM
 
 Press **Super**, search for **Grad Compass**, and open it. The installed desktop entry opens the new map workspace in a Qt window without a terminal. It currently displays three invented universities so the layout can be reviewed before importing personal research results.
 
+Escape moves up from university details to the country/filter view, then to the world view (and from the list to the map). Back/forward buttons, Alt+Left/Right and mouse side buttons restore the full workspace context. Ctrl+W closes the desktop app after a confirmation; cancellation keeps the window open.
+
 The launcher uses `../grad-compass-workspace/runtime/preview/`, creates synthetic data only if that folder is new or empty, and refuses existing unmarked data. Its local server binds to a random loopback port and stops when the window closes. Browser storage and launch logs stay in that ignored runtime. The original application database and configuration are not used.
 
 From a terminal, the same launcher is:
@@ -49,10 +51,13 @@ Use `GRAD_COMPASS_OFFLINE=1` to disable geocoding/photo downloads and the backgr
 grad-compass/envGradCompass/bin/python -B -m unittest discover -s grad-compass/tests -v
 node grad-compass/tests/country_drawer.test.cjs
 node grad-compass/tests/web_discovery.test.cjs
+QT_QPA_PLATFORM=offscreen grad-compass/envGradCompass/bin/python -B grad-compass/tests/check_desktop_controls.py -v
 git diff --check
 ```
 
 Python tests create and clean up their own invented temporary runtimes. Node uses its built-in test library and a small DOM/API double; no npm install is needed. Run the Node test file directly to display each regression case in this environment.
+
+The separate Qt check sends real key and mouse events to isolated widgets. `launch_preview.py --smoke-test` additionally checks browser history, cross-country context, Escape hierarchy and grouped search in the synthetic desktop window, then closes automatically.
 
 ## Synthetic desktop review
 

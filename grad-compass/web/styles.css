@@ -793,3 +793,23 @@ tr.selected {
   stroke: #087ba4;
   stroke-width: 2.5;
 }
+
+.navigation {
+  display: flex;
+  gap: 5px;
+}
+
+.navigation button {
+  border: 1px solid var(--line);
+  background: white;
+  color: var(--ink);
+  border-radius: 7px;
+  width: 30px;
+  height: 30px;
+  font-size: 21px;
+}
+
+.navigation button:disabled {
+  opacity: .35;
+  cursor: default;
+}

@@ -67,6 +67,9 @@ if (typeof document !== "undefined") {
   const get = id => document.getElementById(id);
   const state = { universities: [], filtered: [], selected: null, view: "map", geometry: null, map: null, polygons: null, markers: null, mapError: false, detailSequence: 0 };
   const elements = { search: get("search"), country: get("country"), status: get("status"), results: get("results"), inspector: get("inspector") };
+  let navigationIndex = 0;
+  let navigationEnd = 0;
+  let editingSearch = false;
 
   function node(tag, className, text) {
     const element = document.createElement(tag);
@@ -88,13 +91,27 @@ if (typeof document !== "undefined") {
     if (!response.ok) throw new Error("Could not load workspace");
     return response.json();
   }
-  function updateUrl() {
+  function updateNavigationButtons() {
+    get("nav-back").disabled = navigationIndex === 0;
+    get("nav-forward").disabled = navigationIndex === navigationEnd;
+  }
+  function updateUrl(replace = false) {
     const url = new URL(location.href);
     if (state.view === "list") url.searchParams.set("view", "list"); else url.searchParams.delete("view");
     if (state.selected) url.searchParams.set("university", state.selected); else url.searchParams.delete("university");
-    history.replaceState(null, "", url);
+    for (const name of ["country", "status", "search"]) {
+      if (elements[name].value) url.searchParams.set(name, elements[name].value); else url.searchParams.delete(name);
+    }
+    if (!replace && url.href === location.href) return;
+    if (replace) history.replaceState({ gradCompassIndex: navigationIndex }, "", url);
+    else {
+      navigationIndex++;
+      navigationEnd = navigationIndex;
+      history.pushState({ gradCompassIndex: navigationIndex }, "", url);
+    }
+    updateNavigationButtons();
   }
-  function setView(view) {
+  function setView(view, record = true) {
     state.view = view;
     get("map").hidden = view !== "map";
     get("map-key").hidden = view !== "map";
@@ -102,15 +119,15 @@ if (typeof document !== "undefined") {
     get("list-container").hidden = view !== "list";
     get("map-view").setAttribute("aria-pressed", String(view === "map"));
     get("list-view").setAttribute("aria-pressed", String(view === "list"));
-    updateUrl();
+    if (record) updateUrl();
     if (state.map) requestAnimationFrame(() => state.map.invalidateSize());
   }
-  function closeInspector(restoreFocus = true) {
+  function closeInspector(restoreFocus = true, record = true) {
     state.detailSequence++;
     state.selected = null;
     elements.inspector.hidden = true;
     document.querySelector(".workspace").classList.remove("has-inspector");
-    updateUrl();
+    if (record) updateUrl();
     render();
     if (restoreFocus) elements.search.focus({ preventScroll: true });
   }
@@ -119,13 +136,13 @@ if (typeof document !== "undefined") {
     row.append(node("span", "", label), node("span", "", value));
     return row;
   }
-  async function selectUniversity(id, focusMap = true) {
+  async function selectUniversity(id, focusMap = true, record = true) {
     const sequence = ++state.detailSequence;
     state.selected = id;
     elements.inspector.hidden = false;
     document.querySelector(".workspace").classList.add("has-inspector");
     elements.inspector.replaceChildren(node("p", "empty-state", "Loading university details…"));
-    updateUrl();
+    if (record) updateUrl();
     render();
     try {
       const detail = await api("/api/universities/" + id);
@@ -235,6 +252,22 @@ if (typeof document !== "undefined") {
     const bounds = dominantLandmassBounds(feature);
     if (state.map && bounds) state.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 5, animate: !matchMedia("(prefers-reduced-motion: reduce)").matches });
   }
+  function resetMap() {
+    state.map?.setView([29, 2], 2.4, { animate: false });
+  }
+  function goBack() { if (navigationIndex > 0) history.back(); }
+  function goForward() { if (navigationIndex < navigationEnd) history.forward(); }
+  // The desktop mouse buttons call the same navigation as browser history.
+  window.GradCompassNavigation = Object.freeze({ back: goBack, forward: goForward });
+  function applyLocation() {
+    const url = new URL(location.href);
+    for (const name of ["country", "status", "search"]) elements[name].value = url.searchParams.get(name) || "";
+    setView(url.searchParams.get("view") === "list" ? "list" : "map", false);
+    closeInspector(false, false);
+    if (elements.country.value) focusCountry(elements.country.value); else resetMap();
+    const id = url.searchParams.get("university");
+    if (/^[1-9][0-9]*$/.test(id || "") && state.universities.some(university => university.id === Number(id))) selectUniversity(Number(id), false, false);
+  }
   async function loadMap() {
     if (state.map) return;
     try {
@@ -288,17 +321,53 @@ if (typeof document !== "undefined") {
   }
   get("map-view").addEventListener("click", () => setView("map"));
   get("list-view").addEventListener("click", () => setView("list"));
-  for (const element of [elements.search, elements.country, elements.status]) element.addEventListener(element === elements.search ? "input" : "change", () => closeInspector(false));
-  elements.country.addEventListener("change", () => focusCountry(elements.country.value));
+  for (const element of [elements.country, elements.status]) element.addEventListener("change", () => {
+    editingSearch = false;
+    closeInspector(false);
+    if (element === elements.country) { if (element.value) focusCountry(element.value); else resetMap(); }
+  });
+  elements.search.addEventListener("input", () => {
+    closeInspector(false, false);
+    updateUrl(editingSearch);
+    editingSearch = true;
+  });
+  elements.search.addEventListener("blur", () => { editingSearch = false; });
+  get("nav-back").addEventListener("click", goBack);
+  get("nav-forward").addEventListener("click", goForward);
+  window.addEventListener("popstate", event => {
+    navigationIndex = Number.isInteger(event.state?.gradCompassIndex) ? event.state.gradCompassIndex : 0;
+    navigationEnd = Math.max(navigationEnd, navigationIndex);
+    editingSearch = false;
+    applyLocation();
+    updateNavigationButtons();
+  });
   get("retry").addEventListener("click", loadWorkspace);
-  document.addEventListener("keydown", event => { if (event.key === "Escape" && !elements.inspector.hidden) closeInspector(); });
+  document.addEventListener("keydown", event => {
+    if (event.altKey && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
+      event.preventDefault();
+      if (event.key === "ArrowLeft") goBack(); else goForward();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      if (state.selected) closeInspector();
+      else if (elements.country.value || elements.status.value || elements.search.value) {
+        elements.country.value = ""; elements.status.value = ""; elements.search.value = "";
+        editingSearch = false; closeInspector(false); resetMap();
+      } else if (state.view === "list") setView("map");
+    }
+  });
+  document.addEventListener("auxclick", event => {
+    if ([3, 4].includes(event.button)) {
+      event.preventDefault();
+      if (event.button === 3) goBack(); else goForward();
+    }
+  });
   for (const country of typeof WORLD_COUNTRIES !== "undefined" ? WORLD_COUNTRIES : []) {
     const option = node("option", "", country.flag + " " + country.name); option.value = country.code; elements.country.append(option);
   }
-  const initial = new URL(location.href);
-  const initialSelection = initial.searchParams.get("university");
-  setView(initial.searchParams.get("view") === "list" ? "list" : "map");
+  history.replaceState({ gradCompassIndex: 0 }, "", location.href);
+  updateNavigationButtons();
+  setView(new URL(location.href).searchParams.get("view") === "list" ? "list" : "map", false);
   loadWorkspace().then(() => {
-    if (/^[1-9][0-9]*$/.test(initialSelection || "") && state.universities.some(university => university.id === Number(initialSelection))) selectUniversity(Number(initialSelection), false);
+    applyLocation();
   });
 }

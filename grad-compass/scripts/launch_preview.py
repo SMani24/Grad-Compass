@@ -54,7 +54,18 @@ def main():
             height=960,
             min_size=(390, 640),
             background_color="#f6f8fa",
+            confirm_close=not args.smoke_test,
+            localization={"global.quitConfirmation": "Close Grad Compass?"},
         )
+        from desktop_controls import DesktopControls
+        controls = DesktopControls(window)
+
+        def started():
+            controls.install_requested.emit()
+            if not controls.installed.wait(10):
+                logging.error("Desktop shortcut setup did not complete")
+            if args.smoke_test:
+                smoke_test()
 
         def smoke_test():
             try:
@@ -104,6 +115,8 @@ def main():
                         tasks: document.querySelectorAll('#inspector .task-line').length
                     })"""))
                     if detail["list"] == "true" and detail.get("title") == "Northbridge Example University" and detail["contacts"] == 1 and detail["tasks"] == 2:
+                        from preview_checks import verify_navigation
+                        verify_navigation(window)
                         result["passed"] = True
                         print("Desktop smoke test passed: map pins, focus styling, list toggle and university details.", flush=True)
                         return
@@ -115,7 +128,7 @@ def main():
                 window.destroy()
 
         webview.start(
-            func=smoke_test if args.smoke_test else None,
+            func=started,
             gui="qt",
             private_mode=True,
             storage_path=str(directory / "browser"),
