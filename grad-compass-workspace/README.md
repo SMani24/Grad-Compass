@@ -24,3 +24,5 @@ Read the local mailbox before research-related work. Append dated messages rathe
 The user maintains `../features_and_bugs.md` while using the application. Read it when asked and address one entry at a time, preserving the original feedback and recording completion after verification. New entries do not automatically authorize implementation or expand real-data permissions.
 
 For each requested increment, run the relevant checks and provide a visual review when appropriate. Commit completed changes with a short, natural message and push to the configured GitHub remote so each increment can be reviewed and reverted. Preserve shared history; do not force-push. The manual mailbox and local preview artifacts keep their existing exclusions.
+
+The active publication branch is `app-development-2026-10-11`. GitHub rejected the original local `main` history because an earlier commit contains an oversized generated Qt library. This publication branch starts from GitHub's existing `main` and records the current tracked files; the original local commits remain on `main`. Push subsequent increments to the publication branch until integration with GitHub `main` is agreed.
