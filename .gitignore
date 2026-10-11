@@ -1,1 +1,4 @@
-/envGradCompass
+/envGradCompass/
+/grad-compass/envGradCompass/
+/grad-compass/**/__pycache__/
+/grad-compass/**/*.pyc

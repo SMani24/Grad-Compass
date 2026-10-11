@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "batch_id": "66666666-6666-4666-8666-666666666666",
+  "created_at": "2026-10-02T00:00:00Z",
+  "producer": "grad-compass-research-engine",
+  "institution_file": "institutions.jsonl",
+  "program_file": "programs.jsonl",
+  "counts": {
+    "institutions": 2,
+    "programs": 3
+  },
+  "sha256": {
+    "institutions.jsonl": "40efa3d5baa81d69b68e41f431999b2b2d66a573101700914bee0c368f0da0a1",
+    "programs.jsonl": "864c50a41a117301642600ce1968f43c2b40b97c467bc1d44b9f3f343f39f3e4"
+  }
+}

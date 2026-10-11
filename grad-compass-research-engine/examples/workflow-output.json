@@ -1,0 +1,163 @@
+{
+  "approval": null,
+  "claims": [
+    {
+      "context": null,
+      "evidence": [
+        {
+          "locator": "line 1",
+          "locator_kind": "section",
+          "source_id": "e8b69490-4490-43aa-8659-bf5257f2c765"
+        }
+      ],
+      "field": "education.degree",
+      "id": "256ee407-daf7-4897-b537-2f2ebe334b27",
+      "kind": "documented_fact",
+      "next_action": null,
+      "rationale": null,
+      "related_claim_ids": [],
+      "subject_id": "degree-a",
+      "value": "BA in History"
+    },
+    {
+      "context": null,
+      "evidence": [
+        {
+          "locator": "line 1",
+          "locator_kind": "section",
+          "source_id": "94ea31e2-312a-4fae-a62f-e07a333ffef4"
+        }
+      ],
+      "field": "experience.role",
+      "id": "4336a6fc-2a9e-42cc-afd8-c9d789849792",
+      "kind": "documented_fact",
+      "next_action": null,
+      "rationale": null,
+      "related_claim_ids": [],
+      "subject_id": "job-a",
+      "value": "Museum assistant"
+    },
+    {
+      "context": null,
+      "evidence": [
+        {
+          "locator": "line 1",
+          "locator_kind": "section",
+          "source_id": "43ec3fa3-9498-49c5-b15a-bb70ac9a47dd"
+        }
+      ],
+      "field": "experience.role",
+      "id": "b3a98432-01aa-442d-850b-00beb7a16b08",
+      "kind": "documented_fact",
+      "next_action": null,
+      "rationale": null,
+      "related_claim_ids": [],
+      "subject_id": "job-a",
+      "value": "Archive assistant"
+    },
+    {
+      "context": null,
+      "evidence": [],
+      "field": "experience.role",
+      "id": "12f99621-34ba-4802-9147-94483f4f11bc",
+      "kind": "conflict",
+      "next_action": "Clarify the competing evidence; preserve all alternatives until resolved.",
+      "rationale": "Sources report different values.",
+      "related_claim_ids": [
+        "4336a6fc-2a9e-42cc-afd8-c9d789849792",
+        "b3a98432-01aa-442d-850b-00beb7a16b08"
+      ],
+      "subject_id": "job-a",
+      "value": null
+    },
+    {
+      "context": null,
+      "evidence": [],
+      "field": "preferences.location",
+      "id": "e8c8386c-acb5-4883-9034-6d1dc83fd4ad",
+      "kind": "unknown",
+      "next_action": "Provide evidence or an explicit answer; unknown is acceptable.",
+      "rationale": "No supplied evidence or explicit answer.",
+      "related_claim_ids": [],
+      "subject_id": "applicant",
+      "value": null
+    },
+    {
+      "context": null,
+      "evidence": [],
+      "field": "education.gpa",
+      "id": "1fdc063a-8bd8-4f86-bba5-12f54baeaa34",
+      "kind": "unknown",
+      "next_action": "Provide evidence or an explicit answer; unknown is acceptable.",
+      "rationale": "No supplied evidence or explicit answer.",
+      "related_claim_ids": [],
+      "subject_id": "degree-a",
+      "value": null
+    }
+  ],
+  "issues": [
+    {
+      "claim_ids": [
+        "12f99621-34ba-4802-9147-94483f4f11bc"
+      ],
+      "detail": "Sources report different values.",
+      "id": "6917f336-6042-4c35-b5f7-d973bf97763d",
+      "kind": "conflict",
+      "next_action": "Clarify the competing evidence; preserve all alternatives until resolved."
+    },
+    {
+      "claim_ids": [
+        "e8c8386c-acb5-4883-9034-6d1dc83fd4ad"
+      ],
+      "detail": "No supplied evidence or explicit answer.",
+      "id": "bea08097-8a0f-4e9e-a7a0-e712405846ee",
+      "kind": "missing",
+      "next_action": "Provide evidence or an explicit answer; unknown is acceptable."
+    },
+    {
+      "claim_ids": [
+        "1fdc063a-8bd8-4f86-bba5-12f54baeaa34"
+      ],
+      "detail": "No supplied evidence or explicit answer.",
+      "id": "9c6c2df4-3897-4cf3-912c-ea1925635a80",
+      "kind": "missing",
+      "next_action": "Provide evidence or an explicit answer; unknown is acceptable."
+    }
+  ],
+  "parent_revision_id": null,
+  "profile_id": "1292404b-7aa3-43ee-a5cf-133ef4051d55",
+  "revision_id": "4b61fe37-196e-4a8d-84cf-2c3c2484a214",
+  "schema_version": "1.0.0",
+  "sources": [
+    {
+      "captured_at": "2026-10-01T12:47:25Z",
+      "id": "e8b69490-4490-43aa-8659-bf5257f2c765",
+      "kind": "document",
+      "label": "e8b69490-4490-43aa-8659-bf5257f2c765",
+      "readability": "readable",
+      "sha256": "5f110469736ed385f5e9a798ceef842fb6e0e94edc1ff24906e74cf034b3a274",
+      "synthetic": true
+    },
+    {
+      "captured_at": "2026-10-01T12:47:25Z",
+      "id": "94ea31e2-312a-4fae-a62f-e07a333ffef4",
+      "kind": "document",
+      "label": "94ea31e2-312a-4fae-a62f-e07a333ffef4",
+      "readability": "readable",
+      "sha256": "780fb198e5374b1017ae10c122087caa797bcf2104f0dfd9fad1ffbc077375b5",
+      "synthetic": true
+    },
+    {
+      "captured_at": "2026-10-01T12:47:25Z",
+      "id": "43ec3fa3-9498-49c5-b15a-bb70ac9a47dd",
+      "kind": "document",
+      "label": "43ec3fa3-9498-49c5-b15a-bb70ac9a47dd",
+      "readability": "readable",
+      "sha256": "ef3dac23d65a6ea6c0a604525c3e053ebafc5c4e1e43c083605c9403d9d859b2",
+      "synthetic": true
+    }
+  ],
+  "status": "draft",
+  "synthetic": true,
+  "version_name": "draft-259903f9-ffe4-4a9a-b4ff-119c4a8462cf"
+}

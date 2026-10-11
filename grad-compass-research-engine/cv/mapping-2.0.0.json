@@ -1,0 +1,5 @@
+{
+  "version": "2.0.0",
+  "variants": ["master", "research", "two_page"],
+  "policy": "One private claim-linked selection defines all CV content and variant membership. Every factual span requires approved subject/field references; build.py resolves them to frozen claim IDs for the private audit. Source identity stays out of applicant-facing documents."
+}

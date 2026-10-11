@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grad Compass · Discover</title>
+  <link rel="stylesheet" href="/vendor/leaflet.css">
+  <link rel="stylesheet" href="/styles.css">
+  <script defer src="/vendor/leaflet.js"></script>
+  <script defer src="/flags.js"></script>
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Grad Compass home"><span class="brand-icon" aria-hidden="true">✦</span><span>Grad<span class="brand-light">Compass</span></span></a>
+    <span class="nav-current">Discover <span class="nav-dot" aria-hidden="true"></span></span>
+    <span class="preview-label">Sample workspace</span>
+  </header>
+  <main>
+    <section class="workspace-header" aria-label="Discovery controls">
+      <div><span class="eyebrow">YOUR UNIVERSITY ATLAS</span><h1>Explore universities</h1><p>Explore saved universities by location.</p></div>
+      <div class="view-switch" role="group" aria-label="Discovery view"><button id="map-view" aria-pressed="true">◉ Map</button><button id="list-view" aria-pressed="false">☷ List</button></div>
+    </section>
+    <div class="workspace">
+      <aside class="results-panel" aria-label="University results">
+        <div class="filter-controls">
+          <label class="search-label" for="search">Search your universities</label>
+          <input id="search" type="search" placeholder="University or city…" autocomplete="off">
+          <div class="filter-row"><div><label for="country">Location</label><select id="country"><option value="">All countries</option></select></div><div><label for="status">Stage</label><select id="status"><option value="">All stages</option><option>Researching</option><option>Applying</option><option>Submitted</option><option>Accepted</option><option>Rejected</option></select></div></div>
+        </div>
+        <div class="results-heading"><h2>Saved universities</h2><span id="result-count" class="count">0</span></div>
+        <div id="results" class="result-list" aria-live="polite"><p class="empty-state">Loading your workspace…</p></div>
+        <div class="panel-footer"><span class="small-dot" aria-hidden="true"></span><span id="mapped-count"></span></div>
+      </aside>
+      <section class="discovery-canvas" aria-label="University discovery">
+        <div id="map" aria-label="World map"></div>
+        <div class="map-key" id="map-key"><span class="key-pin"></span> Your universities <span class="key-country"></span> Saved locations</div>
+        <div id="map-message" class="map-message" hidden></div>
+        <div id="list-container" class="list-container" hidden><div class="list-intro"><span class="eyebrow">YOUR SAVED UNIVERSITIES</span><h2>Compare your universities</h2></div><div id="university-table"></div></div>
+      </section>
+      <aside id="inspector" class="inspector" hidden aria-label="University details" tabindex="-1"></aside>
+    </div>
+    <div id="error" class="error-banner" hidden role="alert"><span id="error-text"></span><button id="retry">Try again</button></div>
+  </main>
+</body>
+</html>

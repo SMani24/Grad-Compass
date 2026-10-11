@@ -1,0 +1,312 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "enum": [
+        "1.0.0"
+      ]
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parent_revision_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "version_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "frozen"
+      ]
+    },
+    "synthetic": {
+      "type": "boolean"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "document",
+              "clarification"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "readability": {
+            "enum": [
+              "readable",
+              "partial",
+              "unreadable"
+            ]
+          },
+          "captured_at": {
+            "type": "string",
+            "minLength": 1
+          },
+          "synthetic": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "sha256",
+          "readability",
+          "captured_at",
+          "synthetic"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subject_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "field": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+          },
+          "kind": {
+            "enum": [
+              "documented_fact",
+              "user_report",
+              "preference",
+              "inference",
+              "conflict",
+              "unknown"
+            ]
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "context": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "locator_kind": {
+                  "enum": [
+                    "page",
+                    "section",
+                    "answer",
+                    "unavailable"
+                  ]
+                },
+                "locator": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "source_id",
+                "locator_kind",
+                "locator"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0
+          },
+          "related_claim_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0
+          },
+          "rationale": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "next_action": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "subject_id",
+          "field",
+          "kind",
+          "value",
+          "context",
+          "evidence",
+          "related_claim_ids",
+          "rationale",
+          "next_action"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "missing",
+              "unreadable",
+              "ambiguous",
+              "conflict"
+            ]
+          },
+          "claim_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          },
+          "next_action": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "claim_ids",
+          "detail",
+          "next_action"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0
+    },
+    "approval": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "receipt_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "actor_type": {
+              "enum": [
+                "human"
+              ]
+            },
+            "actor_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "approved_at": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reliable_for_discovery": {
+              "enum": [
+                true
+              ]
+            },
+            "scope": {
+              "enum": [
+                "profile_only"
+              ]
+            }
+          },
+          "required": [
+            "receipt_id",
+            "actor_type",
+            "actor_id",
+            "approved_at",
+            "reliable_for_discovery",
+            "scope"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "profile_id",
+    "revision_id",
+    "parent_revision_id",
+    "version_name",
+    "status",
+    "synthetic",
+    "sources",
+    "claims",
+    "issues",
+    "approval"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:grad-compass:applicant-profile:1.0.0",
+  "title": "Applicant profile 1.0.0"
+}

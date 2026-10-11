@@ -1,0 +1,208 @@
+{
+  "approval": null,
+  "claims": [
+    {
+      "context": "Formatting normalization: markdown_whitespace; balanced inline markers removed and whitespace collapsed. Textual presence does not establish semantic entailment.",
+      "evidence": [
+        {
+          "locator": "lines 1-2",
+          "locator_kind": "section",
+          "source_id": "28c5b88c-f4fa-4bd3-9b0e-c0065ed13df6"
+        }
+      ],
+      "field": "projects.title",
+      "id": "90ff0b8b-e8e0-46d8-ba5f-50998f68d6b5",
+      "kind": "documented_fact",
+      "next_action": null,
+      "rationale": null,
+      "related_claim_ids": [],
+      "subject_id": "project-a",
+      "value": "Community Archive Digitization Study"
+    },
+    {
+      "context": "The source describes the project method; applicant ownership is not established.",
+      "evidence": [
+        {
+          "locator": "line 3",
+          "locator_kind": "section",
+          "source_id": "28c5b88c-f4fa-4bd3-9b0e-c0065ed13df6"
+        }
+      ],
+      "field": "projects.methods.cataloging",
+      "id": "7a7734da-6984-41d8-8469-3727608b5201",
+      "kind": "documented_fact",
+      "next_action": null,
+      "rationale": null,
+      "related_claim_ids": [],
+      "subject_id": "project-a",
+      "value": "catalog comparison"
+    },
+    {
+      "context": "Source-reported result.",
+      "evidence": [
+        {
+          "locator": "line 4",
+          "locator_kind": "section",
+          "source_id": "28c5b88c-f4fa-4bd3-9b0e-c0065ed13df6"
+        }
+      ],
+      "field": "projects.results.catalog",
+      "id": "dfd75222-bb05-4865-8c2e-201613f248cd",
+      "kind": "documented_fact",
+      "next_action": null,
+      "rationale": null,
+      "related_claim_ids": [],
+      "subject_id": "project-a",
+      "value": "120 records indexed"
+    },
+    {
+      "context": null,
+      "evidence": [
+        {
+          "locator": "line 5",
+          "locator_kind": "section",
+          "source_id": "28c5b88c-f4fa-4bd3-9b0e-c0065ed13df6"
+        }
+      ],
+      "field": "projects.limitations.validation",
+      "id": "4c70190d-df92-43d1-ab5a-c78c34459988",
+      "kind": "documented_fact",
+      "next_action": null,
+      "rationale": null,
+      "related_claim_ids": [],
+      "subject_id": "project-a",
+      "value": "accuracy was not independently audited"
+    },
+    {
+      "context": null,
+      "evidence": [
+        {
+          "locator": "line 6",
+          "locator_kind": "section",
+          "source_id": "28c5b88c-f4fa-4bd3-9b0e-c0065ed13df6"
+        }
+      ],
+      "field": "experience.role",
+      "id": "612da967-f531-478a-992e-3180a301c23d",
+      "kind": "documented_fact",
+      "next_action": null,
+      "rationale": null,
+      "related_claim_ids": [],
+      "subject_id": "job-a",
+      "value": "Collection assistant"
+    },
+    {
+      "context": null,
+      "evidence": [
+        {
+          "locator": "line 1",
+          "locator_kind": "section",
+          "source_id": "00defda1-abfc-4421-852c-8fb86376e358"
+        }
+      ],
+      "field": "experience.role",
+      "id": "19e34f67-75a0-4341-82bb-28d9220a7f73",
+      "kind": "documented_fact",
+      "next_action": null,
+      "rationale": null,
+      "related_claim_ids": [],
+      "subject_id": "job-a",
+      "value": "Archive coordinator"
+    },
+    {
+      "context": null,
+      "evidence": [],
+      "field": "experience.role",
+      "id": "5ce015c4-b4ed-4a3d-b669-ee4e56135639",
+      "kind": "conflict",
+      "next_action": "Clarify the competing evidence; preserve all alternatives until resolved.",
+      "rationale": "Sources report different values.",
+      "related_claim_ids": [
+        "612da967-f531-478a-992e-3180a301c23d",
+        "19e34f67-75a0-4341-82bb-28d9220a7f73"
+      ],
+      "subject_id": "job-a",
+      "value": null
+    },
+    {
+      "context": null,
+      "evidence": [],
+      "field": "projects.contribution.applicant",
+      "id": "ee42bcbf-d1a3-487d-8aba-6b63abe7fff1",
+      "kind": "unknown",
+      "next_action": "Supply an explicit contribution statement or retain unknown.",
+      "rationale": "The project method alone does not establish personal contribution.",
+      "related_claim_ids": [],
+      "subject_id": "project-a",
+      "value": null
+    },
+    {
+      "context": null,
+      "evidence": [],
+      "field": "preferences.location",
+      "id": "4f405571-7718-4558-8705-5de37a45111f",
+      "kind": "unknown",
+      "next_action": "Provide evidence or an explicit answer; unknown is acceptable.",
+      "rationale": "No supplied evidence or explicit answer.",
+      "related_claim_ids": [],
+      "subject_id": "applicant",
+      "value": null
+    }
+  ],
+  "issues": [
+    {
+      "claim_ids": [
+        "5ce015c4-b4ed-4a3d-b669-ee4e56135639"
+      ],
+      "detail": "Sources report different values.",
+      "id": "bf80e399-94f7-45ba-b06a-f4244176426e",
+      "kind": "conflict",
+      "next_action": "Clarify the competing evidence; preserve all alternatives until resolved."
+    },
+    {
+      "claim_ids": [
+        "ee42bcbf-d1a3-487d-8aba-6b63abe7fff1"
+      ],
+      "detail": "The project method alone does not establish personal contribution.",
+      "id": "7d7a956a-c6b4-4d37-b0da-801bef8eab2e",
+      "kind": "missing",
+      "next_action": "Supply an explicit contribution statement or retain unknown."
+    },
+    {
+      "claim_ids": [
+        "4f405571-7718-4558-8705-5de37a45111f"
+      ],
+      "detail": "No supplied evidence or explicit answer.",
+      "id": "c16c25f6-0f4a-4dd6-928a-c3a70e1cbd63",
+      "kind": "missing",
+      "next_action": "Provide evidence or an explicit answer; unknown is acceptable."
+    }
+  ],
+  "parent_revision_id": null,
+  "profile_id": "2aa0f353-9be0-441d-a838-39e739858a1e",
+  "revision_id": "35069028-dc0d-4113-80bb-7ae200b0e1ff",
+  "schema_version": "1.0.0",
+  "sources": [
+    {
+      "captured_at": "2026-10-07T14:02:40Z",
+      "id": "28c5b88c-f4fa-4bd3-9b0e-c0065ed13df6",
+      "kind": "document",
+      "label": "28c5b88c-f4fa-4bd3-9b0e-c0065ed13df6",
+      "readability": "readable",
+      "sha256": "8799b84b9f744896086d476860b5070a6fe9473586c23a0b4b2609ec0cc84573",
+      "synthetic": true
+    },
+    {
+      "captured_at": "2026-10-07T14:02:40Z",
+      "id": "00defda1-abfc-4421-852c-8fb86376e358",
+      "kind": "document",
+      "label": "00defda1-abfc-4421-852c-8fb86376e358",
+      "readability": "readable",
+      "sha256": "99883138ae46699a2461c4def14eadd394708611d93b5bda8558d0496f171375",
+      "synthetic": true
+    }
+  ],
+  "status": "draft",
+  "synthetic": true,
+  "version_name": "draft-f742b9d0-73bc-4c7a-a62b-0bc812cac346"
+}

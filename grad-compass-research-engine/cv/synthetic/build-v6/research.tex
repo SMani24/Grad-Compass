@@ -1,0 +1,45 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{CleanCV}
+\usepackage[default,type1]{sourcesanspro}
+\usepackage{fontawesome5}
+\usepackage{microtype}
+\usepackage{needspace}
+\geometry{a4paper,left=2.0cm,right=2.0cm,top=1.8cm,bottom=1.9cm}
+\definecolor{primary}{RGB}{28,70,105}
+\hypersetup{urlcolor=primary}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}\setlength{\parskip}{0pt}\linespread{1.06}\raggedbottom\frenchspacing
+\setlist[itemize]{leftmargin=1.3em,label=\textcolor{primary}{\small$\bullet$},nosep,topsep=2pt,itemsep=2pt,parsep=0pt}
+\newcommand{\cvsection}[1]{\Needspace{6\baselineskip}\vspace{10pt}{\color{primary}\large\bfseries #1}\par\vspace{3pt}{\color{primary}\hrule height 0.55pt}\vspace{6pt}}
+\newcommand{\cvdated}[2]{\Needspace{3\baselineskip}\begin{tabular*}{\linewidth}{@{}p{0.72\linewidth}@{\extracolsep{\fill}}p{0.25\linewidth}@{}}\textbf{#1}&\raggedleft{\small\color{primary}#2}\end{tabular*}\par}
+\begin{document}
+\begin{center}{\fontsize{24}{28}\selectfont\bfseries\color{primary} Avery Example}\end{center}\vspace{-8pt}
+\cvsection{Education}
+\Needspace{3\baselineskip}
+\cvdated{Bachelor of Computer Science}{Expected 2028}
+{\small\itshape Example University · GPA 3.8/4.0}\par
+\vspace{6pt}
+\cvsection{Research Experience}
+\Needspace{4\baselineskip}
+\cvdated{Simulated indoor navigation}{}
+\begin{itemize}
+\item Implemented route search and evaluated sample maps.
+\end{itemize}
+\vspace{6pt}
+\Needspace{11\baselineskip}
+\cvsection{Publications and Manuscripts}
+\Needspace{5\baselineskip}\textbf{A Sample Study of Indoor Navigation}\par{\small \emph{Example Student Research Symposium}. 2026. Accepted for presentation.}\par\vspace{8pt}
+\cvsection{Technical Projects}
+\Needspace{4\baselineskip}
+\cvdated{Indoor Navigation Prototype}{2025–2026}
+{\small\itshape Two-person course project}\par
+\begin{itemize}
+\item Implemented a route planner for a simulated indoor map.
+\end{itemize}
+\vspace{6pt}
+\cvsection{Recognition}
+\Needspace{3\baselineskip}
+\cvdated{Poster finalist}{}
+{\small\itshape Example Student Research Symposium}\par
+\vspace{6pt}
+\end{document}

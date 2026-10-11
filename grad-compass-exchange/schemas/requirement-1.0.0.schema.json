@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/grad-compass-exchange/schemas/requirement-1.0.0.schema.json",
+  "title": "Grad-Compass intake requirement 1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "intake",
+    "value",
+    "source_url",
+    "locator",
+    "observed_at"
+  ],
+  "properties": {
+    "kind": {
+      "enum": [
+        "application_deadline",
+        "funding"
+      ]
+    },
+    "intake": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(spring|summer|fall|winter)$"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source_url": {
+      "type": "string",
+      "pattern": "^https://[^\\s/?#]+(?:[^\\s]*)$",
+      "maxLength": 2048
+    },
+    "locator": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "observed_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "application_deadline"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

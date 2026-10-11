@@ -1,0 +1,14 @@
+{
+  "00defda1-abfc-4421-852c-8fb86376e358": {
+    "original": "intake/letter.txt",
+    "snapshot": "sources/00defda1-abfc-4421-852c-8fb86376e358.bin"
+  },
+  "17a08c6e-543b-47f8-a73f-1a1cbc2cf695": {
+    "original": "intake/answer.txt",
+    "snapshot": "sources/17a08c6e-543b-47f8-a73f-1a1cbc2cf695.bin"
+  },
+  "28c5b88c-f4fa-4bd3-9b0e-c0065ed13df6": {
+    "original": "intake/record.md",
+    "snapshot": "sources/28c5b88c-f4fa-4bd3-9b0e-c0065ed13df6.bin"
+  }
+}

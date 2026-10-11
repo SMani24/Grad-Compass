@@ -1,0 +1,11 @@
+{
+  "profile_id": "synthetic-profile",
+  "revision_id": "synthetic-revision",
+  "version_name": "synthetic-v1",
+  "schema_version": "1.0.0",
+  "sha256": "b003bd0418de3b94d7b6013c083a2406e888f422f26baf1828f3854c68c08c5f",
+  "decision": "accepted",
+  "actor_type": "human",
+  "scope": "profile_only",
+  "receipt_id": "synthetic-receipt"
+}

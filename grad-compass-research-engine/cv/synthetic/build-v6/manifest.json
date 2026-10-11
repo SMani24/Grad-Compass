@@ -1,0 +1,91 @@
+{
+  "source": {
+    "profile_id": "synthetic-profile",
+    "revision_id": "synthetic-revision",
+    "version_name": "synthetic-v1",
+    "schema_version": "1.0.0"
+  },
+  "sha256": "b003bd0418de3b94d7b6013c083a2406e888f422f26baf1828f3854c68c08c5f",
+  "receipt_id": "synthetic-receipt",
+  "template_build_version": "5.2.0-rendercv-inspired",
+  "selection_sha256": "61cd107811cfe2d871552f3dc1db5e6e8bb8140ec63d59db3689c50dcd934e4b",
+  "built_at_utc": "2026-10-08T17:02:49.044006+00:00",
+  "variants": {
+    "master": {
+      "pages": 1,
+      "claim_ids": [
+        "synthetic-001",
+        "synthetic-002",
+        "synthetic-003",
+        "synthetic-004",
+        "synthetic-005",
+        "synthetic-006",
+        "synthetic-007",
+        "synthetic-008",
+        "synthetic-009",
+        "synthetic-010",
+        "synthetic-011",
+        "synthetic-012",
+        "synthetic-013",
+        "synthetic-014",
+        "synthetic-015",
+        "synthetic-016",
+        "synthetic-018",
+        "synthetic-020",
+        "synthetic-021"
+      ],
+      "source": "master.tex",
+      "pdf": "master.pdf"
+    },
+    "research": {
+      "pages": 1,
+      "claim_ids": [
+        "synthetic-001",
+        "synthetic-002",
+        "synthetic-003",
+        "synthetic-004",
+        "synthetic-005",
+        "synthetic-006",
+        "synthetic-007",
+        "synthetic-008",
+        "synthetic-009",
+        "synthetic-010",
+        "synthetic-011",
+        "synthetic-012",
+        "synthetic-013",
+        "synthetic-014",
+        "synthetic-015",
+        "synthetic-016",
+        "synthetic-020",
+        "synthetic-021"
+      ],
+      "source": "research.tex",
+      "pdf": "research.pdf"
+    },
+    "two_page": {
+      "pages": 1,
+      "claim_ids": [
+        "synthetic-001",
+        "synthetic-002",
+        "synthetic-003",
+        "synthetic-004",
+        "synthetic-005",
+        "synthetic-006",
+        "synthetic-007",
+        "synthetic-008",
+        "synthetic-009",
+        "synthetic-010",
+        "synthetic-011",
+        "synthetic-012",
+        "synthetic-013",
+        "synthetic-014",
+        "synthetic-015",
+        "synthetic-016",
+        "synthetic-020",
+        "synthetic-021"
+      ],
+      "source": "two_page.tex",
+      "pdf": "two_page.pdf"
+    }
+  }
+}

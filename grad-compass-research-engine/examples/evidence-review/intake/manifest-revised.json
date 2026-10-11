@@ -1,0 +1,91 @@
+{
+  "corrections": [
+    {
+      "authority_file": "answer.txt",
+      "authority_line": 1,
+      "authority_quote": "Use the role stated in the letter.",
+      "field": "experience.role",
+      "source_file": "letter.txt",
+      "subject_id": "job-a",
+      "value": "Archive coordinator"
+    }
+  ],
+  "required": [
+    {
+      "field": "projects.contribution.applicant",
+      "next_action": "Supply an explicit contribution statement or retain unknown.",
+      "rationale": "The project method alone does not establish personal contribution.",
+      "subject_id": "project-a"
+    },
+    {
+      "field": "preferences.location",
+      "subject_id": "applicant"
+    }
+  ],
+  "sources": [
+    {
+      "file": "record.md",
+      "kind": "document",
+      "observations": [
+        {
+          "end_line": 2,
+          "field": "projects.title",
+          "line": 1,
+          "normalization": "markdown_whitespace",
+          "quote": "**Community Archive**\nDigitization Study",
+          "subject_id": "project-a",
+          "value": "Community Archive Digitization Study"
+        },
+        {
+          "context": "The source describes the project method; applicant ownership is not established.",
+          "field": "projects.methods.cataloging",
+          "line": 3,
+          "quote": "Method: catalog comparison",
+          "subject_id": "project-a",
+          "value": "catalog comparison"
+        },
+        {
+          "context": "Source-reported result.",
+          "field": "projects.results.catalog",
+          "line": 4,
+          "quote": "Result: 120 records indexed",
+          "subject_id": "project-a",
+          "value": "120 records indexed"
+        },
+        {
+          "field": "projects.limitations.validation",
+          "line": 5,
+          "quote": "Limitation: accuracy was not independently audited",
+          "subject_id": "project-a",
+          "value": "accuracy was not independently audited"
+        },
+        {
+          "field": "experience.role",
+          "line": 6,
+          "quote": "Role: Collection assistant",
+          "subject_id": "job-a",
+          "value": "Collection assistant"
+        }
+      ]
+    },
+    {
+      "file": "letter.txt",
+      "kind": "document",
+      "observations": [
+        {
+          "field": "experience.role",
+          "line": 1,
+          "quote": "Role: Archive coordinator",
+          "subject_id": "job-a",
+          "value": "Archive coordinator"
+        }
+      ]
+    },
+    {
+      "file": "answer.txt",
+      "kind": "clarification",
+      "observations": []
+    }
+  ],
+  "synthetic": true
+}

@@ -1,0 +1,16 @@
+/outbox/
+/receipts/
+/registry/
+/private/
+/staging/
+__pycache__/
+*.pyc
+/**/*.db
+/**/*.sqlite
+/**/*.sqlite3
+/**/*-wal
+/**/*-shm
+/**/*-journal
+/**/*.db-*
+/**/*.sqlite-*
+/**/*.sqlite3-*

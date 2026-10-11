@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "education": ["education.institution", "education.major", "education.level", "education.cumulative_gpa", "education.expected_completion_window"],
+  "publication": ["publications.title", "publications.venue", "publications.publication_year", "publications.conference_year", "publications.doi", "publications.status"],
+  "project": ["projects.title", "projects.type", "projects.period", "projects.team", "projects.summary", "projects.role", "projects.contribution.physical", "projects.contribution.team_boundary", "projects.contribution.team_vision", "projects.contribution.boundaries", "projects.tools"],
+  "variants": {
+    "master": {"projects": "all", "project_detail": 5, "publications": "all"},
+    "research": {"projects": "research", "project_detail": 5, "publications": "all"},
+    "two_page": {"projects": "core", "project_detail": 4, "publications": "all"}
+  },
+  "policy": "Select only non-null approved claims. Exact source text is shortened at sentence or list boundaries. Suppress conflicts, unknowns, source-described relevance, unsupported status upgrades and team-only methods. Applicant-specific subject selection stays private."
+}

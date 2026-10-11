@@ -1,5 +1,9 @@
 # 🧭 Grad Compass
 
+This repository is now a monorepo: the application lives in `grad-compass/`, the research producer in `grad-compass-research-engine/`, and the shared public contract in `grad-compass-exchange/`.
+
+For current development and isolated preview commands, see [the application README](grad-compass/README.md). Product plans and the local Paperclip mailbox are documented in [the development workspace](grad-compass-workspace/README.md). The original desktop overview below describes the existing application.
+
 **Grad Compass** is an interactive, cartographic desktop workspace designed to organize international university applications, lab scouting, and faculty outreach.
 
 Instead of juggling fractured spreadsheets, bookmarked lab pages, and scattered PDF folders, Grad Compass unifies the process into a visual hierarchy (**Country $\to$ Institution $\to$ Faculty Lead**) alongside an operational admissions Kanban board, cold outreach tracker, and a local document vault.

@@ -1,0 +1,28 @@
+{
+  "header": {
+    "name": {"text": "Avery Example", "refs": [["paper", "publications.authorship"]]},
+    "contact": []
+  },
+  "sections": [
+    {"title": "Education", "entries": [
+      {"key": "degree", "heading": {"text": "Bachelor of Computer Science", "refs": [["degree", "education.level"], ["degree", "education.major"]]}, "date": {"text": "Expected 2028", "refs": [["degree", "education.expected_completion_window"]]}, "subline": {"text": "Example University · GPA 3.8/4.0", "refs": [["degree", "education.institution"], ["degree", "education.cumulative_gpa"]]}}
+    ]},
+    {"title": "Research Experience", "entries": [
+      {"key": "navigation", "heading": {"text": "Simulated indoor navigation", "refs": [["paper", "publications.title"]]}, "bullets": [
+        {"text": "Implemented route search and evaluated sample maps.", "refs": [["project", "projects.role"]]}
+      ]}
+    ]},
+    {"title": "Publications and Manuscripts", "entries": [
+      {"key": "paper", "kind": "publication", "heading": {"text": "A Sample Study of Indoor Navigation", "refs": [["paper", "publications.title"]]}, "venue": {"text": "Example Student Research Symposium", "refs": [["paper", "publications.venue"]]}, "date": {"text": "2026", "refs": [["paper", "publications.conference_year"]]}, "status": {"text": "Accepted for presentation", "refs": [["paper", "publications.status"]]}}
+    ]},
+    {"title": "Technical Projects", "entries": [
+      {"key": "prototype", "heading": {"text": "Indoor Navigation Prototype", "refs": [["project", "projects.title"]]}, "date": {"text": "2025–2026", "refs": [["project", "projects.period"]]}, "subline": {"text": "Two-person course project", "refs": [["project", "projects.team"], ["project", "projects.type"]]}, "bullets": [
+        {"text": "Implemented a route planner for a simulated indoor map.", "refs": [["project", "projects.summary"]]},
+        {"text": "The teammate designed the interface.", "refs": [["project", "projects.contribution.team_boundary"]], "variants": ["master"]}
+      ]}
+    ]},
+    {"title": "Recognition", "entries": [
+      {"key": "poster", "heading": {"text": "Poster finalist", "refs": [["award", "awards.result"]]}, "subline": {"text": "Example Student Research Symposium", "refs": [["award", "awards.venue"]]}}
+    ]}
+  ]
+}

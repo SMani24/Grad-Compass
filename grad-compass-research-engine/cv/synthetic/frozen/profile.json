@@ -1,0 +1,171 @@
+{
+  "profile_id": "synthetic-profile",
+  "revision_id": "synthetic-revision",
+  "version_name": "synthetic-v1",
+  "schema_version": "1.0.0",
+  "status": "frozen",
+  "synthetic": true,
+  "claims": [
+    {
+      "id": "synthetic-001",
+      "subject_id": "paper",
+      "field": "publications.authorship",
+      "value": "Avery Example",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-002",
+      "subject_id": "degree",
+      "field": "education.institution",
+      "value": "Example University",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-003",
+      "subject_id": "degree",
+      "field": "education.major",
+      "value": "Computer Science",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-004",
+      "subject_id": "degree",
+      "field": "education.level",
+      "value": "Bachelor",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-005",
+      "subject_id": "degree",
+      "field": "education.cumulative_gpa",
+      "value": "3.8 / 4.0",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-006",
+      "subject_id": "degree",
+      "field": "education.expected_completion_window",
+      "value": "Expected completion in 2028.",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-007",
+      "subject_id": "paper",
+      "field": "publications.title",
+      "value": "A Sample Study of Indoor Navigation",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-008",
+      "subject_id": "paper",
+      "field": "publications.venue",
+      "value": "Example Student Research Symposium",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-009",
+      "subject_id": "paper",
+      "field": "publications.conference_year",
+      "value": "2026",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-010",
+      "subject_id": "paper",
+      "field": "publications.status",
+      "value": "Accepted for presentation",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-011",
+      "subject_id": "project",
+      "field": "projects.title",
+      "value": "Indoor Navigation Prototype",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-012",
+      "subject_id": "project",
+      "field": "projects.period",
+      "value": "2025\u20132026",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-013",
+      "subject_id": "project",
+      "field": "projects.type",
+      "value": "Course project",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-014",
+      "subject_id": "project",
+      "field": "projects.team",
+      "value": "Two-person team; teammate designed the interface.",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-015",
+      "subject_id": "project",
+      "field": "projects.summary",
+      "value": "Implemented a route planner for a simulated indoor map.",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-016",
+      "subject_id": "project",
+      "field": "projects.role",
+      "value": "Implemented route search and evaluated sample maps.",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-017",
+      "subject_id": "project",
+      "field": "projects.contribution.physical",
+      "value": "Implemented the route-search component.",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-018",
+      "subject_id": "project",
+      "field": "projects.contribution.team_boundary",
+      "value": "The interface was implemented by a teammate.",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-019",
+      "subject_id": "project",
+      "field": "projects.results.physical",
+      "value": "The prototype completed the course demonstration.",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-020",
+      "subject_id": "award",
+      "field": "awards.result",
+      "value": "Poster finalist",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-021",
+      "subject_id": "award",
+      "field": "awards.venue",
+      "value": "Example Student Research Symposium",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-022",
+      "subject_id": "language",
+      "field": "language_tests.overall",
+      "value": "7.5",
+      "kind": "documented_fact"
+    },
+    {
+      "id": "synthetic-023",
+      "subject_id": "language",
+      "field": "language_tests.test_date",
+      "value": "2025",
+      "kind": "documented_fact"
+    }
+  ]
+}

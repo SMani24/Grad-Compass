@@ -1,0 +1,360 @@
+{
+  "master": [
+    {
+      "location": "header.name",
+      "text": "Avery Example",
+      "claim_ids": [
+        "synthetic-001"
+      ]
+    },
+    {
+      "location": "degree.heading",
+      "text": "Bachelor of Computer Science",
+      "claim_ids": [
+        "synthetic-004",
+        "synthetic-003"
+      ]
+    },
+    {
+      "location": "degree.date",
+      "text": "Expected 2028",
+      "claim_ids": [
+        "synthetic-006"
+      ]
+    },
+    {
+      "location": "degree.subline",
+      "text": "Example University \u00b7 GPA 3.8/4.0",
+      "claim_ids": [
+        "synthetic-002",
+        "synthetic-005"
+      ]
+    },
+    {
+      "location": "navigation.heading",
+      "text": "Simulated indoor navigation",
+      "claim_ids": [
+        "synthetic-007"
+      ]
+    },
+    {
+      "location": "navigation.bullet0",
+      "text": "Implemented route search and evaluated sample maps.",
+      "claim_ids": [
+        "synthetic-016"
+      ]
+    },
+    {
+      "location": "paper.heading",
+      "text": "A Sample Study of Indoor Navigation",
+      "claim_ids": [
+        "synthetic-007"
+      ]
+    },
+    {
+      "location": "paper.date",
+      "text": "2026",
+      "claim_ids": [
+        "synthetic-009"
+      ]
+    },
+    {
+      "location": "paper.venue",
+      "text": "Example Student Research Symposium",
+      "claim_ids": [
+        "synthetic-008"
+      ]
+    },
+    {
+      "location": "paper.status",
+      "text": "Accepted for presentation",
+      "claim_ids": [
+        "synthetic-010"
+      ]
+    },
+    {
+      "location": "prototype.heading",
+      "text": "Indoor Navigation Prototype",
+      "claim_ids": [
+        "synthetic-011"
+      ]
+    },
+    {
+      "location": "prototype.date",
+      "text": "2025\u20132026",
+      "claim_ids": [
+        "synthetic-012"
+      ]
+    },
+    {
+      "location": "prototype.subline",
+      "text": "Two-person course project",
+      "claim_ids": [
+        "synthetic-014",
+        "synthetic-013"
+      ]
+    },
+    {
+      "location": "prototype.bullet0",
+      "text": "Implemented a route planner for a simulated indoor map.",
+      "claim_ids": [
+        "synthetic-015"
+      ]
+    },
+    {
+      "location": "prototype.bullet1",
+      "text": "The teammate designed the interface.",
+      "claim_ids": [
+        "synthetic-018"
+      ]
+    },
+    {
+      "location": "poster.heading",
+      "text": "Poster finalist",
+      "claim_ids": [
+        "synthetic-020"
+      ]
+    },
+    {
+      "location": "poster.subline",
+      "text": "Example Student Research Symposium",
+      "claim_ids": [
+        "synthetic-021"
+      ]
+    }
+  ],
+  "research": [
+    {
+      "location": "header.name",
+      "text": "Avery Example",
+      "claim_ids": [
+        "synthetic-001"
+      ]
+    },
+    {
+      "location": "degree.heading",
+      "text": "Bachelor of Computer Science",
+      "claim_ids": [
+        "synthetic-004",
+        "synthetic-003"
+      ]
+    },
+    {
+      "location": "degree.date",
+      "text": "Expected 2028",
+      "claim_ids": [
+        "synthetic-006"
+      ]
+    },
+    {
+      "location": "degree.subline",
+      "text": "Example University \u00b7 GPA 3.8/4.0",
+      "claim_ids": [
+        "synthetic-002",
+        "synthetic-005"
+      ]
+    },
+    {
+      "location": "navigation.heading",
+      "text": "Simulated indoor navigation",
+      "claim_ids": [
+        "synthetic-007"
+      ]
+    },
+    {
+      "location": "navigation.bullet0",
+      "text": "Implemented route search and evaluated sample maps.",
+      "claim_ids": [
+        "synthetic-016"
+      ]
+    },
+    {
+      "location": "paper.heading",
+      "text": "A Sample Study of Indoor Navigation",
+      "claim_ids": [
+        "synthetic-007"
+      ]
+    },
+    {
+      "location": "paper.date",
+      "text": "2026",
+      "claim_ids": [
+        "synthetic-009"
+      ]
+    },
+    {
+      "location": "paper.venue",
+      "text": "Example Student Research Symposium",
+      "claim_ids": [
+        "synthetic-008"
+      ]
+    },
+    {
+      "location": "paper.status",
+      "text": "Accepted for presentation",
+      "claim_ids": [
+        "synthetic-010"
+      ]
+    },
+    {
+      "location": "prototype.heading",
+      "text": "Indoor Navigation Prototype",
+      "claim_ids": [
+        "synthetic-011"
+      ]
+    },
+    {
+      "location": "prototype.date",
+      "text": "2025\u20132026",
+      "claim_ids": [
+        "synthetic-012"
+      ]
+    },
+    {
+      "location": "prototype.subline",
+      "text": "Two-person course project",
+      "claim_ids": [
+        "synthetic-014",
+        "synthetic-013"
+      ]
+    },
+    {
+      "location": "prototype.bullet0",
+      "text": "Implemented a route planner for a simulated indoor map.",
+      "claim_ids": [
+        "synthetic-015"
+      ]
+    },
+    {
+      "location": "poster.heading",
+      "text": "Poster finalist",
+      "claim_ids": [
+        "synthetic-020"
+      ]
+    },
+    {
+      "location": "poster.subline",
+      "text": "Example Student Research Symposium",
+      "claim_ids": [
+        "synthetic-021"
+      ]
+    }
+  ],
+  "two_page": [
+    {
+      "location": "header.name",
+      "text": "Avery Example",
+      "claim_ids": [
+        "synthetic-001"
+      ]
+    },
+    {
+      "location": "degree.heading",
+      "text": "Bachelor of Computer Science",
+      "claim_ids": [
+        "synthetic-004",
+        "synthetic-003"
+      ]
+    },
+    {
+      "location": "degree.date",
+      "text": "Expected 2028",
+      "claim_ids": [
+        "synthetic-006"
+      ]
+    },
+    {
+      "location": "degree.subline",
+      "text": "Example University \u00b7 GPA 3.8/4.0",
+      "claim_ids": [
+        "synthetic-002",
+        "synthetic-005"
+      ]
+    },
+    {
+      "location": "navigation.heading",
+      "text": "Simulated indoor navigation",
+      "claim_ids": [
+        "synthetic-007"
+      ]
+    },
+    {
+      "location": "navigation.bullet0",
+      "text": "Implemented route search and evaluated sample maps.",
+      "claim_ids": [
+        "synthetic-016"
+      ]
+    },
+    {
+      "location": "paper.heading",
+      "text": "A Sample Study of Indoor Navigation",
+      "claim_ids": [
+        "synthetic-007"
+      ]
+    },
+    {
+      "location": "paper.date",
+      "text": "2026",
+      "claim_ids": [
+        "synthetic-009"
+      ]
+    },
+    {
+      "location": "paper.venue",
+      "text": "Example Student Research Symposium",
+      "claim_ids": [
+        "synthetic-008"
+      ]
+    },
+    {
+      "location": "paper.status",
+      "text": "Accepted for presentation",
+      "claim_ids": [
+        "synthetic-010"
+      ]
+    },
+    {
+      "location": "prototype.heading",
+      "text": "Indoor Navigation Prototype",
+      "claim_ids": [
+        "synthetic-011"
+      ]
+    },
+    {
+      "location": "prototype.date",
+      "text": "2025\u20132026",
+      "claim_ids": [
+        "synthetic-012"
+      ]
+    },
+    {
+      "location": "prototype.subline",
+      "text": "Two-person course project",
+      "claim_ids": [
+        "synthetic-014",
+        "synthetic-013"
+      ]
+    },
+    {
+      "location": "prototype.bullet0",
+      "text": "Implemented a route planner for a simulated indoor map.",
+      "claim_ids": [
+        "synthetic-015"
+      ]
+    },
+    {
+      "location": "poster.heading",
+      "text": "Poster finalist",
+      "claim_ids": [
+        "synthetic-020"
+      ]
+    },
+    {
+      "location": "poster.subline",
+      "text": "Example Student Research Symposium",
+      "claim_ids": [
+        "synthetic-021"
+      ]
+    }
+  ]
+}

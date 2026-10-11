@@ -1,0 +1,175 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "synthetic-a",
+  "revision_id": "revision-a1",
+  "parent_revision_id": null,
+  "version_name": "synthetic-a-v1",
+  "status": "draft",
+  "synthetic": true,
+  "sources": [
+    {
+      "id": "src-transcript",
+      "kind": "document",
+      "label": "Invented transcript",
+      "sha256": "62ba10b02ecb46690af5f4c9475cecb2e6ace96f6a3281d34c8ab0db3dcbf2f3",
+      "readability": "readable",
+      "captured_at": "2026-10-01T00:00:00Z",
+      "synthetic": true
+    },
+    {
+      "id": "src-cv",
+      "kind": "document",
+      "label": "Invented CV",
+      "sha256": "fb490e0bc298a19ae3c5b23e60244341f91bc1dbb1659594318067a91823a1b2",
+      "readability": "readable",
+      "captured_at": "2026-10-01T00:00:00Z",
+      "synthetic": true
+    },
+    {
+      "id": "src-answer",
+      "kind": "clarification",
+      "label": "Synthetic explicit answer",
+      "sha256": "e0e1c410e6d68786a07d9743374e148f9b4aa6b6ba0aa894c5a9e896179f5bed",
+      "readability": "readable",
+      "captured_at": "2026-10-01T00:00:00Z",
+      "synthetic": true
+    }
+  ],
+  "claims": [
+    {
+      "id": "degree",
+      "subject_id": "subject-1",
+      "field": "education.degree",
+      "kind": "documented_fact",
+      "value": "Bachelor of History",
+      "context": null,
+      "evidence": [
+        {
+          "source_id": "src-transcript",
+          "locator_kind": "page",
+          "locator": "1"
+        }
+      ],
+      "related_claim_ids": [],
+      "rationale": null,
+      "next_action": null
+    },
+    {
+      "id": "year-a",
+      "subject_id": "subject-1",
+      "field": "education.completion_year",
+      "kind": "documented_fact",
+      "value": 2024,
+      "context": null,
+      "evidence": [
+        {
+          "source_id": "src-transcript",
+          "locator_kind": "page",
+          "locator": "1"
+        }
+      ],
+      "related_claim_ids": [],
+      "rationale": null,
+      "next_action": null
+    },
+    {
+      "id": "year-b",
+      "subject_id": "subject-1",
+      "field": "education.completion_year",
+      "kind": "documented_fact",
+      "value": 2023,
+      "context": null,
+      "evidence": [
+        {
+          "source_id": "src-cv",
+          "locator_kind": "section",
+          "locator": "Education"
+        }
+      ],
+      "related_claim_ids": [],
+      "rationale": null,
+      "next_action": null
+    },
+    {
+      "id": "year-conflict",
+      "subject_id": "subject-1",
+      "field": "education.completion_year",
+      "kind": "conflict",
+      "value": null,
+      "context": null,
+      "evidence": [],
+      "related_claim_ids": [
+        "year-a",
+        "year-b"
+      ],
+      "rationale": "Supplied sources disagree.",
+      "next_action": "Ask which year is correct and request supporting evidence."
+    },
+    {
+      "id": "location",
+      "subject_id": "subject-1",
+      "field": "preferences.delivery",
+      "kind": "preference",
+      "value": "remote",
+      "context": null,
+      "evidence": [
+        {
+          "source_id": "src-answer",
+          "locator_kind": "answer",
+          "locator": "1"
+        }
+      ],
+      "related_claim_ids": [],
+      "rationale": null,
+      "next_action": null
+    },
+    {
+      "id": "budget",
+      "subject_id": "subject-1",
+      "field": "preferences.budget",
+      "kind": "unknown",
+      "value": null,
+      "context": null,
+      "evidence": [],
+      "related_claim_ids": [],
+      "rationale": "No explicit answer supplied.",
+      "next_action": "Ask the applicant for an optional budget and currency."
+    },
+    {
+      "id": "recency",
+      "subject_id": "subject-1",
+      "field": "education.recent_completion",
+      "kind": "inference",
+      "value": true,
+      "context": null,
+      "evidence": [],
+      "related_claim_ids": [
+        "year-a",
+        "year-b"
+      ],
+      "rationale": "Both reported years fall within five years of 2026; the exact year remains disputed.",
+      "next_action": null
+    }
+  ],
+  "issues": [
+    {
+      "id": "issue-year",
+      "kind": "conflict",
+      "claim_ids": [
+        "year-conflict"
+      ],
+      "detail": "Two completion years.",
+      "next_action": "Clarify with applicant."
+    },
+    {
+      "id": "issue-budget",
+      "kind": "missing",
+      "claim_ids": [
+        "budget"
+      ],
+      "detail": "Budget not supplied.",
+      "next_action": "Ask explicitly if needed."
+    }
+  ],
+  "approval": null
+}

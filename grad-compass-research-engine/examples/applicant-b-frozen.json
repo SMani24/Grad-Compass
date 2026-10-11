@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "synthetic-b",
+  "revision_id": "revision-b2",
+  "parent_revision_id": "revision-b1",
+  "version_name": "synthetic-b-v2",
+  "status": "frozen",
+  "synthetic": true,
+  "sources": [
+    {
+      "id": "src-answer-b",
+      "kind": "clarification",
+      "label": "Invented vocational background",
+      "sha256": "62423ee5c26d81388ef8b6535d829530915c07ad6d4051204e4c818e5da502bf",
+      "readability": "readable",
+      "captured_at": "2026-10-01T00:00:00Z",
+      "synthetic": true
+    },
+    {
+      "id": "src-correction",
+      "kind": "clarification",
+      "label": "Invented correction",
+      "sha256": "6b73b37ef3b676a8ff9c5c2edcc8eae21c570acaed52fc551f6534dea48d3063",
+      "readability": "readable",
+      "captured_at": "2026-10-01T00:00:00Z",
+      "synthetic": true
+    }
+  ],
+  "claims": [
+    {
+      "id": "degree-b",
+      "subject_id": "subject-1",
+      "field": "education.degree",
+      "kind": "user_report",
+      "value": "Diploma in Culinary Arts",
+      "context": null,
+      "evidence": [
+        {
+          "source_id": "src-answer-b",
+          "locator_kind": "answer",
+          "locator": "1"
+        }
+      ],
+      "related_claim_ids": [],
+      "rationale": null,
+      "next_action": null
+    },
+    {
+      "id": "role-b",
+      "subject_id": "subject-1",
+      "field": "experience.role",
+      "kind": "user_report",
+      "value": "Pastry supervisor",
+      "context": null,
+      "evidence": [
+        {
+          "source_id": "src-correction",
+          "locator_kind": "answer",
+          "locator": "1"
+        }
+      ],
+      "related_claim_ids": [],
+      "rationale": null,
+      "next_action": null
+    },
+    {
+      "id": "grade-b",
+      "subject_id": "subject-1",
+      "field": "education.grade",
+      "kind": "unknown",
+      "value": null,
+      "context": null,
+      "evidence": [],
+      "related_claim_ids": [],
+      "rationale": "Transcript not supplied.",
+      "next_action": "Request transcript if grade is required."
+    }
+  ],
+  "issues": [
+    {
+      "id": "issue-grade",
+      "kind": "missing",
+      "claim_ids": [
+        "grade-b"
+      ],
+      "detail": "No documented grade.",
+      "next_action": "Request evidence."
+    }
+  ],
+  "approval": {
+    "receipt_id": "synthetic-receipt-b2",
+    "actor_type": "human",
+    "actor_id": "synthetic-human",
+    "approved_at": "2026-10-01T01:00:00Z",
+    "reliable_for_discovery": true,
+    "scope": "profile_only"
+  }
+}

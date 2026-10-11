@@ -1,0 +1,1 @@
+CleanCV by Gilad Turok, MIT License. Source: https://github.com/giladturok/CleanCV . The style file is retained as an upstream foundation; the CV renderer applies restrained academic overrides for applicant-specific layout and pagination. No applicant facts are stored here.

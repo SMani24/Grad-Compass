@@ -1,0 +1,15 @@
+{
+  "receipt_id": "synthetic-receipt-b2",
+  "synthetic": true,
+  "decision": "accepted",
+  "actor_type": "human",
+  "actor_id": "synthetic-human",
+  "profile_id": "synthetic-b",
+  "revision_id": "revision-b2",
+  "version_name": "synthetic-b-v2",
+  "schema_version": "1.0.0",
+  "sha256": "fb48d436c8cbe868581222f7e92b2561a1bef5c3df7fc7a8704b2aff69b6486f",
+  "reliable_for_discovery": true,
+  "scope": "profile_only",
+  "approved_at": "2026-10-01T01:00:00Z"
+}

@@ -1,0 +1,28 @@
+I want to finish developing the existing Grad-Compass application.
+
+The application is in `grad-compass/` inside the Grad-Compass monorepo. Another project, `grad-compass-research-engine/`, will produce university research data through a versioned contract in `grad-compass-exchange/`.
+
+For now, **do not modify any files**.
+
+First, thoroughly inspect the existing application, including its Python backend, SQLite database integration, frontend HTML/CSS/JavaScript, and existing features.
+
+Then interview me about the intended final functionality and design. I want to be involved in product decisions rather than having you assume what the application should do.
+
+After understanding the codebase and requirements, propose:
+
+1. What the application currently supports.
+2. What is unfinished, broken, or architecturally problematic.
+3. What should be preserved or improved.
+4. A prioritized MVP feature backlog.
+5. A practical implementation and testing workflow.
+6. How to integrate with the shared research-data contract without duplicating Marry's ongoing work.
+
+Important constraints:
+- Preserve existing user data.
+- Do not modify the production SQLite database, configuration, or Git tracking.
+- Do not modify the Research Engine, frozen Applicant Profile, or CV artifacts.
+- Do not implement features before we agree on the plan.
+- Favor simple, maintainable solutions over unnecessary frameworks or major rewrites.
+- Implement features incrementally with tests and opportunities for visual review.
+
+Start with the codebase audit and then ask me about the application's intended functionality.
