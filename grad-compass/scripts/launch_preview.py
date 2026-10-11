@@ -80,6 +80,20 @@ def main():
                 """))
                 if focus["outline"] != "3px":
                     raise RuntimeError("Keyboard focus styling did not render")
+                window.run_js("""
+                    document.getElementById('country').value = 'FRA';
+                    document.getElementById('country').dispatchEvent(new Event('change'));
+                    document.querySelector('[data-country="FRA"]').focus();
+                """)
+                country = json.loads(window.run_js("""JSON.stringify({
+                    selected: document.querySelector('[data-country="FRA"]').getAttribute('aria-pressed'),
+                    fill: document.querySelector('[data-country="FRA"]').getAttribute('fill'),
+                    outline: getComputedStyle(document.querySelector('[data-country="FRA"]')).outlineStyle,
+                    results: document.querySelectorAll('.university-card').length
+                })"""))
+                if country != {"selected": "true", "fill": "#85c2d4", "outline": "none", "results": 0}:
+                    raise RuntimeError("Selected country did not highlight along its shape")
+                window.run_js("document.getElementById('country').value = ''; document.getElementById('country').dispatchEvent(new Event('change'));")
                 window.run_js("document.getElementById('list-view').click(); document.querySelector('.university-card').click();")
                 stop_at = time.monotonic() + 20
                 while time.monotonic() < stop_at:

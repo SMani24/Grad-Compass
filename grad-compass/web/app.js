@@ -20,7 +20,48 @@ function safeExternalUrl(value) {
   } catch { return null; }
 }
 
-if (typeof module !== "undefined") module.exports = { hasCoordinates, filterUniversities, safeExternalUrl };
+function dominantLandmassBounds(feature) {
+  const geometry = feature?.geometry;
+  const polygons = geometry?.type === "Polygon" ? [geometry.coordinates]
+    : geometry?.type === "MultiPolygon" ? geometry.coordinates : [];
+  let largest = null;
+  let largestArea = -1;
+  for (const polygon of polygons) {
+    const ring = polygon[0];
+    if (!ring || ring.length < 4) continue;
+    const points = [];
+    for (const coordinate of ring) {
+      let [longitude, latitude] = coordinate;
+      if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) break;
+      const previous = points.at(-1)?.[0];
+      // Keep a dateline-crossing ring together rather than spanning the globe.
+      if (previous !== undefined) {
+        while (longitude - previous > 180) longitude -= 360;
+        while (longitude - previous < -180) longitude += 360;
+      }
+      points.push([longitude, latitude]);
+    }
+    if (points.length !== ring.length) continue;
+    let area = 0;
+    for (let index = 0; index < points.length; index++) {
+      const current = points[index];
+      const next = points[(index + 1) % points.length];
+      area += current[0] * next[1] - next[0] * current[1];
+    }
+    const south = Math.min(...points.map(point => point[1]));
+    const north = Math.max(...points.map(point => point[1]));
+    // Approximate geographic area so a polar island does not dominate by projection.
+    area = Math.abs(area) * Math.cos((south + north) * Math.PI / 360);
+    if (area > largestArea) {
+      largestArea = area;
+      largest = [[south, Math.min(...points.map(point => point[0]))],
+        [north, Math.max(...points.map(point => point[0]))]];
+    }
+  }
+  return largest;
+}
+
+if (typeof module !== "undefined") module.exports = { hasCoordinates, filterUniversities, safeExternalUrl, dominantLandmassBounds };
 
 if (typeof document !== "undefined") {
   const get = id => document.getElementById(id);
@@ -168,7 +209,14 @@ if (typeof document !== "undefined") {
   function renderMap() {
     if (!state.map) return;
     const countries = new Set(state.filtered.map(university => university.country_code));
-    state.polygons.setStyle(feature => ({ fillColor: countries.has(resolveCountryFeature(feature).code) ? "#cce5ee" : "#fff", fillOpacity: 1, color: "#b6cbd6", weight: .7 }));
+    state.polygons.eachLayer(layer => {
+      const code = resolveCountryFeature(layer.feature).code;
+      const selected = code === elements.country.value;
+      layer.setStyle({ fillColor: selected ? "#85c2d4" : countries.has(code) ? "#cce5ee" : "#fff",
+        fillOpacity: 1, color: selected ? "#087ba4" : "#b6cbd6", weight: selected ? 1.8 : .7 });
+      layer.getElement()?.setAttribute("aria-pressed", String(selected));
+      if (selected) layer.bringToFront();
+    });
     state.markers.clearLayers();
     for (const university of state.filtered.filter(hasCoordinates)) {
       const selected = state.selected === university.id;
@@ -182,6 +230,11 @@ if (typeof document !== "undefined") {
     state.filtered = filterUniversities(state.universities, { search: elements.search.value, country: elements.country.value, status: elements.status.value });
     renderResults(); renderMap();
   }
+  function focusCountry(code) {
+    const feature = state.geometry?.features.find(feature => resolveCountryFeature(feature).code === code);
+    const bounds = dominantLandmassBounds(feature);
+    if (state.map && bounds) state.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 5, animate: !matchMedia("(prefers-reduced-motion: reduce)").matches });
+  }
   async function loadMap() {
     if (state.map) return;
     try {
@@ -190,8 +243,19 @@ if (typeof document !== "undefined") {
       state.map = L.map("map", { center: [29, 2], zoom: 2.4, zoomSnap: .2, minZoom: 1.5, maxZoom: 12, zoomControl: false, attributionControl: false });
       L.control.zoom({ position: "bottomright" }).addTo(state.map);
       state.polygons = L.geoJSON({ ...data, features: data.features.filter(feature => resolveCountryFeature(feature).code !== "ATA") }, {
+        className: "country-outline",
         onEachFeature(feature, layer) {
           const country = resolveCountryFeature(feature);
+          layer.on("add", () => {
+            const path = layer.getElement();
+            path.setAttribute("data-country", country.code);
+            path.setAttribute("tabindex", "0");
+            path.setAttribute("role", "button");
+            path.setAttribute("aria-label", "Explore " + country.name);
+            path.addEventListener("keydown", event => {
+              if (event.key === "Enter" || event.key === " ") { event.preventDefault(); layer.fire("click"); }
+            });
+          });
           layer.bindTooltip(node("span", "", country.name), { sticky: true });
           layer.on("click", () => {
             if (![...elements.country.options].some(option => option.value === country.code)) {
@@ -199,7 +263,7 @@ if (typeof document !== "undefined") {
               option.value = country.code; elements.country.append(option);
             }
             elements.country.value = country.code; closeInspector(false);
-            state.map.fitBounds(layer.getBounds(), { padding: [30, 30], maxZoom: 5, animate: !matchMedia("(prefers-reduced-motion: reduce)").matches });
+            focusCountry(country.code);
           });
         }
       }).addTo(state.map);
@@ -225,6 +289,7 @@ if (typeof document !== "undefined") {
   get("map-view").addEventListener("click", () => setView("map"));
   get("list-view").addEventListener("click", () => setView("list"));
   for (const element of [elements.search, elements.country, elements.status]) element.addEventListener(element === elements.search ? "input" : "change", () => closeInspector(false));
+  elements.country.addEventListener("change", () => focusCountry(elements.country.value));
   get("retry").addEventListener("click", loadWorkspace);
   document.addEventListener("keydown", event => { if (event.key === "Escape" && !elements.inspector.hidden) closeInspector(); });
   for (const country of typeof WORLD_COUNTRIES !== "undefined" ? WORLD_COUNTRIES : []) {

@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { hasCoordinates, filterUniversities, safeExternalUrl } = require('../web/app.js');
+const { hasCoordinates, filterUniversities, safeExternalUrl, dominantLandmassBounds } = require('../web/app.js');
 
 const universities = [
   { id: 1, name: 'Northbridge Example', city: 'Example City', country_code: 'CAN', status: 'Researching', latitude: 0, longitude: 0 },
@@ -25,4 +25,22 @@ test('valid zero coordinates are accepted but invalid/non-numeric coordinates ar
 test('external links allow only explicit HTTP/HTTPS URLs', () => {
   assert.equal(safeExternalUrl('https://example.invalid/program'), 'https://example.invalid/program');
   for (const value of ['javascript:alert(1)', 'file:///private/profile.json', '//example.invalid', 'data:text/html,example', '']) assert.equal(safeExternalUrl(value), null);
+});
+
+test('country framing uses the main landmass without distant islands', () => {
+  const geometry = require('../ui/data/countries.geo.json');
+  const france = geometry.features.find(feature => feature.properties.name === 'France');
+  assert.ok(france);
+  const [[south, west], [north, east]] = dominantLandmassBounds(france);
+  assert.ok(south > 40 && north < 52 && west > -6 && east < 10, 'France should frame Europe, rather than all overseas territory');
+});
+test('dateline-crossing land is framed locally rather than as a world-wide box', () => {
+  const bounds = dominantLandmassBounds({ geometry: { type: 'Polygon', coordinates: [
+    [[179, 10], [-179, 10], [-179, 12], [179, 12], [179, 10]]
+  ] } });
+  assert.deepEqual(bounds, [[10, 179], [12, 181]]);
+});
+test('unsupported or missing country geometry does not produce a camera target', () => {
+  assert.equal(dominantLandmassBounds(null), null);
+  assert.equal(dominantLandmassBounds({ geometry: { type: 'Point', coordinates: [0, 0] } }), null);
 });

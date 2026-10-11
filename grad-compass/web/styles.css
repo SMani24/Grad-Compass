@@ -784,3 +784,12 @@ tr.selected {
 .inspector:focus {
   outline: none;
 }
+
+.country-outline:focus {
+  outline: none;
+}
+
+.country-outline:focus-visible {
+  stroke: #087ba4;
+  stroke-width: 2.5;
+}
