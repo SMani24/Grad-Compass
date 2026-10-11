@@ -113,6 +113,7 @@ if (typeof document !== "undefined") {
   }
   function setView(view, record = true) {
     state.view = view;
+    document.querySelector(".workspace").classList.toggle("list-view", view === "list");
     get("map").hidden = view !== "map";
     get("map-key").hidden = view !== "map";
     get("map-message").hidden = view !== "map" || !state.mapError;
@@ -232,6 +233,7 @@ if (typeof document !== "undefined") {
       layer.setStyle({ fillColor: selected ? "#85c2d4" : countries.has(code) ? "#cce5ee" : "#fff",
         fillOpacity: 1, color: selected ? "#087ba4" : "#b6cbd6", weight: selected ? 1.8 : .7 });
       layer.getElement()?.setAttribute("aria-pressed", String(selected));
+      layer.getElement()?.setAttribute("tabindex", selected ? "0" : "-1");
       if (selected) layer.bringToFront();
     });
     state.markers.clearLayers();
@@ -282,7 +284,7 @@ if (typeof document !== "undefined") {
           layer.on("add", () => {
             const path = layer.getElement();
             path.setAttribute("data-country", country.code);
-            path.setAttribute("tabindex", "0");
+            path.setAttribute("tabindex", "-1");
             path.setAttribute("role", "button");
             path.setAttribute("aria-label", "Explore " + country.name);
             path.addEventListener("keydown", event => {
@@ -321,6 +323,11 @@ if (typeof document !== "undefined") {
   }
   get("map-view").addEventListener("click", () => setView("map"));
   get("list-view").addEventListener("click", () => setView("list"));
+  document.querySelector(".brand").addEventListener("click", event => {
+    event.preventDefault();
+    elements.country.value = ""; elements.status.value = ""; elements.search.value = "";
+    editingSearch = false; setView("map", false); closeInspector(false, false); resetMap(); updateUrl();
+  });
   for (const element of [elements.country, elements.status]) element.addEventListener("change", () => {
     editingSearch = false;
     closeInspector(false);

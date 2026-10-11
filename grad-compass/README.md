@@ -59,6 +59,8 @@ Python tests create and clean up their own invented temporary runtimes. Node use
 
 The separate Qt check sends real key and mouse events to isolated widgets. `launch_preview.py --smoke-test` additionally checks browser history, cross-country context, Escape hierarchy and grouped search in the synthetic desktop window, then closes automatically.
 
+On a graphical desktop, `grad-compass/envGradCompass/bin/python -B grad-compass/tests/check_close_confirmation.py` checks the actual close dialog: it automatically cancels Ctrl+W once, verifies that the local server remains available, then confirms closure. Both GUI checks use only the synthetic preview.
+
 ## Synthetic desktop review
 
 Create a new demo folder; the helper refuses nonempty directories:

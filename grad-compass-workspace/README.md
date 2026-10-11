@@ -21,7 +21,7 @@ Read the local mailbox before research-related work. Append dated messages rathe
 
 ## Feedback and delivery
 
-The user maintains `../features_and_bugs.md` while using the application. Read it when asked and address one entry at a time, preserving the original feedback and recording completion after verification. New entries do not automatically authorize implementation or expand real-data permissions.
+The user maintains `../features_and_bugs.md` while using the application. Read it when asked and address one entry at a time. After implementation and verification, remove the completed entry and record its outcome in the review notes; Git history preserves the original feedback. New entries do not automatically authorize implementation or expand real-data permissions.
 
 For each requested increment, run the relevant checks and provide a visual review when appropriate. Commit completed changes with a short, natural message and push to the configured GitHub remote so each increment can be reviewed and reverted. Preserve shared history; do not force-push. The manual mailbox and local preview artifacts keep their existing exclusions.
 

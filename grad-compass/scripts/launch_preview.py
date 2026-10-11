@@ -78,9 +78,15 @@ def main():
                         cards: document.querySelectorAll('.university-card').length,
                         pins: document.querySelectorAll('.leaflet-overlay-pane path[fill="#087ba4"]').length,
                         map: !!document.querySelector('.leaflet-container'),
+                        width: document.getElementById('map').getBoundingClientRect().width,
+                        height: document.getElementById('map').getBoundingClientRect().height,
+                        viewportWidth: innerWidth,
+                        viewportHeight: innerHeight,
                         error: !document.getElementById('error').hidden
                     })"""))
                     if rendered and rendered["cards"] == 3 and rendered["pins"] == 2 and rendered["map"] and not rendered["error"]:
+                        if rendered["width"] != rendered["viewportWidth"] or rendered["height"] != rendered["viewportHeight"]:
+                            raise RuntimeError("Map does not fill the workspace viewport")
                         break
                     time.sleep(0.2)
                 else:

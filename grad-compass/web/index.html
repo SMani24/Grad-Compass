@@ -18,12 +18,11 @@
     <span class="preview-label">Sample workspace</span>
   </header>
   <main>
-    <section class="workspace-header" aria-label="Discovery controls">
-      <div><span class="eyebrow">YOUR UNIVERSITY ATLAS</span><h1>Explore universities</h1><p>Explore saved universities by location.</p></div>
-      <div class="view-switch" role="group" aria-label="Discovery view"><button id="map-view" aria-pressed="true">◉ Map</button><button id="list-view" aria-pressed="false">☷ List</button></div>
-    </section>
     <div class="workspace">
       <aside class="results-panel" aria-label="University results">
+        <section class="workspace-header" aria-label="University atlas">
+          <span class="eyebrow">YOUR UNIVERSITY ATLAS</span><h1>Explore universities</h1><p>A world of possibilities, in one place.</p>
+        </section>
         <div class="filter-controls">
           <label class="search-label" for="search">Search your universities</label>
           <input id="search" type="search" placeholder="University or city…" autocomplete="off">
@@ -39,6 +38,7 @@
         <div id="map-message" class="map-message" hidden></div>
         <div id="list-container" class="list-container" hidden><div class="list-intro"><span class="eyebrow">YOUR SAVED UNIVERSITIES</span><h2>Compare your universities</h2></div><div id="university-table"></div></div>
       </section>
+      <div class="view-switch" role="group" aria-label="Discovery view"><button id="map-view" aria-pressed="true">◉ Map</button><button id="list-view" aria-pressed="false">☷ List</button></div>
       <aside id="inspector" class="inspector" hidden aria-label="University details" tabindex="-1"></aside>
     </div>
     <div id="error" class="error-banner" hidden role="alert"><span id="error-text"></span><button id="retry">Try again</button></div>
