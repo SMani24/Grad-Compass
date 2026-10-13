@@ -1,0 +1,234 @@
+.research-link  {
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 11px;
+  background: #edf6f9;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+#exchange-dialog  {
+  width: min(1120px,calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 28px;
+  color: var(--ink);
+  box-shadow: 0 24px 100px #15304438;
+}
+
+#exchange-dialog::backdrop  {
+  background: #15304450;
+  backdrop-filter: blur(4px);
+}
+
+.exchange-header  {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.exchange-header h2  {
+  margin: 8px 0;
+  font-size: 25px;
+  letter-spacing: -.6px;
+}
+
+.exchange-header p  {
+  font-size: 12px;
+  margin: 0;
+}
+
+.exchange-step  {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.exchange-step h3  {
+  font-size: 14px;
+  margin: 0 0 13px;
+}
+
+.exchange-step h4  {
+  font-size: 12px;
+  margin: 24px 0 10px;
+}
+
+.exchange-step button  {
+  background: #087ba4;
+  color: white;
+  border: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.exchange-step button:disabled  {
+  opacity: .4;
+  cursor: default;
+}
+
+.exchange-actions  {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.exchange-actions label  {
+  grid-column: 1/-1;
+  margin: 0;
+}
+
+.exchange-actions select  {
+  font-size: 12px;
+}
+
+.exchange-hint  {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.exchange-table  {
+  overflow-x: auto;
+}
+
+.exchange-table table  {
+  min-width: 720px;
+}
+
+.exchange-table th  {
+  padding: 10px;
+}
+
+.exchange-table td  {
+  vertical-align: top;
+  padding: 14px 10px;
+  font-size: 11px;
+}
+
+.exchange-table td p  {
+  font-size: 10px;
+  margin: 5px 0;
+}
+
+.exchange-table details  {
+  margin-top: 8px;
+  max-width: 230px;
+  overflow-wrap: anywhere;
+}
+
+.exchange-table summary  {
+  color: var(--blue);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.mapping-select  {
+  min-width: 155px;
+  margin-bottom: 8px;
+}
+
+.exchange-badge  {
+  display: inline-block;
+  border-radius: 5px;
+  padding: 4px 7px;
+  background: #eef2f5;
+  color: #647989;
+  font-size: 10px;
+}
+
+.exchange-badge.promoted  {
+  background: #e6f5ed;
+  color: #26794d;
+}
+
+.exchange-badge.staged  {
+  background: #fff2d9;
+  color: #997421;
+}
+
+.exchange-approval  {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  margin: 16px 0;
+  color: var(--ink);
+}
+
+.exchange-approval input  {
+  width: 17px;
+  min-height: 17px;
+  flex-shrink: 0;
+}
+
+.exchange-change  {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  margin: 12px 0;
+}
+
+.exchange-change strong  {
+  font-size: 12px;
+}
+
+.exchange-change td,.exchange-change th  {
+  font-size: 11px;
+  padding: 8px;
+  overflow-wrap: anywhere;
+}
+
+.exchange-notice,.exchange-error  {
+  font-size: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin: 16px 0;
+  line-height: 1.6;
+}
+
+.exchange-notice  {
+  background: #edf6f9;
+  color: #087ba4;
+}
+
+.exchange-error  {
+  background: #fff1ee;
+  color: #984438;
+}
+
+#exchange-outcomes p  {
+  font-size: 12px;
+}
+
+#exchange-outcomes details  {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+@media(max-width:580px)  {
+  .research-link  {
+    position: absolute;
+    top: 66px;
+    left: 0;
+    padding: 12px;
+  }
+  #exchange-dialog  {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    padding: 20px 16px;
+  }
+  .exchange-header h2  {
+    font-size: 21px;
+  }
+  .exchange-actions  {
+    grid-template-columns: minmax(0,1fr);
+  }
+}

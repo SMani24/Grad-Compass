@@ -25,3 +25,9 @@ Deferred: bring-your-own Codex, mailbox connectors, public signup, payments, una
 5. Incorporate feedback before the next product-facing increment.
 
 Tests never point to the original application database or private Research Engine data. A production migration, private-artifact transfer, or deployment is a separate reviewed operation. Preserve original row IDs, legacy fields, and source/revision mappings when designing migrations.
+
+## Current bounded increment — 2026-10-13
+
+Increment 3 is authorized as an end-to-end **synthetic** app UI workflow only. It reuses unchanged exchange 1.0.0 and its importer on an explicitly marked disposable database, with selection, validation/staging, explicit institution mapping, simulated dry-run changes, operational approval, eligible promotion and idempotent replay. Real discovery, real publishing/importing and activation on production storage remain outside this increment.
+
+Dave's verified status supersedes stale enrichment/CV assumptions: the existing frozen profile remains valid, the applicant-specific v8 CV package is board accepted, and no additional enrichment task is approved or underway. Increment 4 still needs a separately approved private artifact handoff; increment 5's queue/manifests remain proposals. No regeneration or private transfer is needed to complete this synthetic proof.

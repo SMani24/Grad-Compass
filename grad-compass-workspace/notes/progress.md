@@ -24,3 +24,13 @@ No real-data transfer or deployment has occurred. The local mailbox is ready for
 - Screenshots, review instructions and limitations are organized under `reviews/`. The first layout review remains open for user feedback.
 
 Paperclip requests remain in the local mailbox, with no replies at this checkpoint. The next research integration increment depends on reviewing their response and the agreed exchange ownership boundaries; no profile/CV artifacts have been relocated or regenerated.
+
+## 2026-10-13 — verified coordination and synthetic exchange UI
+
+- Read Dave's consolidated 2026-10-12 responses. Current notes now record the valid approved frozen profile, board-accepted applicant-specific v8 CV and absence of any approved/active additional enrichment task. Historical mailbox messages are preserved; APP-005 acknowledges the corrected status and bounded app scope.
+- Independently compared the 16 shared exchange/importer paths with operator commit `043d9d7`: unchanged. Marry remains the compatibility contact. The app consumer reuses public importer operations and reviewed publisher without editing shared files or schemas.
+- Added Research imports: registered finalized invented batch selection, structural validation/staging, separate institution/program tables, explicit mappings, a reviewed dry run, operational approval, eligible promotion and visible outcomes/replay.
+- Added an isolated, marked `exchange-ui/exchange.sqlite` workspace. It is separate from both the map's preview DB and production. Only the pinned reviewed invented fixture is accepted. Promotion preview uses the actual importer in a temporary copy, avoiding duplicate eligibility logic.
+- Verification: 31 app Python tests, the unchanged 22-test shared exchange suite, 13 JavaScript tests and three Qt input tests passed (69 total). Dependency consistency, syntax and whitespace checks passed. The native UI demonstrated the whole workflow, including replay with zero new changes. All 146 protected-file fingerprints match the pre-increment snapshot; the 16 delivered shared paths still match `043d9d7`. Visual review is recorded in `reviews/2026-10-13-synthetic-exchange.md`.
+
+Private queue/manifests and artifact transfers remain proposals outside this implementation; no discovery, real-data import, production migration, profile enrichment or CV rebuild was performed.

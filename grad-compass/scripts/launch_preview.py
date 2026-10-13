@@ -7,11 +7,13 @@ from pathlib import Path
 import subprocess
 import sys
 import threading
+import tempfile
 import time
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = APP_ROOT.parent
 PREVIEW_DIR = REPO_ROOT / "grad-compass-workspace" / "runtime" / "preview"
+EXCHANGE_DIR = REPO_ROOT / "grad-compass-workspace" / "runtime" / "exchange-ui"
 sys.path.insert(0, str(APP_ROOT))
 
 
@@ -35,14 +37,22 @@ def prepare_workspace():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--smoke-test", action="store_true", help="verify rendering and close automatically")
+    parser.add_argument("--exchange-dir", type=Path, default=EXCHANGE_DIR, help="disposable synthetic exchange workspace")
+    parser.add_argument("--exchange-smoke-test", action="store_true", help="demonstrate the exchange UI in a new disposable database, then close")
+    parser.add_argument("--review-screenshots", type=Path, help="optional synthetic exchange review screenshot directory")
     args = parser.parse_args()
+    if args.review_screenshots and not args.exchange_smoke_test:
+        parser.error("--review-screenshots requires --exchange-smoke-test")
+    temporary_exchange = tempfile.TemporaryDirectory(prefix="grad-compass-exchange-ui-check-") if args.exchange_smoke_test else None
+    if temporary_exchange:
+        args.smoke_test = True
     directory = prepare_workspace()
     logging.basicConfig(filename=directory / "launcher.log", level=logging.WARNING)
     os.environ["QT_API"] = "pyqt6"
     import webview
     from web.server import create_server
 
-    server = create_server(directory, port=0)
+    server = create_server(directory, port=0, exchange_directory=Path(temporary_exchange.name) if temporary_exchange else args.exchange_dir)
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()
     result = {"passed": False}
@@ -59,6 +69,11 @@ def main():
         )
         from desktop_controls import DesktopControls
         controls = DesktopControls(window)
+        capture = None
+        if args.review_screenshots:
+            from core.paths import validate_data_directory
+            from preview_capture import PreviewCapture
+            capture = PreviewCapture(window, validate_data_directory(args.review_screenshots))
 
         def started():
             controls.install_requested.emit()
@@ -123,6 +138,9 @@ def main():
                     if detail["list"] == "true" and detail.get("title") == "Northbridge Example University" and detail["contacts"] == 1 and detail["tasks"] == 2:
                         from preview_checks import verify_navigation
                         verify_navigation(window)
+                        if args.exchange_smoke_test:
+                            from exchange_checks import verify_exchange
+                            verify_exchange(window, capture.save if capture else None)
                         result["passed"] = True
                         print("Desktop smoke test passed: map pins, focus styling, list toggle and university details.", flush=True)
                         return
@@ -144,6 +162,8 @@ def main():
         server.shutdown()
         server.server_close()
         worker.join(timeout=5)
+        if temporary_exchange:
+            temporary_exchange.cleanup()
     if args.smoke_test and not result["passed"]:
         raise SystemExit("Desktop smoke test failed; see the synthetic runtime's launcher.log")
 

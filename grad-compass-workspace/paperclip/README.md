@@ -4,21 +4,21 @@ The temporary mailbox is `messages.local.md` in this directory. It is local and 
 
 Each message has an ID, author, date with timezone, subject, and response section. Replies should refer to the message ID and identify any proposed contract change or blocker. Questions about applicant facts stay in the established private intake/review channel; this mailbox contains coordination only.
 
-## Current clarification — 2026-10-11, Asia/Tehran
+## Current verified status — 2026-10-13, Asia/Tehran
 
-Read **APP-004** in the mailbox for the current clarification of APP-001 through APP-003. Earlier messages remain intact as communication history; APP-004 supersedes conflicting authorization assumptions and artifact-status wording.
+Read Dave's dated **2026-10-12 responses to APP-001 through APP-004**, followed by APP-005. His consolidated confirmation supersedes APP-004's stale enrichment/CV wording. Earlier messages remain intact as communication history.
 
-Synthetic exchange implementation is authorized. This mailbox does not establish authorization for university discovery, real-data publishing/importing, private transfers, production changes, or new research stages. Dave should confirm the actual authorized work, existing engineering ownership and delivery blockers before action. Earlier instructions to keep discovery progressing, publish a first delivery or continue delivering are conditional on separately confirmed authorization.
+Synthetic exchange implementation is authorized. On 2026-10-13 the user additionally authorized an end-to-end synthetic workflow in the app UI, using an explicit disposable database and isolated runtime. No university discovery, real-data producer/publishing/import, private transfer or new enrichment task is authorized or underway. Earlier instructions to continue discovery/delivery remain conditional on separately confirmed authorization.
 
 ## Ownership and review
 
-Paperclip owns canonical profile enrichment, CV generation, research evidence, factual acceptance and producer IDs/revisions. The existing frozen Applicant Profile is approved and immutable. A separate enrichment revision is planned for missing research appointments, teaching, coursework, contacts, publications and other supported categories; it requires its own approval/freeze gate.
+Paperclip owns canonical profile work, CV generation, research evidence, factual acceptance and producer IDs/revisions. Alex's verification in GRA-38 confirms that the existing frozen Applicant Profile is approved, valid and immutable; prior enrichment/correction rounds are complete. No additional enrichment task is approved or underway. Any future changed revision requires its own evidence review, exact-version human approval and immutable freeze.
 
-The current CV package is **unapproved**. The adapted **Clean Academic CV design direction** is approved; the next applicant-specific rebuild waits for an approved enriched profile. Availability, review status and source revision are separate facts. A file's existence, transfer or draft viewing does not imply approval.
+Riley's verification in GRA-39 confirms that the applicant-specific three-variant **v8 CV package is board accepted** against the existing approved frozen profile. This acceptance goes beyond the earlier Clean Academic design-direction approval. A future changed-profile rebuild requires separate authorization and review. Availability, review status and source revision remain separate facts; possession or draft viewing never implies approval.
 
 The app consumes approved handoffs and displays their canonical status. Separately authorized draft viewing must retain a clear draft/unapproved label and source revision. The app does not introduce a competing profile/CV approval process. Its operational batch import decision remains distinct from Paperclip's factual acceptance.
 
-Proposed engineering split, pending Dave/Marry confirmation: **Codex owns subsequent application development; Marry is the technical contact for exchange compatibility.** APP-004 inventories the existing delivery in commit `043d9d7`: v1 schemas, validator, synthetic exporter/fixtures/tests and the app-side synthetic importer draft. The importer is a manual API, not connected to either app interface, and is not authorized for real data. Confirm outstanding work before overlapping edits; coordinate changes to shared files, importer compatibility and schemas before editing them. Exchange **1.0.0 remains unchanged** under this request.
+Confirmed engineering split: **Codex owns subsequent application development and operational import decisions; Marry is the technical contact for exchange/importer compatibility.** GRA-37 verified all 16 delivered paths against operator commit `043d9d7`; the app team independently checked that they remain unchanged. The existing importer API is reused by the new synthetic UI consumer, with no production activation or real-data input. Coordinate with Marry before editing any shared importer/contract file. Exchange **1.0.0 remains unchanged**.
 
 ## Three separate handoffs
 
@@ -36,4 +36,4 @@ Private queue and manifest shapes in APP-001 through APP-003 remain proposals un
 
 Already-tracked exceptions, identified from filenames only: `grad-compass/data/grad_compass.db`, `grad-compass/data/config.json` and four files under `grad-compass/ui/cache/` remain tracked despite their ignore rules. Treat the database/configuration and potentially personal cache as sensitive; contents were not inspected. Nine logs under `grad-compass-research-engine/cv/synthetic/build-v6/`, `build-v7/` and `build-v8/` are also tracked; their paths identify synthetic build output, and their contents were not inspected. No paths under `grad-compass-research-engine/private/` are tracked.
 
-This documentation update does not change exclusions, tracking, file locations or Git history. It does not modify production databases/configuration, the Research Engine, frozen artifacts or CV outputs.
+The synthetic UI feature does not expand production/private-data permissions. Existing local-file exclusions remain in force; the implementation does not modify the production database/configuration, Research Engine, frozen artifacts or CV outputs.

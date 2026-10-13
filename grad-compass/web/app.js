@@ -355,7 +355,8 @@ if (typeof document !== "undefined") {
       if (event.key === "ArrowLeft") goBack(); else goForward();
     } else if (event.key === "Escape") {
       event.preventDefault();
-      if (state.selected) closeInspector();
+      if (get("exchange-dialog")?.open) get("exchange-dialog").close();
+      else if (state.selected) closeInspector();
       else if (elements.country.value || elements.status.value || elements.search.value) {
         elements.country.value = ""; elements.status.value = ""; elements.search.value = "";
         editingSearch = false; closeInspector(false); resetMap();

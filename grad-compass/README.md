@@ -16,7 +16,27 @@ From a terminal, the same launcher is:
 grad-compass/envGradCompass/bin/python -B grad-compass/scripts/launch_preview.py
 ```
 
-This checkout's Python, geopy, pywebview, QtPy, PyQt6, Qt WebEngine, and Linux Qt platform libraries have been verified. For a fresh checkout, create `grad-compass/envGradCompass/` and install `grad-compass/requirements.txt` there. Desktop rendering requires a graphical session and the Qt platform's Linux libraries; the browser preview itself uses Python's standard library.
+This checkout's Python, geopy, pywebview, QtPy, PyQt6, Qt WebEngine, jsonschema and Linux Qt platform libraries have been verified. For a fresh checkout, create `grad-compass/envGradCompass/` and install `grad-compass/requirements.txt` there. Desktop rendering requires a graphical session and the Qt platform's Linux libraries; the HTTP layer uses Python's standard library and the shared exchange validator uses jsonschema.
+
+## Synthetic research imports
+
+Open **Research imports** in the desktop workspace. The launcher explicitly configures the separate, disposable `../grad-compass-workspace/runtime/exchange-ui/exchange.sqlite` database and synthetic outbox. New/empty storage is initialized with its own scope markers; existing unmarked storage is refused. The map's preview database remains read-only and separate.
+
+1. Select the finalized invented v1.0.0 batch and click **Validate & stage**. Inspect the separate institution/program tables, producer review states, evidence references and staging status.
+2. For **Example North University**, explicitly choose **Create a new institution** or link **Existing Demo University**, then save the mapping. Pending reviews may stay unmapped; they will remain in staging.
+3. Click **Review dry run**. Inspect before/after values, program-parent linkage, eligible intake claims and held records. The app runs the unchanged importer on a temporary database copy; this preview does not create rows in the source workspace.
+4. Check the operational approval box and click **Approve & promote eligible records**. This approves an import operation, not producer facts. Mapping changes or changes in eligibility require a new preview.
+5. Inspect outcomes, then click **Replay the same batch**. With the create-new choice, one institution and one program record are promoted; three records remain staged. The workspace totals are two local institutions (including the original seed) and one program. Replay reports zero new changes and no duplicates.
+
+Only the reviewed bundled synthetic fixture is selectable in this increment. A schema-valid real batch is not sufficient input. Unknown/stale/expired requirement claims remain staged according to the unchanged importer; the default freshness window is 30 days. Map geocoding, applicant artifacts and the proposed private queue are outside this workflow.
+
+To try the alternative mapping from a fresh disposable workspace, use `launch_preview.py --exchange-dir /tmp/grad-compass-exchange-alternative`. The app never deletes or resets an existing workspace automatically. Browser state/logs and exchange runtime files remain ignored.
+
+An unattended UI demonstration uses a new temporary database, operates the visible controls, verifies replay and cleans up that owned temporary workspace:
+
+```bash
+grad-compass/envGradCompass/bin/python -B grad-compass/scripts/launch_preview.py --exchange-smoke-test --review-screenshots grad-compass-workspace/reviews
+```
 
 The desktop entry generator emits checkout-specific paths without installing anything:
 
@@ -32,10 +52,10 @@ On this machine, it is installed at `~/.local/share/applications/grad-compass.de
 To review the same synthetic workspace in a regular browser:
 
 ```bash
-grad-compass/envGradCompass/bin/python -B grad-compass/web/server.py --data-dir grad-compass-workspace/runtime/preview --port 8765
+grad-compass/envGradCompass/bin/python -B grad-compass/web/server.py --data-dir grad-compass-workspace/runtime/preview --exchange-dir grad-compass-workspace/runtime/exchange-ui --port 8765
 ```
 
-Open `http://127.0.0.1:8765/`; stop the server with Ctrl+C. Search, country and stage filters work across both views. Select a university to inspect its metadata, saved contacts and linked tasks. Universities without coordinates remain visible in the results and list. This read-only local preview is the current visual checkpoint; real-data import, editing, authentication and deployment remain later increments.
+Open `http://127.0.0.1:8765/`; stop the server with Ctrl+C. Search, country and stage filters work across both views. Select a university to inspect its metadata, saved contacts and linked tasks. Universities without coordinates remain visible in the results and list. The map is read-only; Research imports writes only its separately configured synthetic database. Real-data import, personal-data editing, authentication and deployment remain later increments.
 
 ## Isolated development
 
@@ -49,6 +69,7 @@ Use `GRAD_COMPASS_OFFLINE=1` to disable geocoding/photo downloads and the backgr
 
 ```bash
 grad-compass/envGradCompass/bin/python -B -m unittest discover -s grad-compass/tests -v
+grad-compass/envGradCompass/bin/python -B -m unittest discover -s grad-compass-exchange/tests -v
 node grad-compass/tests/country_drawer.test.cjs
 node grad-compass/tests/web_discovery.test.cjs
 QT_QPA_PLATFORM=offscreen grad-compass/envGradCompass/bin/python -B grad-compass/tests/check_desktop_controls.py -v

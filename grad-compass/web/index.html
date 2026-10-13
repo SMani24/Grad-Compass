@@ -6,15 +6,18 @@
   <title>Grad Compass · Discover</title>
   <link rel="stylesheet" href="/vendor/leaflet.css">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/exchange.css">
   <script defer src="/vendor/leaflet.js"></script>
   <script defer src="/flags.js"></script>
   <script defer src="/app.js"></script>
+  <script defer src="/exchange.js"></script>
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Grad Compass home"><span class="brand-icon" aria-hidden="true">✦</span><span>Grad<span class="brand-light">Compass</span></span></a>
     <div class="navigation" role="group" aria-label="Workspace history"><button id="nav-back" type="button" aria-label="Go back" title="Go back (Alt+Left)" disabled>‹</button><button id="nav-forward" type="button" aria-label="Go forward" title="Go forward (Alt+Right)" disabled>›</button></div>
     <span class="nav-current">Discover <span class="nav-dot" aria-hidden="true"></span></span>
+    <button id="open-exchange" class="research-link" type="button">Research imports</button>
     <span class="preview-label">Sample workspace</span>
   </header>
   <main>
@@ -43,5 +46,16 @@
     </div>
     <div id="error" class="error-banner" hidden role="alert"><span id="error-text"></span><button id="retry">Try again</button></div>
   </main>
+  <dialog id="exchange-dialog" aria-labelledby="exchange-title">
+    <header class="exchange-header"><div><span class="eyebrow">SYNTHETIC RESEARCH HANDOFF</span><h2 id="exchange-title">Review an exchange batch</h2><p>Invented records in a separate disposable workspace. Producer review and your import decision stay distinct.</p></div><button id="close-exchange" type="button" class="inspector-close" aria-label="Close research imports">×</button></header>
+    <div id="exchange-message" role="status" aria-live="polite"></div>
+    <section class="exchange-step"><h3>1. Select a finalized batch</h3><div class="exchange-actions"><label for="exchange-batch">Synthetic outbox</label><select id="exchange-batch"><option value="">Choose a batch…</option></select><button id="exchange-stage" type="button" disabled>Validate &amp; stage</button></div><p id="exchange-validation" class="exchange-hint">Only the reviewed invented v1.0.0 fixture is available in this increment.</p></section>
+    <div id="exchange-content" hidden>
+      <section class="exchange-step"><h3>2. Inspect staged records and map institutions</h3><p class="exchange-hint">Choose an existing local institution or create a new one on promotion. Pending producer reviews remain in staging.</p><h4>Institutions</h4><div id="exchange-institutions" class="exchange-table"></div><h4>Programs</h4><div id="exchange-programs" class="exchange-table"></div></section>
+      <section class="exchange-step"><h3>3. Review the dry run</h3><button id="exchange-preview" type="button">Review dry run</button><div id="exchange-changes"></div></section>
+      <section class="exchange-step"><h3>4. Approve eligible promotion</h3><label class="exchange-approval"><input id="exchange-approve" type="checkbox" disabled>Approve the reviewed operational changes in this disposable workspace</label><button id="exchange-promote" type="button" disabled>Approve &amp; promote eligible records</button></section>
+      <section class="exchange-step"><h3>5. Inspect outcomes and replay</h3><div id="exchange-outcomes"></div><button id="exchange-replay" type="button" disabled>Replay the same batch</button></section>
+    </div>
+  </dialog>
 </body>
 </html>

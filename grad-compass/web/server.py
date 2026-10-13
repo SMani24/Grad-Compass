@@ -1,10 +1,11 @@
-"""Read-only, loopback-only browser preview of explicitly marked synthetic data."""
+"""Loopback-only synthetic map preview and opt-in disposable exchange workflow."""
 import argparse
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import re
+import secrets
 import sqlite3
 import sys
 from urllib.parse import urlsplit
@@ -18,6 +19,8 @@ STATIC_FILES = {
     "/": (APP_ROOT / "web" / "index.html", "text/html; charset=utf-8"),
     "/styles.css": (APP_ROOT / "web" / "styles.css", "text/css; charset=utf-8"),
     "/app.js": (APP_ROOT / "web" / "app.js", "text/javascript; charset=utf-8"),
+    "/exchange.js": (APP_ROOT / "web" / "exchange.js", "text/javascript; charset=utf-8"),
+    "/exchange.css": (APP_ROOT / "web" / "exchange.css", "text/css; charset=utf-8"),
     "/vendor/leaflet.js": (APP_ROOT / "ui" / "vendor" / "leaflet.js", "text/javascript; charset=utf-8"),
     "/vendor/leaflet.css": (APP_ROOT / "ui" / "vendor" / "leaflet.css", "text/css; charset=utf-8"),
     "/flags.js": (APP_ROOT / "ui" / "js" / "flags.js", "text/javascript; charset=utf-8"),
@@ -77,7 +80,7 @@ class DemoWorkspace:
             return {"university":dict(university), "professors":professors, "tasks":tasks}
 
 
-def handler_for(workspace):
+def handler_for(workspace, exchange=None, session_token=None):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):
             pass  # Do not log query strings, private request contents, or local paths.
@@ -107,6 +110,11 @@ def handler_for(workspace):
                     return self.respond(200,(APP_ROOT/"ui/data/countries.geo.json").read_bytes())
                 if route == "/api/workspace":
                     return self.respond(200,workspace.overview())
+                if route == "/api/exchange":
+                    result = exchange.catalog() if exchange else {"batches": []}
+                    return self.respond(200, {**result, "enabled": exchange is not None, "session": session_token})
+                if route.startswith("/api/exchange/state/") and exchange:
+                    return self.respond(200, exchange.state(route.removeprefix("/api/exchange/state/")))
                 match = re.fullmatch(r"/api/universities/([1-9][0-9]{0,9})",route)
                 if match:
                     result = workspace.university(int(match[1]))
@@ -116,25 +124,65 @@ def handler_for(workspace):
                 self.respond(500,{"error":"Could not load the preview workspace"})
 
         def do_POST(self):
-            self.respond(405,{"error":"This preview is read-only"})
+            route = urlsplit(self.path).path
+            actions = {"stage", "map", "preview", "promote", "replay"}
+            action = route.removeprefix("/api/exchange/")
+            if not exchange or action not in actions or route != "/api/exchange/" + action:
+                return self.respond(405,{"error":"This preview endpoint is read-only"})
+            origin = f"http://127.0.0.1:{self.server.server_port}"
+            if (self.headers.get("Host") != origin.removeprefix("http://")
+                or self.headers.get("Origin", origin) != origin
+                or not secrets.compare_digest(self.headers.get("X-Grad-Compass-Session", ""), session_token or "")):
+                return self.respond(403, {"error": "Use this app session to operate the disposable exchange workspace"})
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= 16384 or self.headers.get("Content-Type") != "application/json":
+                    raise ValueError("A small JSON request is required")
+                payload = json.loads(self.rfile.read(length))
+                allowed = {"batch_id"} | {"map": {"external_id", "local_id", "create"},
+                    "promote": {"preview_id", "approved"}}.get(action, set())
+                if not isinstance(payload, dict) or set(payload) - allowed or not isinstance(payload.get("batch_id"), str):
+                    raise ValueError("Invalid synthetic exchange request")
+                if action == "map":
+                    if not isinstance(payload.get("external_id"), str) or type(payload.get("create", False)) is not bool:
+                        raise ValueError("Select an explicit institution mapping")
+                    if payload.get("local_id") is not None and type(payload["local_id"]) is not int:
+                        raise ValueError("Select a local institution ID")
+                if action == "promote" and not isinstance(payload.get("preview_id"), str):
+                    raise ValueError("Review a dry run before approval")
+                return self.respond(200, getattr(exchange, action)(**payload))
+            except (TypeError, json.JSONDecodeError):
+                return self.respond(400, {"error": "Invalid synthetic exchange request"})
+            except ValueError as error:
+                return self.respond(409, {"error": str(error)})
+            except (OSError, sqlite3.Error):
+                return self.respond(500, {"error": "Could not complete the disposable exchange operation"})
 
-        do_PUT = do_PATCH = do_DELETE = do_POST
+        def do_PUT(self):
+            self.respond(405, {"error": "Use the explicit exchange workflow actions"})
+
+        do_PATCH = do_DELETE = do_PUT
 
     return Handler
 
 
-def create_server(directory, port=8765):
+def create_server(directory, port=8765, exchange_directory=None):
     workspace = DemoWorkspace(directory)
-    return ThreadingHTTPServer(("127.0.0.1",port),handler_for(workspace))
+    exchange = None
+    if exchange_directory is not None:
+        from web.exchange_workflow import SyntheticExchangeWorkflow
+        exchange = SyntheticExchangeWorkflow(exchange_directory)
+    return ThreadingHTTPServer(("127.0.0.1",port),handler_for(workspace, exchange, secrets.token_urlsafe(24)))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir",type=Path,required=True)
     parser.add_argument("--port",type=int,default=8765)
+    parser.add_argument("--exchange-dir", type=Path, help="explicit disposable synthetic exchange workspace")
     args = parser.parse_args()
     try:
-        server = create_server(args.data_dir,args.port)
+        server = create_server(args.data_dir,args.port, args.exchange_dir)
     except (ValueError,OSError) as error:
         parser.error(str(error))
     print(f"Local synthetic preview: http://127.0.0.1:{server.server_port}",flush=True)
