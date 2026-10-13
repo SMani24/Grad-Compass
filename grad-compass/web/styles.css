@@ -942,3 +942,11 @@ html {
   box-shadow: 0 1px 5px #18394e16;
 }
 .coverage-hint { display: block; margin-top: 8px; font-size: .625rem; color: var(--muted); }
+
+.country-personal { margin: 24px 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #f7fafb; }
+.country-personal select { font-size: .75rem; }
+.research-state { color: var(--muted); background: #edf5f8; padding: 10px; border-radius: 8px; }
+.decision-status,.source-revision { font-size: .625rem; }
+.decision-badge { display: inline-block; margin-top: 8px; padding: 4px 7px; border-radius: 5px; background: #eef3f6; color: var(--ink); font-size: .625rem; }
+.country-source { overflow-wrap: anywhere; }
+.country-source a { color: var(--blue); font-size: .75rem; }

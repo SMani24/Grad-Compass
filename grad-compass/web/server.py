@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 import tempfile
+import threading
 from pathlib import Path
 import re
 import secrets
@@ -34,6 +35,7 @@ class DemoWorkspace:
     def __init__(self, directory):
         self.directory = validate_data_directory(directory)
         self.database = self.directory / "grad_compass.db"
+        self.state_lock = threading.RLock()
         with closing(self.connect()) as connection:
             pass
 
@@ -84,6 +86,42 @@ class DemoWorkspace:
             if os.path.exists(temporary):
                 os.unlink(temporary)
         return {"text_size": size}
+
+    def country_decisions(self, code=None, decision=None):
+        from web.country_evidence import COUNTRY_CODES, DECISIONS
+        with self.state_lock, closing(self.connect()):
+            if any(path.is_symlink() for path in (self.directory, *self.directory.parents)):
+                raise ValueError("Personal decisions require an unlinked synthetic workspace")
+            path = self.directory / "country-decisions.json"
+            if path.is_symlink() or (path.exists() and (not path.is_file() or path.stat().st_nlink != 1)):
+                raise ValueError("Personal decisions require an unlinked workspace file")
+            saved = {}
+            if path.exists():
+                if path.stat().st_size > 65536:
+                    raise ValueError("Invalid saved country decisions")
+                try:
+                    saved = json.loads(path.read_text())
+                    if not isinstance(saved, dict) or any(key not in COUNTRY_CODES or value not in DECISIONS for key,value in saved.items()):
+                        raise ValueError("Invalid saved country decisions")
+                except (json.JSONDecodeError, TypeError):
+                    raise ValueError("Invalid saved country decisions") from None
+            if code is None:
+                return saved
+            if not isinstance(code, str) or code not in COUNTRY_CODES or not isinstance(decision, str) or decision not in (*DECISIONS, ""):
+                raise ValueError("Choose a displayed country and personal decision")
+            if decision:
+                saved[code] = decision
+            else:
+                saved.pop(code, None)
+            descriptor, temporary = tempfile.mkstemp(prefix=".country-decisions-", dir=self.directory)
+            try:
+                with os.fdopen(descriptor, "w") as output:
+                    json.dump(saved, output)
+                os.replace(temporary, path)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+            return saved
 
     def overview(self):
         with closing(self.connect()) as connection:
@@ -143,7 +181,7 @@ def handler_for(workspace, exchange=None, session_token=None):
                     return self.respond(200,(APP_ROOT/"ui/data/countries.geo.json").read_bytes())
                 if route == "/api/workspace":
                     from web.discovery import overview
-                    return self.respond(200,overview(workspace, exchange))
+                    return self.respond(200,{**overview(workspace, exchange), "country_decisions": workspace.country_decisions(), "session": session_token})
                 if route == "/api/display-preferences":
                     return self.respond(200, {**workspace.display_preferences(), "session": session_token})
                 if route == "/api/exchange":
@@ -151,6 +189,11 @@ def handler_for(workspace, exchange=None, session_token=None):
                     return self.respond(200, {**result, "enabled": exchange is not None, "session": session_token})
                 if route.startswith("/api/exchange/state/") and exchange:
                     return self.respond(200, exchange.state(route.removeprefix("/api/exchange/state/")))
+                country = re.fullmatch(r"/api/countries/([A-Z0-9_]{1,80})", route)
+                if country:
+                    from web.country_evidence import detail
+                    result = detail(workspace, exchange, country[1])
+                    return self.respond(200,result) if result else self.respond(404,{"error":"Country not found"})
                 match = re.fullmatch(r"/api/universities/((?:exchange-)?[1-9][0-9]{0,9})",route)
                 if match:
                     from web.discovery import university
@@ -164,8 +207,9 @@ def handler_for(workspace, exchange=None, session_token=None):
             route = urlsplit(self.path).path
             actions = {"stage", "map", "preview", "promote", "replay"}
             action = route.removeprefix("/api/exchange/")
+            personal_decision = route == "/api/country-decisions"
             preferences = route == "/api/display-preferences"
-            if not preferences and (not exchange or action not in actions or route != "/api/exchange/" + action):
+            if not (preferences or personal_decision) and (not exchange or action not in actions or route != "/api/exchange/" + action):
                 return self.respond(405,{"error":"This preview endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"
             if (self.headers.get("Host") != origin.removeprefix("http://")
@@ -178,6 +222,10 @@ def handler_for(workspace, exchange=None, session_token=None):
                 if not 0 < length <= 16384 or self.headers.get("Content-Type") != "application/json":
                     raise ValueError("A small JSON request is required")
                 payload = json.loads(self.rfile.read(length))
+                if personal_decision:
+                    if not isinstance(payload, dict) or set(payload) != {"country_code", "decision"} or not isinstance(payload["country_code"], str) or not isinstance(payload["decision"], str):
+                        raise ValueError("Choose a displayed country and personal decision")
+                    return self.respond(200, {"country_decisions": workspace.country_decisions(payload["country_code"], payload["decision"])})
                 if preferences:
                     if not isinstance(payload, dict) or set(payload) != {"text_size"} or not isinstance(payload["text_size"], str):
                         raise ValueError("Choose an available text size")

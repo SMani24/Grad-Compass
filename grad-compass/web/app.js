@@ -83,7 +83,7 @@ if (typeof module !== "undefined") module.exports = { hasCoordinates, filterUniv
 
 if (typeof document !== "undefined") {
   const get = id => document.getElementById(id);
-  const state = { universities: [], filtered: [], selected: null, view: "map", mode: "universities", countries: [], geometry: null, map: null, polygons: null, markers: null, mapError: false, detailSequence: 0 };
+  const state = { universities: [], filtered: [], selected: null, view: "map", mode: "universities", selectedCountry: null, decisions: {}, session: null, countries: [], geometry: null, map: null, polygons: null, markers: null, mapError: false, detailSequence: 0 };
   const elements = { search: get("search"), country: get("country"), status: get("status"), results: get("results"), inspector: get("inspector") };
   let navigationIndex = 0;
   let navigationEnd = 0;
@@ -117,6 +117,7 @@ if (typeof document !== "undefined") {
     const url = new URL(location.href);
     if (state.mode === "countries") url.searchParams.set("mode", "countries"); else url.searchParams.delete("mode");
     if (state.view === "list") url.searchParams.set("view", "list"); else url.searchParams.delete("view");
+    if (state.selectedCountry) url.searchParams.set("countryDetails", "1"); else url.searchParams.delete("countryDetails");
     if (state.selected) url.searchParams.set("university", state.selected); else url.searchParams.delete("university");
     for (const name of ["country", "status", "search"]) {
       if (elements[name].value) url.searchParams.set(name, elements[name].value); else url.searchParams.delete(name);
@@ -158,17 +159,21 @@ if (typeof document !== "undefined") {
     closeInspector(false, false);
     if (record) updateUrl();
   }
-  function selectCountry(code) {
+  function selectCountry(code, frame = true, record = true) {
     if (![...elements.country.options].some(option => option.value === code)) {
       const country = state.countries.find(item => item.code === code);
       const option = node("option", "", country?.name || code);
       option.value = code; elements.country.append(option);
     }
-    elements.country.value = code; closeInspector(false); focusCountry(code);
+    elements.country.value = code; closeInspector(false, false);
+    if (state.mode === "countries") showCountry(code);
+    if (record) updateUrl();
+    if (frame) focusCountry(code);
   }
   function closeInspector(restoreFocus = true, record = true) {
     state.detailSequence++;
     state.selected = null;
+    state.selectedCountry = null;
     elements.inspector.hidden = true;
     document.querySelector(".workspace").classList.remove("has-inspector");
     if (record) updateUrl();
@@ -180,9 +185,75 @@ if (typeof document !== "undefined") {
     row.append(node("span", "", label), node("span", "", value));
     return row;
   }
+  async function showCountry(code) {
+    const sequence = ++state.detailSequence;
+    state.selectedCountry = code;
+    state.selected = null;
+    elements.inspector.hidden = false;
+    elements.inspector.setAttribute("aria-label", "Country details");
+    document.querySelector(".workspace").classList.add("has-inspector");
+    elements.inspector.replaceChildren(node("p", "empty-state", "Loading country research…"));
+    try {
+      const detail = await api("/api/countries/" + encodeURIComponent(code));
+      if (sequence !== state.detailSequence || state.mode !== "countries") return;
+      const country = state.countries.find(item => item.code === code);
+      const top = node("div", "inspector-top");
+      const close = node("button", "inspector-close", "×");
+      close.type = "button"; close.setAttribute("aria-label", "Close country details");
+      close.addEventListener("click", closeInspector);
+      top.append(node("span", "eyebrow", "COUNTRY DETAILS"), close);
+      elements.inspector.replaceChildren(top, node("div", "institution-symbol", country?.flag || "🌐"), node("h2", "", country?.name || code));
+      elements.inspector.append(node("p", "research-state", detail.review_status === "unreviewed_demo" ? "Invented evidence · unreviewed demo" : "Country evidence not researched"));
+      const personal = node("section", "country-personal");
+      const label = node("label", "", "Your personal decision"); label.htmlFor = "country-decision";
+      const chooser = node("select"); chooser.id = "country-decision";
+      for (const value of ["", "Considering", "Shortlisted", "On hold", "Excluded"]) {
+        const option = node("option", "", value || "No decision yet"); option.value = value; chooser.append(option);
+      }
+      chooser.value = detail.decision;
+      const saved = node("p", "decision-status", detail.decision ? "Saved in this workspace." : "Independent of research review and application stages.");
+      saved.setAttribute("role", "status"); saved.setAttribute("aria-live", "polite");
+      personal.append(label, chooser, saved); elements.inspector.append(personal);
+      chooser.addEventListener("change", async () => {
+        const previous = state.decisions[code] || "";
+        const choice = chooser.value; chooser.disabled = true; saved.textContent = "Saving…";
+        try {
+          const response = await fetch("/api/country-decisions", {method:"POST",headers:{"Content-Type":"application/json","X-Grad-Compass-Session":state.session},body:JSON.stringify({country_code:code,decision:choice})});
+          const result = await response.json();
+          if (!response.ok) throw new Error("Could not save your decision. Please retry.");
+          state.decisions = result.country_decisions; renderResults();
+          if (sequence === state.detailSequence) saved.textContent = "Saved in this workspace. Research review is unchanged.";
+        } catch(error) { chooser.value = previous; if (sequence === state.detailSequence) saved.textContent = error.message; }
+        finally { chooser.disabled = false; }
+      });
+      elements.inspector.append(node("h3", "", "Research summary"), node("p", "country-summary", detail.summary));
+      elements.inspector.append(node("h3", "", "Sources"));
+      if (!detail.sources.length) elements.inspector.append(node("p", "", "No country sources supplied yet."));
+      for (const source of detail.sources) {
+        const card = node("div", "detail-card country-source");
+        const url = safeExternalUrl(source.source_url);
+        const link = node(url ? "a" : "span", "", "Synthetic source · example only");
+        if (url) { link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer"; }
+        card.append(link, node("p", "", source.source_url), node("p", "", source.locator), node("p", "", "Observed " + source.observed_at)); elements.inspector.append(card);
+      }
+      elements.inspector.append(node("h3", "", "Uncertainties & coverage"));
+      for (const uncertainty of detail.uncertainties) elements.inspector.append(node("p", "", "• " + uncertainty));
+      elements.inspector.append(node("p", "country-coverage", detail.university_count + " saved universities here. Empty results indicate missing coverage, not unsuitability."));
+      if (detail.revision) elements.inspector.append(node("p", "source-revision", "Demo source revision: " + detail.revision));
+      elements.inspector.focus({preventScroll:true});
+    } catch {
+      if (sequence !== state.detailSequence) return;
+      const retry = node("button", "inspector-close", "Try again");
+      retry.addEventListener("click", () => showCountry(code));
+      const close = node("button", "inspector-close", "Close"); close.addEventListener("click", closeInspector);
+      elements.inspector.replaceChildren(node("p", "", "Country research could not load. This does not indicate unsuitability."), retry, close);
+    }
+  }
   async function selectUniversity(id, focusMap = true, record = true) {
     const sequence = ++state.detailSequence;
     state.selected = id;
+    state.selectedCountry = null;
+    elements.inspector.setAttribute("aria-label", "University details");
     elements.inspector.hidden = false;
     document.querySelector(".workspace").classList.add("has-inspector");
     elements.inspector.replaceChildren(node("p", "empty-state", "Loading university details…"));
@@ -258,19 +329,19 @@ if (typeof document !== "undefined") {
     get("mapped-count").textContent = "Saved university counts describe coverage, not suitability";
     if (!countries.length) elements.results.append(node("p", "empty-state", state.geometry ? "No countries match this search." : "Loading countries…"));
     const table = node("table"); const head = node("thead"); const headings = node("tr");
-    for (const title of ["Country", "Saved universities", "Coverage"]) { const cell = node("th", "", title); cell.scope = "col"; headings.append(cell); }
+    for (const title of ["Country", "Saved universities", "Personal decision"]) { const cell = node("th", "", title); cell.scope = "col"; headings.append(cell); }
     head.append(headings); table.append(head); const body = node("tbody");
     for (const country of countries) {
       const count = state.universities.filter(university => university.country_code === country.code).length;
       const selected = elements.country.value === country.code;
       const card = node("button", "country-card" + (selected ? " selected" : ""));
       card.type = "button"; card.dataset.country = country.code; card.setAttribute("aria-pressed", String(selected));
-      card.append(node("span", "country-tag", country.code), node("span", "university-name", country.flag + " " + country.name), node("span", "card-meta", count + " saved universities"), node("span", "coverage-hint", "Research coverage incomplete"));
+      card.append(node("span", "country-tag", country.code), node("span", "university-name", country.flag + " " + country.name), node("span", "card-meta", count + " saved universities"), node("span", "coverage-hint", "Research coverage incomplete"), node("span", "decision-badge", state.decisions[country.code] || "No personal decision"));
       card.addEventListener("click", () => selectCountry(country.code)); elements.results.append(card);
       const row = node("tr", selected ? "selected" : ""); row.dataset.country = country.code;
       const name = node("td"); const button = node("button", "", country.flag + " " + country.name);
       button.addEventListener("click", () => selectCountry(country.code)); name.append(button);
-      row.append(name, node("td", "", count), node("td", "", "Incomplete")); body.append(row);
+      row.append(name, node("td", "", count), node("td", "", state.decisions[country.code] || "No decision")); body.append(row);
     }
     table.append(body);
     get("university-table").replaceChildren(countries.length ? table : node("p", "empty-state", "No countries match this search."));
@@ -356,15 +427,16 @@ if (typeof document !== "undefined") {
     closeInspector(false, false);
     if (elements.country.value) focusCountry(elements.country.value); else resetMap();
     const id = url.searchParams.get("university");
+    if (state.mode === "countries" && url.searchParams.get("countryDetails") === "1" && state.countries.some(country => country.code === elements.country.value)) selectCountry(elements.country.value, false, false);
     const selected = state.universities.find(university => String(university.id) === id);
-    if (selected) selectUniversity(selected.id, false, false);
+    if (selected && state.mode === "universities") selectUniversity(selected.id, false, false);
   }
   async function loadMap() {
     if (state.map) return;
     try {
       const data = await api("/api/map");
       state.geometry = discoveryGeometry(data);
-      state.countries = [...new Map(state.geometry.features.map(feature => { const country = discoveryCountry(feature); return [country.code, country]; })).values()].sort((a,b) => a.name.localeCompare(b.name));
+      state.countries = [...new Map(state.geometry.features.map(feature => { const country = discoveryCountry(feature); return [country.code, {...country, name: typeof BY_CODE !== "undefined" ? BY_CODE[country.code]?.name || country.name : country.name}]; })).values()].sort((a,b) => a.name.localeCompare(b.name));
       state.map = L.map("map", { center: [29, 2], zoom: 2.4, zoomSnap: .2, minZoom: 1.5, maxZoom: 12, zoomControl: false, attributionControl: false });
       L.control.zoom({ position: "bottomright" }).addTo(state.map);
       state.polygons = L.geoJSON(state.geometry, {
@@ -397,6 +469,7 @@ if (typeof document !== "undefined") {
     try {
       const result = await api("/api/workspace");
       state.universities = result.universities;
+      state.decisions = result.country_decisions || {}; state.session = result.session;
       render();
       await loadMap();
     } catch {
@@ -437,8 +510,10 @@ if (typeof document !== "undefined") {
   window.addEventListener("grad-compass:discovery-updated", async () => {
     try {
       const result = await api("/api/workspace");
-      state.universities = result.universities; render();
+      state.universities = result.universities;
+      state.decisions = result.country_decisions || {}; state.session = result.session; render();
       if (state.selected) selectUniversity(state.selected, false, false);
+      else if (state.selectedCountry) showCountry(state.selectedCountry);
     } catch {
       get("error-text").textContent = "Could not refresh promoted research. Please try again.";
       get("error").hidden = false;
@@ -452,7 +527,7 @@ if (typeof document !== "undefined") {
       event.preventDefault();
       if (get("settings-dialog")?.open) get("settings-dialog").close();
       else if (get("exchange-dialog")?.open) get("exchange-dialog").close();
-      else if (state.selected) closeInspector();
+      else if (state.selected || state.selectedCountry) closeInspector();
       else if (elements.country.value || elements.status.value || elements.search.value) {
         elements.country.value = ""; elements.status.value = ""; elements.search.value = "";
         editingSearch = false; closeInspector(false); resetMap();

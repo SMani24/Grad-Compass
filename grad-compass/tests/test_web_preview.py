@@ -35,9 +35,9 @@ class WebPreviewTests(unittest.TestCase):
         getattr(handler,"do_" + method)()
         return result
 
-    def preference_request(self, payload, **headers):
+    def preference_request(self, payload, path="/api/display-preferences", **headers):
         handler = object.__new__(server.handler_for(self.workspace, session_token="test-session"))
-        handler.path = "/api/display-preferences"
+        handler.path = path
         raw = json.dumps(payload).encode()
         handler.headers = {"Host": "127.0.0.1:8765", "Origin": "http://127.0.0.1:8765",
             "Content-Type": "application/json", "Content-Length": str(len(raw)),
@@ -87,6 +87,51 @@ class WebPreviewTests(unittest.TestCase):
             connection.execute("DELETE FROM app_synthetic_demo_guard")
         self.assertEqual(self.preference_request({"text_size": "large"})["status"], 409)
         self.assertFalse(path.exists())
+
+    def test_country_evidence_empty_coverage_is_distinct_from_personal_decision(self):
+        result = self.route("/api/countries/FRA")["payload"]
+        self.assertTrue(result["synthetic"])
+        self.assertEqual(result["university_count"],0)
+        self.assertEqual(result["review_status"],"unreviewed_demo")
+        self.assertTrue(result["sources"])
+        self.assertTrue(result["uncertainties"])
+        digest = hashlib.sha256(self.workspace.database.read_bytes()).hexdigest()
+        for decision in ("Considering", "Shortlisted", "On hold", "Excluded"):
+            response = self.preference_request({"country_code":"FRA", "decision":decision}, path="/api/country-decisions")
+            self.assertEqual(response["status"],200)
+            self.assertEqual(server.DemoWorkspace(self.directory).country_decisions()["FRA"],decision)
+            current = self.route("/api/countries/FRA")["payload"]
+            self.assertEqual(current["decision"],decision)
+            self.assertEqual(current["review_status"],result["review_status"])
+            self.assertEqual(current["summary"],result["summary"])
+        self.assertEqual(hashlib.sha256(self.workspace.database.read_bytes()).hexdigest(),digest)
+        self.assertEqual(self.route("/api/countries/ATA")["status"],404)
+        untouched = self.route("/api/countries/JPN")["payload"]
+        self.assertEqual(untouched["review_status"],"not_researched")
+        self.assertEqual(untouched["sources"],[])
+
+    def test_country_decisions_preserve_other_choices_and_reject_unsafe_writes(self):
+        path="/api/country-decisions"
+        for code in ("CAN", "FRA"):
+            self.assertEqual(self.preference_request({"country_code":code,"decision":"Considering"},path=path)["status"],200)
+        for payload in ({"country_code":None,"decision":"Excluded"}, {"country_code":"CAN","decision":[]},
+                        {"country_code":"ATA","decision":"Excluded"}, {"country_code":"CAN","decision":"accepted"},
+                        {"country_code":"CAN","decision":"Excluded","review":"accepted"}):
+            self.assertEqual(self.preference_request(payload,path=path)["status"],409)
+        self.assertEqual(self.preference_request({"country_code":"CAN","decision":"Excluded"},path=path,Origin="https://example.com")["status"],403)
+        self.assertEqual(self.workspace.country_decisions(),{"CAN":"Considering","FRA":"Considering"})
+        self.preference_request({"country_code":"CAN","decision":""},path=path)
+        self.assertEqual(self.workspace.country_decisions(),{"FRA":"Considering"})
+        file=self.directory / "country-decisions.json"
+        self.assertEqual(file.stat().st_mode & 0o777,0o600)
+        file.unlink()
+        target=Path(self.temp.name)/"other.json";target.write_text('{}')
+        file.symlink_to(target)
+        self.assertEqual(self.preference_request({"country_code":"CAN","decision":"Considering"},path=path)["status"],409)
+        self.assertEqual(target.read_text(),'{}')
+        file.unlink();file.write_text('{broken')
+        self.assertEqual(self.preference_request({"country_code":"CAN","decision":"Considering"},path=path)["status"],409)
+        self.assertEqual(file.read_text(),'{broken')
 
     def test_overview_and_details_return_linked_synthetic_records(self):
         overview = self.route("/api/workspace")
