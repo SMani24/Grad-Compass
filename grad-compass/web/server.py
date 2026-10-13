@@ -3,6 +3,8 @@ import argparse
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
+import tempfile
 from pathlib import Path
 import re
 import secrets
@@ -19,6 +21,7 @@ STATIC_FILES = {
     "/": (APP_ROOT / "web" / "index.html", "text/html; charset=utf-8"),
     "/styles.css": (APP_ROOT / "web" / "styles.css", "text/css; charset=utf-8"),
     "/app.js": (APP_ROOT / "web" / "app.js", "text/javascript; charset=utf-8"),
+    "/settings.js": (APP_ROOT / "web" / "settings.js", "text/javascript; charset=utf-8"),
     "/exchange.js": (APP_ROOT / "web" / "exchange.js", "text/javascript; charset=utf-8"),
     "/exchange.css": (APP_ROOT / "web" / "exchange.css", "text/css; charset=utf-8"),
     "/vendor/leaflet.js": (APP_ROOT / "ui" / "vendor" / "leaflet.js", "text/javascript; charset=utf-8"),
@@ -51,6 +54,36 @@ class DemoWorkspace:
             connection.close()
             raise ValueError("Preview requires a workspace created by create_demo.py") from None
         return connection
+
+    def display_preferences(self, size=None):
+        """Persist display choices only in the marked, disposable app workspace."""
+        with closing(self.connect()):
+            pass
+        path = self.directory / "display-preferences.json"
+        if path.is_symlink() or (path.exists() and (not path.is_file() or path.stat().st_nlink != 1)):
+            raise ValueError("Display preferences must be an unlinked workspace file")
+        sizes = {"standard", "comfortable", "large", "extra-large"}
+        if size is None:
+            if not path.exists():
+                return {"text_size": "standard"}
+            try:
+                saved = json.loads(path.read_text())
+                if not isinstance(saved, dict) or saved.get("text_size") not in sizes:
+                    raise ValueError("Invalid saved display preferences")
+                return {"text_size": saved["text_size"]}
+            except (json.JSONDecodeError, TypeError):
+                raise ValueError("Invalid saved display preferences") from None
+        if not isinstance(size, str) or size not in sizes:
+            raise ValueError("Choose an available text size")
+        descriptor, temporary = tempfile.mkstemp(prefix=".display-", dir=self.directory)
+        try:
+            with os.fdopen(descriptor, "w") as output:
+                json.dump({"text_size": size}, output)
+            os.replace(temporary, path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        return {"text_size": size}
 
     def overview(self):
         with closing(self.connect()) as connection:
@@ -110,6 +143,8 @@ def handler_for(workspace, exchange=None, session_token=None):
                     return self.respond(200,(APP_ROOT/"ui/data/countries.geo.json").read_bytes())
                 if route == "/api/workspace":
                     return self.respond(200,workspace.overview())
+                if route == "/api/display-preferences":
+                    return self.respond(200, {**workspace.display_preferences(), "session": session_token})
                 if route == "/api/exchange":
                     result = exchange.catalog() if exchange else {"batches": []}
                     return self.respond(200, {**result, "enabled": exchange is not None, "session": session_token})
@@ -127,18 +162,24 @@ def handler_for(workspace, exchange=None, session_token=None):
             route = urlsplit(self.path).path
             actions = {"stage", "map", "preview", "promote", "replay"}
             action = route.removeprefix("/api/exchange/")
-            if not exchange or action not in actions or route != "/api/exchange/" + action:
+            preferences = route == "/api/display-preferences"
+            if not preferences and (not exchange or action not in actions or route != "/api/exchange/" + action):
                 return self.respond(405,{"error":"This preview endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"
             if (self.headers.get("Host") != origin.removeprefix("http://")
                 or self.headers.get("Origin", origin) != origin
+                or not session_token
                 or not secrets.compare_digest(self.headers.get("X-Grad-Compass-Session", ""), session_token or "")):
-                return self.respond(403, {"error": "Use this app session to operate the disposable exchange workspace"})
+                return self.respond(403, {"error": "Use this app session to save changes in the disposable workspace"})
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 if not 0 < length <= 16384 or self.headers.get("Content-Type") != "application/json":
                     raise ValueError("A small JSON request is required")
                 payload = json.loads(self.rfile.read(length))
+                if preferences:
+                    if not isinstance(payload, dict) or set(payload) != {"text_size"} or not isinstance(payload["text_size"], str):
+                        raise ValueError("Choose an available text size")
+                    return self.respond(200, workspace.display_preferences(payload["text_size"]))
                 allowed = {"batch_id"} | {"map": {"external_id", "local_id", "create"},
                     "promote": {"preview_id", "approved"}}.get(action, set())
                 if not isinstance(payload, dict) or set(payload) - allowed or not isinstance(payload.get("batch_id"), str):
@@ -152,11 +193,11 @@ def handler_for(workspace, exchange=None, session_token=None):
                     raise ValueError("Review a dry run before approval")
                 return self.respond(200, getattr(exchange, action)(**payload))
             except (TypeError, json.JSONDecodeError):
-                return self.respond(400, {"error": "Invalid synthetic exchange request"})
+                return self.respond(400, {"error": "Invalid app request"})
             except ValueError as error:
                 return self.respond(409, {"error": str(error)})
             except (OSError, sqlite3.Error):
-                return self.respond(500, {"error": "Could not complete the disposable exchange operation"})
+                return self.respond(500, {"error": "Could not complete the disposable workspace operation"})
 
         def do_PUT(self):
             self.respond(405, {"error": "Use the explicit exchange workflow actions"})

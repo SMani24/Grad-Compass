@@ -17,12 +17,12 @@ EXCHANGE_DIR = REPO_ROOT / "grad-compass-workspace" / "runtime" / "exchange-ui"
 sys.path.insert(0, str(APP_ROOT))
 
 
-def prepare_workspace():
+def prepare_workspace(preview_directory=PREVIEW_DIR):
     from core.paths import validate_data_directory
     from web.server import DemoWorkspace
 
-    directory = validate_data_directory(PREVIEW_DIR)
-    if PREVIEW_DIR.is_symlink():
+    directory = validate_data_directory(preview_directory)
+    if preview_directory.is_symlink():
         raise ValueError("Preview storage must not be a symbolic link")
     if not directory.exists() or (directory.is_dir() and not any(directory.iterdir())):
         subprocess.run(
@@ -37,16 +37,20 @@ def prepare_workspace():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--smoke-test", action="store_true", help="verify rendering and close automatically")
+    parser.add_argument("--readability-smoke-test", action="store_true", help="check text sizes in a new disposable workspace")
     parser.add_argument("--exchange-dir", type=Path, default=EXCHANGE_DIR, help="disposable synthetic exchange workspace")
     parser.add_argument("--exchange-smoke-test", action="store_true", help="demonstrate the exchange UI in a new disposable database, then close")
-    parser.add_argument("--review-screenshots", type=Path, help="optional synthetic exchange review screenshot directory")
+    parser.add_argument("--review-screenshots", type=Path, help="optional synthetic review screenshot directory")
     args = parser.parse_args()
-    if args.review_screenshots and not args.exchange_smoke_test:
-        parser.error("--review-screenshots requires --exchange-smoke-test")
-    temporary_exchange = tempfile.TemporaryDirectory(prefix="grad-compass-exchange-ui-check-") if args.exchange_smoke_test else None
+    if args.review_screenshots and not (args.exchange_smoke_test or args.readability_smoke_test):
+        parser.error("--review-screenshots requires an exchange or readability smoke test")
+    temporary_preview = tempfile.TemporaryDirectory(prefix="grad-compass-readability-") if args.readability_smoke_test else None
+    if temporary_preview:
+        args.smoke_test = True
+    temporary_exchange = tempfile.TemporaryDirectory(prefix="grad-compass-exchange-ui-check-") if (args.exchange_smoke_test or args.readability_smoke_test) else None
     if temporary_exchange:
         args.smoke_test = True
-    directory = prepare_workspace()
+    directory = prepare_workspace(Path(temporary_preview.name) / "preview" if temporary_preview else PREVIEW_DIR)
     logging.basicConfig(filename=directory / "launcher.log", level=logging.WARNING)
     os.environ["QT_API"] = "pyqt6"
     import webview
@@ -144,13 +148,17 @@ def main():
                         if args.exchange_smoke_test:
                             from exchange_checks import verify_exchange
                             verify_exchange(window, capture.save if capture else None)
+                        if args.readability_smoke_test:
+                            from readability_checks import verify_readability
+                            verify_readability(window, directory, capture.save if capture else None)
                         result["passed"] = True
                         print("Desktop smoke test passed: map pins, focus styling, list toggle and university details.", flush=True)
                         return
                     time.sleep(0.2)
                 raise RuntimeError("List or university inspector did not render")
-            except Exception:
+            except Exception as error:
                 logging.exception("Desktop smoke test failed")
+                print(f"Desktop smoke check failed: {error}", file=sys.stderr, flush=True)
             finally:
                 window.destroy()
 
@@ -167,6 +175,8 @@ def main():
         worker.join(timeout=5)
         if temporary_exchange:
             temporary_exchange.cleanup()
+        if temporary_preview:
+            temporary_preview.cleanup()
     if args.smoke_test and not result["passed"]:
         raise SystemExit("Desktop smoke test failed; see the synthetic runtime's launcher.log")
 

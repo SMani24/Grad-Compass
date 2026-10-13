@@ -8,6 +8,8 @@ Press **Super**, search for **Grad Compass**, and open it. The installed desktop
 
 Escape moves up from university details to the country/filter view, then to the world view (and from the list to the map). Back/forward buttons, Alt+Left/Right and mouse side buttons restore the full workspace context. Ctrl+W closes the desktop app after a confirmation; cancellation keeps the window open.
 
+Open **Settings → Text size** to choose Standard (100%), Comfortable (115%), Large (130%) or Extra large (150%). The choice applies to the map/list workspace, university details and research-import dialog, and survives relaunches. It is saved in the ignored synthetic runtime as `display-preferences.json`; production configuration is untouched. At larger sizes, the header wraps and panels scroll as needed. Antarctica is excluded from the discovery map.
+
 The launcher uses `../grad-compass-workspace/runtime/preview/`, creates synthetic data only if that folder is new or empty, and refuses existing unmarked data. Its local server binds to a random loopback port and stops when the window closes. Browser storage and launch logs stay in that ignored runtime. The original application database and configuration are not used.
 
 From a terminal, the same launcher is:
@@ -77,6 +79,14 @@ git diff --check
 ```
 
 Python tests create and clean up their own invented temporary runtimes. Node uses its built-in test library and a small DOM/API double; no npm install is needed. Run the Node test file directly to display each regression case in this environment.
+
+To exercise display settings at all four sizes, reload persistence, intermediate widths and the minimum 390×640 window, run:
+
+```bash
+grad-compass/envGradCompass/bin/python -B grad-compass/scripts/launch_preview.py --readability-smoke-test --review-screenshots grad-compass-workspace/reviews
+```
+
+This creates disposable map and exchange workspaces, checks details and dialogs, completes the synthetic import/replay workflow at the largest size, and cleans up. Optional screenshots stay local and ignored.
 
 The separate Qt check sends real key and mouse events to isolated widgets. `launch_preview.py --smoke-test` additionally checks browser history, cross-country context, Escape hierarchy and grouped search in the synthetic desktop window, then closes automatically.
 

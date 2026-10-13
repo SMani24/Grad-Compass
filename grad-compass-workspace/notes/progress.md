@@ -34,3 +34,10 @@ Paperclip requests remain in the local mailbox, with no replies at this checkpoi
 - Verification: 31 app Python tests, the unchanged 22-test shared exchange suite, 13 JavaScript tests and three Qt input tests passed (69 total). Dependency consistency, syntax and whitespace checks passed. The native UI demonstrated the whole workflow, including replay with zero new changes. All 146 protected-file fingerprints match the pre-increment snapshot; the 16 delivered shared paths still match `043d9d7`. Visual review is recorded in `reviews/2026-10-13-synthetic-exchange.md`.
 
 Private queue/manifests and artifact transfers remain proposals outside this implementation; no discovery, real-data import, production migration, profile enrichment or CV rebuild was performed.
+
+## 2026-10-13 — readability feedback
+
+- Completed both entries in `features_and_bugs.md`: exclude Antarctica at the map consumer and add persistent Settings text sizes (100–150%). Finished entries are removed; headings remain for further feedback.
+- Kept app typography, details and research dialogs consistent; header/panel layouts adapt to larger text and mobile zoom controls remain reachable.
+- Verification: 73 automated regression cases and native UI checks for four sizes, reload persistence, intermediate/minimum widths and the synthetic exchange workflow with duplicate-free replay. Review notes and local screenshots are under `reviews/2026-10-13-readability.md`.
+- Display preferences are confined to ignored synthetic runtime storage. Production data/configuration, Research Engine, approved profile/CV artifacts and shared exchange/importer files remain unchanged.

@@ -4,7 +4,7 @@
   padding: 9px 11px;
   background: #edf6f9;
   color: var(--blue);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 650;
   white-space: nowrap;
 }
@@ -33,12 +33,12 @@
 
 .exchange-header h2  {
   margin: 8px 0;
-  font-size: 25px;
+  font-size: 1.5625rem;
   letter-spacing: -.6px;
 }
 
 .exchange-header p  {
-  font-size: 12px;
+  font-size: 0.75rem;
   margin: 0;
 }
 
@@ -49,12 +49,12 @@
 }
 
 .exchange-step h3  {
-  font-size: 14px;
+  font-size: 0.875rem;
   margin: 0 0 13px;
 }
 
 .exchange-step h4  {
-  font-size: 12px;
+  font-size: 0.75rem;
   margin: 24px 0 10px;
 }
 
@@ -65,7 +65,7 @@
   padding: 10px 14px;
   border-radius: 7px;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .exchange-step button:disabled  {
@@ -86,11 +86,11 @@
 }
 
 .exchange-actions select  {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .exchange-hint  {
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.6;
   color: var(--muted);
 }
@@ -110,11 +110,11 @@
 .exchange-table td  {
   vertical-align: top;
   padding: 14px 10px;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .exchange-table td p  {
-  font-size: 10px;
+  font-size: 0.625rem;
   margin: 5px 0;
 }
 
@@ -126,7 +126,7 @@
 
 .exchange-table summary  {
   color: var(--blue);
-  font-size: 10px;
+  font-size: 0.625rem;
   cursor: pointer;
 }
 
@@ -141,7 +141,7 @@
   padding: 4px 7px;
   background: #eef2f5;
   color: #647989;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 
 .exchange-badge.promoted  {
@@ -158,7 +158,7 @@
   display: flex;
   gap: 10px;
   align-items: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin: 16px 0;
   color: var(--ink);
 }
@@ -177,17 +177,17 @@
 }
 
 .exchange-change strong  {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .exchange-change td,.exchange-change th  {
-  font-size: 11px;
+  font-size: 0.6875rem;
   padding: 8px;
   overflow-wrap: anywhere;
 }
 
 .exchange-notice,.exchange-error  {
-  font-size: 12px;
+  font-size: 0.75rem;
   padding: 12px 14px;
   border-radius: 8px;
   margin: 16px 0;
@@ -205,20 +205,17 @@
 }
 
 #exchange-outcomes p  {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 #exchange-outcomes details  {
-  font-size: 11px;
+  font-size: 0.6875rem;
   overflow-wrap: anywhere;
 }
 
 @media(max-width:580px)  {
   .research-link  {
-    position: absolute;
-    top: 66px;
-    left: 0;
-    padding: 12px;
+    padding: 9px 11px;
   }
   #exchange-dialog  {
     width: calc(100vw - 24px);
@@ -226,7 +223,7 @@
     padding: 20px 16px;
   }
   .exchange-header h2  {
-    font-size: 21px;
+    font-size: 1.3125rem;
   }
   .exchange-actions  {
     grid-template-columns: minmax(0,1fr);

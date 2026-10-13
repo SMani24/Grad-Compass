@@ -11,6 +11,7 @@
   <script defer src="/flags.js"></script>
   <script defer src="/app.js"></script>
   <script defer src="/exchange.js"></script>
+  <script defer src="/settings.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -18,6 +19,8 @@
     <div class="navigation" role="group" aria-label="Workspace history"><button id="nav-back" type="button" aria-label="Go back" title="Go back (Alt+Left)" disabled>‹</button><button id="nav-forward" type="button" aria-label="Go forward" title="Go forward (Alt+Right)" disabled>›</button></div>
     <span class="nav-current">Discover <span class="nav-dot" aria-hidden="true"></span></span>
     <button id="open-exchange" class="research-link" type="button">Research imports</button>
+    <button id="open-settings" class="research-link" type="button">Settings</button>
+    <div class="view-switch" role="group" aria-label="Discovery view"><button id="map-view" aria-pressed="true">◉ Map</button><button id="list-view" aria-pressed="false">☷ List</button></div>
     <span class="preview-label">Sample workspace</span>
   </header>
   <main>
@@ -41,11 +44,17 @@
         <div id="map-message" class="map-message" hidden></div>
         <div id="list-container" class="list-container" hidden><div class="list-intro"><span class="eyebrow">YOUR SAVED UNIVERSITIES</span><h2>Compare your universities</h2></div><div id="university-table"></div></div>
       </section>
-      <div class="view-switch" role="group" aria-label="Discovery view"><button id="map-view" aria-pressed="true">◉ Map</button><button id="list-view" aria-pressed="false">☷ List</button></div>
       <aside id="inspector" class="inspector" hidden aria-label="University details" tabindex="-1"></aside>
     </div>
     <div id="error" class="error-banner" hidden role="alert"><span id="error-text"></span><button id="retry">Try again</button></div>
   </main>
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <header class="exchange-header"><h2 id="settings-title">Settings</h2><button id="close-settings" class="inspector-close" type="button" aria-label="Close settings">×</button></header>
+    <label for="text-size">Text size</label>
+    <select id="text-size" disabled><option value="standard">Standard · 100%</option><option value="comfortable">Comfortable · 115%</option><option value="large">Large · 130%</option><option value="extra-large">Extra large · 150%</option></select>
+    <p class="settings-sample">Explore universities with text that feels comfortable to read.</p>
+    <p id="settings-status" role="status" aria-live="polite">Loading your preference…</p>
+  </dialog>
   <dialog id="exchange-dialog" aria-labelledby="exchange-title">
     <header class="exchange-header"><div><span class="eyebrow">SYNTHETIC RESEARCH HANDOFF</span><h2 id="exchange-title">Review an exchange batch</h2><p>Invented records in a separate disposable workspace. Producer review and your import decision stay distinct.</p></div><button id="close-exchange" type="button" class="inspector-close" aria-label="Close research imports">×</button></header>
     <div id="exchange-message" role="status" aria-live="polite"></div>

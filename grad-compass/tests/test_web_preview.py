@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("grad_compass_web_preview",APP_ROOT / "web" / "server.py")
@@ -33,6 +34,59 @@ class WebPreviewTests(unittest.TestCase):
         handler.respond = respond
         getattr(handler,"do_" + method)()
         return result
+
+    def preference_request(self, payload, **headers):
+        handler = object.__new__(server.handler_for(self.workspace, session_token="test-session"))
+        handler.path = "/api/display-preferences"
+        raw = json.dumps(payload).encode()
+        handler.headers = {"Host": "127.0.0.1:8765", "Origin": "http://127.0.0.1:8765",
+            "Content-Type": "application/json", "Content-Length": str(len(raw)),
+            "X-Grad-Compass-Session": "test-session", **headers}
+        handler.server = SimpleNamespace(server_port=8765)
+        handler.rfile = io.BytesIO(raw)
+        result = {}
+        handler.respond = lambda status, payload: result.update(status=status, payload=payload)
+        handler.do_POST()
+        return result
+
+    def test_display_preferences_persist_without_changing_database(self):
+        digest = hashlib.sha256(self.workspace.database.read_bytes()).hexdigest()
+        self.assertEqual(self.route("/api/display-preferences")["payload"]["text_size"], "standard")
+        path = self.directory / "display-preferences.json"
+        self.assertFalse(path.exists())
+        for size in ("comfortable", "large", "extra-large", "standard"):
+            self.assertEqual(self.preference_request({"text_size": size})["status"], 200)
+            reopened = server.DemoWorkspace(self.directory)
+            self.assertEqual(reopened.display_preferences(), {"text_size": size})
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(hashlib.sha256(self.workspace.database.read_bytes()).hexdigest(), digest)
+        self.assertEqual(self.route("/display-preferences.json")["status"], 404)
+
+    def test_display_preferences_reject_invalid_and_cross_origin_writes(self):
+        for payload in ({"text_size": "huge"}, {"text_size": None}, {"text_size": []},
+                        {"text_size": "large", "file": "config.json"}, []):
+            self.assertEqual(self.preference_request(payload)["status"], 409)
+        for headers in ({"Origin": "https://example.com"}, {"Host": "example.com"},
+                        {"X-Grad-Compass-Session": "wrong"}):
+            self.assertEqual(self.preference_request({"text_size": "large"}, **headers)["status"], 403)
+        self.assertFalse((self.directory / "display-preferences.json").exists())
+
+    def test_display_preferences_refuse_links_and_changed_workspace(self):
+        path = self.directory / "display-preferences.json"
+        target = Path(self.temp.name) / "other.json"
+        target.write_text('{"text_size":"standard"}')
+        path.symlink_to(target)
+        self.assertEqual(self.preference_request({"text_size": "large"})["status"], 409)
+        self.assertEqual(target.read_text(), '{"text_size":"standard"}')
+        path.unlink()
+        import os
+        os.link(target, path)
+        self.assertEqual(self.preference_request({"text_size": "large"})["status"], 409)
+        path.unlink()
+        with sqlite3.connect(self.workspace.database) as connection:
+            connection.execute("DELETE FROM app_synthetic_demo_guard")
+        self.assertEqual(self.preference_request({"text_size": "large"})["status"], 409)
+        self.assertFalse(path.exists())
 
     def test_overview_and_details_return_linked_synthetic_records(self):
         overview = self.route("/api/workspace")

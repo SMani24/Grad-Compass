@@ -362,7 +362,8 @@ if (typeof document !== "undefined") {
       if (event.key === "ArrowLeft") goBack(); else goForward();
     } else if (event.key === "Escape") {
       event.preventDefault();
-      if (get("exchange-dialog")?.open) get("exchange-dialog").close();
+      if (get("settings-dialog")?.open) get("settings-dialog").close();
+      else if (get("exchange-dialog")?.open) get("exchange-dialog").close();
       else if (state.selected) closeInspector();
       else if (elements.country.value || elements.status.value || elements.search.value) {
         elements.country.value = ""; elements.status.value = ""; elements.search.value = "";
