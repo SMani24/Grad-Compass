@@ -93,6 +93,7 @@ def main():
                         cards: document.querySelectorAll('.university-card').length,
                         pins: document.querySelectorAll('.leaflet-overlay-pane path[fill="#087ba4"]').length,
                         map: !!document.querySelector('.leaflet-container'),
+                        antarctica: !!document.querySelector('[data-country="ANTARCTICA"],[data-country="ATA"]'),
                         width: document.getElementById('map').getBoundingClientRect().width,
                         height: document.getElementById('map').getBoundingClientRect().height,
                         viewportWidth: innerWidth,
@@ -100,6 +101,8 @@ def main():
                         error: !document.getElementById('error').hidden
                     })"""))
                     if rendered and rendered["cards"] == 3 and rendered["pins"] == 2 and rendered["map"] and not rendered["error"]:
+                        if rendered["antarctica"]:
+                            raise RuntimeError("Antarctica must not be rendered in the discovery map")
                         if rendered["width"] != rendered["viewportWidth"] or rendered["height"] != rendered["viewportHeight"]:
                             raise RuntimeError("Map does not fill the workspace viewport")
                         break

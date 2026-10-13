@@ -61,7 +61,14 @@ function dominantLandmassBounds(feature) {
   return largest;
 }
 
-if (typeof module !== "undefined") module.exports = { hasCoordinates, filterUniversities, safeExternalUrl, dominantLandmassBounds };
+function discoveryGeometry(data) {
+  return { ...data, features: data.features.filter(feature => {
+    const properties = feature.properties || {};
+    return properties["ISO3166-1-Alpha-3"] !== "ATA" && properties.name?.toLowerCase() !== "antarctica";
+  }) };
+}
+
+if (typeof module !== "undefined") module.exports = { hasCoordinates, filterUniversities, safeExternalUrl, dominantLandmassBounds, discoveryGeometry };
 
 if (typeof document !== "undefined") {
   const get = id => document.getElementById(id);
@@ -255,7 +262,7 @@ if (typeof document !== "undefined") {
     if (state.map && bounds) state.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 5, animate: !matchMedia("(prefers-reduced-motion: reduce)").matches });
   }
   function resetMap() {
-    state.map?.setView([29, 2], 2.4, { animate: false });
+    state.map?.fitBounds([[-58, -170], [84, 180]], { padding: [24, 24], maxZoom: 2.8, animate: false });
   }
   function goBack() { if (navigationIndex > 0) history.back(); }
   function goForward() { if (navigationIndex < navigationEnd) history.forward(); }
@@ -274,10 +281,10 @@ if (typeof document !== "undefined") {
     if (state.map) return;
     try {
       const data = await api("/api/map");
-      state.geometry = data;
+      state.geometry = discoveryGeometry(data);
       state.map = L.map("map", { center: [29, 2], zoom: 2.4, zoomSnap: .2, minZoom: 1.5, maxZoom: 12, zoomControl: false, attributionControl: false });
       L.control.zoom({ position: "bottomright" }).addTo(state.map);
-      state.polygons = L.geoJSON({ ...data, features: data.features.filter(feature => resolveCountryFeature(feature).code !== "ATA") }, {
+      state.polygons = L.geoJSON(state.geometry, {
         className: "country-outline",
         onEachFeature(feature, layer) {
           const country = resolveCountryFeature(feature);

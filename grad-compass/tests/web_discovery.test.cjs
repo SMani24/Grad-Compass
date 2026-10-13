@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { hasCoordinates, filterUniversities, safeExternalUrl, dominantLandmassBounds } = require('../web/app.js');
+const { hasCoordinates, filterUniversities, safeExternalUrl, dominantLandmassBounds, discoveryGeometry } = require('../web/app.js');
 
 const universities = [
   { id: 1, name: 'Northbridge Example', city: 'Example City', country_code: 'CAN', status: 'Researching', latitude: 0, longitude: 0 },
@@ -43,4 +43,12 @@ test('dateline-crossing land is framed locally rather than as a world-wide box',
 test('unsupported or missing country geometry does not produce a camera target', () => {
   assert.equal(dominantLandmassBounds(null), null);
   assert.equal(dominantLandmassBounds({ geometry: { type: 'Point', coordinates: [0, 0] } }), null);
+});
+test('discovery excludes Antarctica using the bundled ISO field without dropping other territories or changing source geometry', () => {
+  const geometry = require('../ui/data/countries.geo.json');
+  const result = discoveryGeometry(geometry);
+  assert.equal(result.features.length, geometry.features.length - 1);
+  assert.ok(!result.features.some(feature => feature.properties.name === 'Antarctica'));
+  assert.ok(result.features.some(feature => feature.properties['ISO3166-1-Alpha-3'] === 'ATF'));
+  assert.ok(geometry.features.some(feature => feature.properties.name === 'Antarctica'));
 });
