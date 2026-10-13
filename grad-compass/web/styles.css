@@ -913,3 +913,5 @@ html {
 #settings-status {
   font-size: .75rem;
 }
+
+.source-details { overflow-wrap: anywhere; font-size: .75rem; }

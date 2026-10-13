@@ -26,6 +26,8 @@ def verify_exchange(window, capture=None):
             message: document.getElementById('exchange-message').textContent,
             outcomes: document.getElementById('exchange-outcomes').textContent,
             validation: document.getElementById('exchange-validation').textContent,
+            discovery: [...document.querySelectorAll('.university-card')].map(card=>card.dataset.university).sort(),
+            pins: document.querySelectorAll('.leaflet-overlay-pane path[fill="#087ba4"]').length,
             open: document.getElementById('exchange-dialog').open
         })"""))
 
@@ -75,10 +77,26 @@ def verify_exchange(window, capture=None):
     promoted = expect(lambda state: not state["replayDisabled"] and state["promoted"] == 2, "eligible committed promotion")
     assert promoted["staged"] == 3
     assert "2 local institutions" in promoted["outcomes"] and "1 programs" in promoted["outcomes"]
+    discovery = expect(lambda state: len(state["discovery"]) == 4, "promoted institution visible in discovery")
+    assert discovery["pins"] == 2, "An unlocated promoted institution must not acquire a marker"
     click("exchange-replay")
     replay = expect(lambda state: "Replay verified: 0 new changes; no duplicates." in state["outcomes"], "idempotent replay")
     assert replay["promoted"] == 2 and replay["staged"] == 3
+    assert replay["discovery"] == discovery["discovery"], "Replay must preserve discovery identities"
     screenshot("replay", "#exchange-outcomes")
     run("document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true, cancelable:true}))")
     expect(lambda state: not state["open"], "Escape closes only the exchange dialog")
+    run("""document.getElementById('list-view').click();document.querySelector('.university-card[data-university="exchange-2"]').click()""")
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        detail = json.loads(run("JSON.stringify({title:document.querySelector('#inspector h2')?.textContent,programs:[...document.querySelectorAll('.program-card strong')].map(el=>el.textContent),selected:!!document.querySelector('.university-card.selected[data-university=\"exchange-2\"]'),row:!!document.querySelector('#university-table tr[data-university=\"exchange-2\"]')})"))
+        if detail.get("title") == "Example North University" and detail["programs"] == ["MSc Example Studies"]:
+            assert detail["selected"] and detail["row"], detail
+            break
+        time.sleep(.05)
+    else: raise AssertionError(f"Promoted program detail did not render: {detail}")
+    if capture:
+        time.sleep(.5)
+        capture("promoted-discovery")
+    run("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}))")
     print("Exchange UI passed: select → validate/stage → map → dry run → explicit approval → promotion → replay with zero new changes.", flush=True)

@@ -44,10 +44,10 @@ def main():
     args = parser.parse_args()
     if args.review_screenshots and not (args.exchange_smoke_test or args.readability_smoke_test):
         parser.error("--review-screenshots requires an exchange or readability smoke test")
-    temporary_preview = tempfile.TemporaryDirectory(prefix="grad-compass-readability-") if args.readability_smoke_test else None
+    temporary_preview = tempfile.TemporaryDirectory(prefix="grad-compass-readability-") if (args.smoke_test or args.exchange_smoke_test or args.readability_smoke_test) else None
     if temporary_preview:
         args.smoke_test = True
-    temporary_exchange = tempfile.TemporaryDirectory(prefix="grad-compass-exchange-ui-check-") if (args.exchange_smoke_test or args.readability_smoke_test) else None
+    temporary_exchange = tempfile.TemporaryDirectory(prefix="grad-compass-exchange-ui-check-") if (args.smoke_test or args.exchange_smoke_test or args.readability_smoke_test) else None
     if temporary_exchange:
         args.smoke_test = True
     directory = prepare_workspace(Path(temporary_preview.name) / "preview" if temporary_preview else PREVIEW_DIR)

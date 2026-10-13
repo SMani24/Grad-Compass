@@ -172,6 +172,23 @@ if (typeof document !== "undefined") {
         link.href = portal; link.target = "_blank"; link.rel = "noopener noreferrer";
         elements.inspector.append(link);
       }
+      if (university.research) {
+        const research = node("div", "metadata");
+        research.append(metadata("Research review", university.research.review), metadata("Import status", "Promoted · synthetic"));
+        const source = node("details", "source-details");
+        source.append(node("summary", "Source identity & revision"), node("p", "ID: " + university.research.external_id), node("p", "Revision: " + university.research.revision));
+        research.append(source); elements.inspector.append(research);
+      }
+      elements.inspector.append(node("h3", "", "Programs"));
+      if (!detail.programs?.length) elements.inspector.append(node("p", "", "No promoted programs saved yet."));
+      for (const program of detail.programs || []) {
+        const card = node("div", "detail-card program-card");
+        card.dataset.program = program.id;
+        card.append(node("strong", "", program.name), node("p", "", program.degree_level), node("p", "", "Research review: " + program.review + " · Promoted synthetic record"));
+        for (const claim of program.requirements) card.append(node("p", "", claim.kind.replaceAll("_", " ") + " · " + claim.intake + ": " + claim.value));
+        if (!program.requirements.length) card.append(node("p", "", "No eligible intake claims supplied. This is incomplete evidence."));
+        elements.inspector.append(card);
+      }
       elements.inspector.append(node("h3", "", "Faculty contacts"));
       if (!detail.professors.length) elements.inspector.append(node("p", "", "No faculty contacts saved yet."));
       for (const professor of detail.professors) {
@@ -206,6 +223,7 @@ if (typeof document !== "undefined") {
     for (const university of state.filtered) {
       const card = node("button", "university-card" + (state.selected === university.id ? " selected" : ""));
       card.type = "button";
+      card.dataset.university = university.id;
       card.setAttribute("aria-pressed", String(state.selected === university.id));
       card.append(node("span", "country-tag", countryFlag(university.country_code) + " " + countryName(university.country_code)), node("span", "university-name", university.name));
       const meta = node("span", "card-meta");
@@ -224,6 +242,7 @@ if (typeof document !== "undefined") {
     const body = node("tbody");
     for (const university of state.filtered) {
       const row = node("tr", state.selected === university.id ? "selected" : "");
+      row.dataset.university = university.id;
       const name = node("td"); const button = node("button", "", university.name);
       button.addEventListener("click", () => selectUniversity(university.id)); name.append(button);
       const progress = node("td"); progress.append(stage(university.status));
@@ -275,7 +294,8 @@ if (typeof document !== "undefined") {
     closeInspector(false, false);
     if (elements.country.value) focusCountry(elements.country.value); else resetMap();
     const id = url.searchParams.get("university");
-    if (/^[1-9][0-9]*$/.test(id || "") && state.universities.some(university => university.id === Number(id))) selectUniversity(Number(id), false, false);
+    const selected = state.universities.find(university => String(university.id) === id);
+    if (selected) selectUniversity(selected.id, false, false);
   }
   async function loadMap() {
     if (state.map) return;
@@ -356,6 +376,16 @@ if (typeof document !== "undefined") {
     updateNavigationButtons();
   });
   get("retry").addEventListener("click", loadWorkspace);
+  window.addEventListener("grad-compass:discovery-updated", async () => {
+    try {
+      const result = await api("/api/workspace");
+      state.universities = result.universities; render();
+      if (state.selected) selectUniversity(state.selected, false, false);
+    } catch {
+      get("error-text").textContent = "Could not refresh promoted research. Please try again.";
+      get("error").hidden = false;
+    }
+  });
   document.addEventListener("keydown", event => {
     if (event.altKey && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
       event.preventDefault();

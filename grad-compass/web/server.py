@@ -142,7 +142,8 @@ def handler_for(workspace, exchange=None, session_token=None):
                 if route == "/api/map":
                     return self.respond(200,(APP_ROOT/"ui/data/countries.geo.json").read_bytes())
                 if route == "/api/workspace":
-                    return self.respond(200,workspace.overview())
+                    from web.discovery import overview
+                    return self.respond(200,overview(workspace, exchange))
                 if route == "/api/display-preferences":
                     return self.respond(200, {**workspace.display_preferences(), "session": session_token})
                 if route == "/api/exchange":
@@ -150,9 +151,10 @@ def handler_for(workspace, exchange=None, session_token=None):
                     return self.respond(200, {**result, "enabled": exchange is not None, "session": session_token})
                 if route.startswith("/api/exchange/state/") and exchange:
                     return self.respond(200, exchange.state(route.removeprefix("/api/exchange/state/")))
-                match = re.fullmatch(r"/api/universities/([1-9][0-9]{0,9})",route)
+                match = re.fullmatch(r"/api/universities/((?:exchange-)?[1-9][0-9]{0,9})",route)
                 if match:
-                    result = workspace.university(int(match[1]))
+                    from web.discovery import university
+                    result = university(workspace, exchange, match[1])
                     return self.respond(200,result) if result else self.respond(404,{"error":"University not found"})
                 return self.respond(404,{"error":"Not found"})
             except (OSError,ValueError,sqlite3.Error):

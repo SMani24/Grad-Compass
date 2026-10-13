@@ -47,6 +47,7 @@
       data = await request("/api/exchange/" + action, { batch_id: select.value, ...extras });
       get("exchange-approve").checked = false;
       render();
+      if (["promote", "replay"].includes(action)) window.dispatchEvent(new Event("grad-compass:discovery-updated"));
       message(action === "replay" ? (data.replay.no_changes ? "Replay verified: zero new changes." : "Replay changed the workspace; inspect the outcomes.")
         : action === "promote" ? "Eligible promotion committed. Other records remain in staging."
         : action === "map" ? "Explicit mapping saved. No institution was created yet."
