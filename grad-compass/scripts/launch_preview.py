@@ -37,17 +37,18 @@ def prepare_workspace(preview_directory=PREVIEW_DIR):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--smoke-test", action="store_true", help="verify rendering and close automatically")
+    parser.add_argument("--country-smoke-test", action="store_true", help="demonstrate country exploration in disposable storage")
     parser.add_argument("--readability-smoke-test", action="store_true", help="check text sizes in a new disposable workspace")
     parser.add_argument("--exchange-dir", type=Path, default=EXCHANGE_DIR, help="disposable synthetic exchange workspace")
     parser.add_argument("--exchange-smoke-test", action="store_true", help="demonstrate the exchange UI in a new disposable database, then close")
     parser.add_argument("--review-screenshots", type=Path, help="optional synthetic review screenshot directory")
     args = parser.parse_args()
-    if args.review_screenshots and not (args.exchange_smoke_test or args.readability_smoke_test):
+    if args.review_screenshots and not (args.exchange_smoke_test or args.readability_smoke_test or args.country_smoke_test):
         parser.error("--review-screenshots requires an exchange or readability smoke test")
-    temporary_preview = tempfile.TemporaryDirectory(prefix="grad-compass-readability-") if (args.smoke_test or args.exchange_smoke_test or args.readability_smoke_test) else None
+    temporary_preview = tempfile.TemporaryDirectory(prefix="grad-compass-readability-") if (args.smoke_test or args.exchange_smoke_test or args.readability_smoke_test or args.country_smoke_test) else None
     if temporary_preview:
         args.smoke_test = True
-    temporary_exchange = tempfile.TemporaryDirectory(prefix="grad-compass-exchange-ui-check-") if (args.smoke_test or args.exchange_smoke_test or args.readability_smoke_test) else None
+    temporary_exchange = tempfile.TemporaryDirectory(prefix="grad-compass-exchange-ui-check-") if (args.smoke_test or args.exchange_smoke_test or args.readability_smoke_test or args.country_smoke_test) else None
     if temporary_exchange:
         args.smoke_test = True
     directory = prepare_workspace(Path(temporary_preview.name) / "preview" if temporary_preview else PREVIEW_DIR)
@@ -151,6 +152,9 @@ def main():
                         if args.readability_smoke_test:
                             from readability_checks import verify_readability
                             verify_readability(window, directory, capture.save if capture else None)
+                        if args.country_smoke_test:
+                            from country_checks import verify_countries
+                            verify_countries(window, capture.save if capture else None)
                         result["passed"] = True
                         print("Desktop smoke test passed: map pins, focus styling, list toggle and university details.", flush=True)
                         return

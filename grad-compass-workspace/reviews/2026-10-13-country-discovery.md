@@ -7,3 +7,9 @@ A read-only app projection connects committed importer outcomes to cards/List an
 Demonstrated in disposable map/exchange storage before beginning the exploration selector: select → stage → explicit mapping → dry run → approve → institution appears in cards/List → program opens in its parent details → replay preserves four distinct discovery IDs and makes no duplicate changes. Existing country/history/selection checks passed. App suite: 37 Python cases; JavaScript suites: 14 cases. Local screenshot: `2026-10-13-exchange-promoted-discovery.local.png`.
 
 APP-006 in the ignored mailbox proposes country-evidence compatibility requirements to Marry/Dave. It requests a separately versioned future envelope; it does not change public exchange 1.0.0 or authorize real data. The user bridges the mailbox manually.
+
+## 2. Independent exploration and presentation choices
+
+Added Countries / Universities inside the existing left panel, while Map/List remains in the floating top bar. Universities remains the initial exploration mode. Countries can be searched by name/code, selected from cards or polygons, framed on the map, and compared in List. A zero-university country remains present; counts describe saved coverage rather than suitability. Mode, view, filters and selection participate in existing history. Application-stage filters are hidden in Countries mode.
+
+Demonstrated this increment before adding country evidence: Countries → France card → framed/highlighted country with zero saved universities → List → Universities → Back/Forward restores exploration/presentation/country context. Existing native navigation checks and nine discovery JavaScript cases passed. Local captures: `2026-10-13-exchange-countries-{map,list}.local.png`.

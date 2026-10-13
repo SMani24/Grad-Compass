@@ -27,14 +27,15 @@
     <div class="workspace">
       <aside class="results-panel" aria-label="University results">
         <section class="workspace-header" aria-label="University atlas">
-          <span class="eyebrow">YOUR UNIVERSITY ATLAS</span><h1>Explore universities</h1><p>A world of possibilities, in one place.</p>
+          <span id="atlas-label" class="eyebrow">YOUR UNIVERSITY ATLAS</span><h1 id="exploration-title">Explore universities</h1><p id="exploration-description">A world of possibilities, in one place.</p>
         </section>
         <div class="filter-controls">
+          <div class="exploration-switch" role="group" aria-label="Explore countries or universities"><button id="countries-mode" type="button" aria-pressed="false">Countries</button><button id="universities-mode" type="button" aria-pressed="true">Universities</button></div>
           <label class="search-label" for="search">Search your universities</label>
           <input id="search" type="search" placeholder="University or city…" autocomplete="off">
           <div class="filter-row"><div><label for="country">Location</label><select id="country"><option value="">All countries</option></select></div><div><label for="status">Stage</label><select id="status"><option value="">All stages</option><option>Researching</option><option>Applying</option><option>Submitted</option><option>Accepted</option><option>Rejected</option></select></div></div>
         </div>
-        <div class="results-heading"><h2>Saved universities</h2><span id="result-count" class="count">0</span></div>
+        <div class="results-heading"><h2 id="results-title">Saved universities</h2><span id="result-count" class="count">0</span></div>
         <div id="results" class="result-list" aria-live="polite"><p class="empty-state">Loading your workspace…</p></div>
         <div class="panel-footer"><span class="small-dot" aria-hidden="true"></span><span id="mapped-count"></span></div>
       </aside>
@@ -42,7 +43,7 @@
         <div id="map" aria-label="World map"></div>
         <div class="map-key" id="map-key"><span class="key-pin"></span> Your universities <span class="key-country"></span> Saved locations</div>
         <div id="map-message" class="map-message" hidden></div>
-        <div id="list-container" class="list-container" hidden><div class="list-intro"><span class="eyebrow">YOUR SAVED UNIVERSITIES</span><h2>Compare your universities</h2></div><div id="university-table"></div></div>
+        <div id="list-container" class="list-container" hidden><div class="list-intro"><span id="list-label" class="eyebrow">YOUR SAVED UNIVERSITIES</span><h2 id="list-title">Compare your universities</h2></div><div id="university-table"></div></div>
       </section>
       <aside id="inspector" class="inspector" hidden aria-label="University details" tabindex="-1"></aside>
     </div>

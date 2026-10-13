@@ -61,6 +61,17 @@ function dominantLandmassBounds(feature) {
   return largest;
 }
 
+function discoveryCountry(feature) {
+  const country = resolveCountryFeature(feature);
+  const iso = feature.properties?.["ISO3166-1-Alpha-3"];
+  return {...country, code: /^[A-Z]{3}$/.test(iso || "") ? iso : country.code};
+}
+
+function filterCountries(countries, query) {
+  const search = (query || "").trim().toLowerCase();
+  return countries.filter(country => [country.name, country.code].some(value => value.toLowerCase().includes(search)));
+}
+
 function discoveryGeometry(data) {
   return { ...data, features: data.features.filter(feature => {
     const properties = feature.properties || {};
@@ -68,11 +79,11 @@ function discoveryGeometry(data) {
   }) };
 }
 
-if (typeof module !== "undefined") module.exports = { hasCoordinates, filterUniversities, safeExternalUrl, dominantLandmassBounds, discoveryGeometry };
+if (typeof module !== "undefined") module.exports = { hasCoordinates, filterUniversities, safeExternalUrl, dominantLandmassBounds, discoveryGeometry, filterCountries };
 
 if (typeof document !== "undefined") {
   const get = id => document.getElementById(id);
-  const state = { universities: [], filtered: [], selected: null, view: "map", geometry: null, map: null, polygons: null, markers: null, mapError: false, detailSequence: 0 };
+  const state = { universities: [], filtered: [], selected: null, view: "map", mode: "universities", countries: [], geometry: null, map: null, polygons: null, markers: null, mapError: false, detailSequence: 0 };
   const elements = { search: get("search"), country: get("country"), status: get("status"), results: get("results"), inspector: get("inspector") };
   let navigationIndex = 0;
   let navigationEnd = 0;
@@ -104,6 +115,7 @@ if (typeof document !== "undefined") {
   }
   function updateUrl(replace = false) {
     const url = new URL(location.href);
+    if (state.mode === "countries") url.searchParams.set("mode", "countries"); else url.searchParams.delete("mode");
     if (state.view === "list") url.searchParams.set("view", "list"); else url.searchParams.delete("view");
     if (state.selected) url.searchParams.set("university", state.selected); else url.searchParams.delete("university");
     for (const name of ["country", "status", "search"]) {
@@ -129,6 +141,30 @@ if (typeof document !== "undefined") {
     get("list-view").setAttribute("aria-pressed", String(view === "list"));
     if (record) updateUrl();
     if (state.map) requestAnimationFrame(() => state.map.invalidateSize());
+  }
+  function setMode(mode, record = true, clearSearch = true) {
+    state.mode = mode;
+    if (clearSearch) { elements.search.value = ""; editingSearch = false; }
+    get("countries-mode").setAttribute("aria-pressed", String(mode === "countries"));
+    get("universities-mode").setAttribute("aria-pressed", String(mode === "universities"));
+    document.querySelector(".filter-row").hidden = mode === "countries";
+    get("atlas-label").textContent = mode === "countries" ? "YOUR COUNTRY ATLAS" : "YOUR UNIVERSITY ATLAS";
+    get("exploration-title").textContent = mode === "countries" ? "Explore countries" : "Explore universities";
+    get("results-title").textContent = mode === "countries" ? "Countries" : "Saved universities";
+    get("list-label").textContent = mode === "countries" ? "YOUR COUNTRY ATLAS" : "YOUR SAVED UNIVERSITIES";
+    get("list-title").textContent = mode === "countries" ? "Compare countries" : "Compare your universities";
+    document.querySelector(".search-label").textContent = mode === "countries" ? "Search countries" : "Search your universities";
+    elements.search.placeholder = mode === "countries" ? "Country or code…" : "University or city…";
+    closeInspector(false, false);
+    if (record) updateUrl();
+  }
+  function selectCountry(code) {
+    if (![...elements.country.options].some(option => option.value === code)) {
+      const country = state.countries.find(item => item.code === code);
+      const option = node("option", "", country?.name || code);
+      option.value = code; elements.country.append(option);
+    }
+    elements.country.value = code; closeInspector(false); focusCountry(code);
   }
   function closeInspector(restoreFocus = true, record = true) {
     state.detailSequence++;
@@ -176,7 +212,7 @@ if (typeof document !== "undefined") {
         const research = node("div", "metadata");
         research.append(metadata("Research review", university.research.review), metadata("Import status", "Promoted · synthetic"));
         const source = node("details", "source-details");
-        source.append(node("summary", "Source identity & revision"), node("p", "ID: " + university.research.external_id), node("p", "Revision: " + university.research.revision));
+        source.append(node("summary", "", "Source identity & revision"), node("p", "", "ID: " + university.research.external_id), node("p", "", "Revision: " + university.research.revision));
         research.append(source); elements.inspector.append(research);
       }
       elements.inspector.append(node("h3", "", "Programs"));
@@ -215,7 +251,32 @@ if (typeof document !== "undefined") {
       elements.inspector.replaceChildren(node("p", "", "Could not load this university. Close and select it again to retry."), back);
     }
   }
+  function renderCountries() {
+    const countries = filterCountries(state.countries, elements.search.value);
+    elements.results.replaceChildren();
+    get("result-count").textContent = countries.length;
+    get("mapped-count").textContent = "Saved university counts describe coverage, not suitability";
+    if (!countries.length) elements.results.append(node("p", "empty-state", state.geometry ? "No countries match this search." : "Loading countries…"));
+    const table = node("table"); const head = node("thead"); const headings = node("tr");
+    for (const title of ["Country", "Saved universities", "Coverage"]) { const cell = node("th", "", title); cell.scope = "col"; headings.append(cell); }
+    head.append(headings); table.append(head); const body = node("tbody");
+    for (const country of countries) {
+      const count = state.universities.filter(university => university.country_code === country.code).length;
+      const selected = elements.country.value === country.code;
+      const card = node("button", "country-card" + (selected ? " selected" : ""));
+      card.type = "button"; card.dataset.country = country.code; card.setAttribute("aria-pressed", String(selected));
+      card.append(node("span", "country-tag", country.code), node("span", "university-name", country.flag + " " + country.name), node("span", "card-meta", count + " saved universities"), node("span", "coverage-hint", "Research coverage incomplete"));
+      card.addEventListener("click", () => selectCountry(country.code)); elements.results.append(card);
+      const row = node("tr", selected ? "selected" : ""); row.dataset.country = country.code;
+      const name = node("td"); const button = node("button", "", country.flag + " " + country.name);
+      button.addEventListener("click", () => selectCountry(country.code)); name.append(button);
+      row.append(name, node("td", "", count), node("td", "", "Incomplete")); body.append(row);
+    }
+    table.append(body);
+    get("university-table").replaceChildren(countries.length ? table : node("p", "empty-state", "No countries match this search."));
+  }
   function renderResults() {
+    if (state.mode === "countries") { renderCountries(); return; }
     elements.results.replaceChildren();
     get("result-count").textContent = state.filtered.length;
     get("mapped-count").textContent = state.filtered.filter(hasCoordinates).length + " of " + state.filtered.length + " universities mapped";
@@ -254,7 +315,7 @@ if (typeof document !== "undefined") {
     if (!state.map) return;
     const countries = new Set(state.filtered.map(university => university.country_code));
     state.polygons.eachLayer(layer => {
-      const code = resolveCountryFeature(layer.feature).code;
+      const code = discoveryCountry(layer.feature).code;
       const selected = code === elements.country.value;
       layer.setStyle({ fillColor: selected ? "#85c2d4" : countries.has(code) ? "#cce5ee" : "#fff",
         fillOpacity: 1, color: selected ? "#087ba4" : "#b6cbd6", weight: selected ? 1.8 : .7 });
@@ -272,11 +333,11 @@ if (typeof document !== "undefined") {
     requestAnimationFrame(() => state.map.invalidateSize());
   }
   function render() {
-    state.filtered = filterUniversities(state.universities, { search: elements.search.value, country: elements.country.value, status: elements.status.value });
+    state.filtered = filterUniversities(state.universities, { search: state.mode === "countries" ? "" : elements.search.value, country: elements.country.value, status: state.mode === "countries" ? "" : elements.status.value });
     renderResults(); renderMap();
   }
   function focusCountry(code) {
-    const feature = state.geometry?.features.find(feature => resolveCountryFeature(feature).code === code);
+    const feature = state.geometry?.features.find(feature => discoveryCountry(feature).code === code);
     const bounds = dominantLandmassBounds(feature);
     if (state.map && bounds) state.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 5, animate: !matchMedia("(prefers-reduced-motion: reduce)").matches });
   }
@@ -289,6 +350,7 @@ if (typeof document !== "undefined") {
   window.GradCompassNavigation = Object.freeze({ back: goBack, forward: goForward });
   function applyLocation() {
     const url = new URL(location.href);
+    setMode(url.searchParams.get("mode") === "countries" ? "countries" : "universities", false, false);
     for (const name of ["country", "status", "search"]) elements[name].value = url.searchParams.get(name) || "";
     setView(url.searchParams.get("view") === "list" ? "list" : "map", false);
     closeInspector(false, false);
@@ -302,12 +364,13 @@ if (typeof document !== "undefined") {
     try {
       const data = await api("/api/map");
       state.geometry = discoveryGeometry(data);
+      state.countries = [...new Map(state.geometry.features.map(feature => { const country = discoveryCountry(feature); return [country.code, country]; })).values()].sort((a,b) => a.name.localeCompare(b.name));
       state.map = L.map("map", { center: [29, 2], zoom: 2.4, zoomSnap: .2, minZoom: 1.5, maxZoom: 12, zoomControl: false, attributionControl: false });
       L.control.zoom({ position: "bottomright" }).addTo(state.map);
       state.polygons = L.geoJSON(state.geometry, {
         className: "country-outline",
         onEachFeature(feature, layer) {
-          const country = resolveCountryFeature(feature);
+          const country = discoveryCountry(feature);
           layer.on("add", () => {
             const path = layer.getElement();
             path.setAttribute("data-country", country.code);
@@ -319,18 +382,11 @@ if (typeof document !== "undefined") {
             });
           });
           layer.bindTooltip(node("span", "", country.name), { sticky: true });
-          layer.on("click", () => {
-            if (![...elements.country.options].some(option => option.value === country.code)) {
-              const option = node("option", "", country.flag + " " + country.name);
-              option.value = country.code; elements.country.append(option);
-            }
-            elements.country.value = country.code; closeInspector(false);
-            focusCountry(country.code);
-          });
+          layer.on("click", () => selectCountry(country.code));
         }
       }).addTo(state.map);
       state.markers = L.layerGroup().addTo(state.map);
-      state.mapError = false; get("map-message").hidden = true; renderMap();
+      state.mapError = false; get("map-message").hidden = true; render();
     } catch {
       get("map-message").textContent = "The map could not load. You can still explore your universities in the list view.";
       state.mapError = true; get("map-message").hidden = state.view !== "map";
@@ -348,12 +404,14 @@ if (typeof document !== "undefined") {
       get("error-text").textContent = "Could not load the workspace. Please try again."; get("error").hidden = false;
     }
   }
+  get("countries-mode").addEventListener("click", () => setMode("countries"));
+  get("universities-mode").addEventListener("click", () => setMode("universities"));
   get("map-view").addEventListener("click", () => setView("map"));
   get("list-view").addEventListener("click", () => setView("list"));
   document.querySelector(".brand").addEventListener("click", event => {
     event.preventDefault();
     elements.country.value = ""; elements.status.value = ""; elements.search.value = "";
-    editingSearch = false; setView("map", false); closeInspector(false, false); resetMap(); updateUrl();
+    editingSearch = false; setMode("universities", false); setView("map", false); closeInspector(false, false); resetMap(); updateUrl();
   });
   for (const element of [elements.country, elements.status]) element.addEventListener("change", () => {
     editingSearch = false;

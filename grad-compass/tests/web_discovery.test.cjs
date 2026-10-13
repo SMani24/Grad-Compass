@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { hasCoordinates, filterUniversities, safeExternalUrl, dominantLandmassBounds, discoveryGeometry } = require('../web/app.js');
+const { hasCoordinates, filterUniversities, safeExternalUrl, dominantLandmassBounds, discoveryGeometry, filterCountries } = require('../web/app.js');
 
 const universities = [
   { id: 1, name: 'Northbridge Example', city: 'Example City', country_code: 'CAN', status: 'Researching', latitude: 0, longitude: 0 },
@@ -51,4 +51,11 @@ test('discovery excludes Antarctica using the bundled ISO field without dropping
   assert.ok(!result.features.some(feature => feature.properties.name === 'Antarctica'));
   assert.ok(result.features.some(feature => feature.properties['ISO3166-1-Alpha-3'] === 'ATF'));
   assert.ok(geometry.features.some(feature => feature.properties.name === 'Antarctica'));
+});
+
+test('country search retains zero-result countries independently of application stages', () => {
+  const countries = [{code:'CAN',name:'Canada'}, {code:'FRA',name:'France'}];
+  assert.deepEqual(filterCountries(countries,' fra '), [countries[1]]);
+  assert.deepEqual(filterCountries(countries,'CAN'), [countries[0]]);
+  assert.equal(filterCountries(countries,'').length,2);
 });

@@ -280,7 +280,7 @@ select {
   min-height: 8rem;
 }
 
-.university-card {
+:is(.university-card,.country-card) {
   width: 100%;
   display: block;
   text-align: left;
@@ -292,11 +292,11 @@ select {
   color: var(--ink);
 }
 
-.university-card:hover {
+:is(.university-card,.country-card):hover {
   background: #f4f8fa;
 }
 
-.university-card.selected {
+:is(.university-card,.country-card).selected {
   background: #eef6fa;
   border-color: #b9dce9;
 }
@@ -814,7 +814,7 @@ html {
     overflow: auto;
     padding: 0 8px 8px;
   }
-  .university-card {
+  :is(.university-card,.country-card) {
     flex: 0 0 14rem;
     margin: 0 4px;
     padding: 11px 10px;
@@ -915,3 +915,30 @@ html {
 }
 
 .source-details { overflow-wrap: anywhere; font-size: .75rem; }
+
+.exploration-switch {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f2f6f8;
+}
+.exploration-switch button {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .75rem;
+  font-weight: 650;
+}
+.exploration-switch button[aria-pressed=true] {
+  background: white;
+  color: var(--blue);
+  box-shadow: 0 1px 5px #18394e16;
+}
+.coverage-hint { display: block; margin-top: 8px; font-size: .625rem; color: var(--muted); }
