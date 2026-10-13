@@ -37,3 +37,9 @@ Private queue and manifest shapes in APP-001 through APP-003 remain proposals un
 Already-tracked exceptions, identified from filenames only: `grad-compass/data/grad_compass.db`, `grad-compass/data/config.json` and four files under `grad-compass/ui/cache/` remain tracked despite their ignore rules. Treat the database/configuration and potentially personal cache as sensitive; contents were not inspected. Nine logs under `grad-compass-research-engine/cv/synthetic/build-v6/`, `build-v7/` and `build-v8/` are also tracked; their paths identify synthetic build output, and their contents were not inspected. No paths under `grad-compass-research-engine/private/` are tracked.
 
 The synthetic UI feature does not expand production/private-data permissions. Existing local-file exclusions remain in force; the implementation does not modify the production database/configuration, Research Engine, frozen artifacts or CV outputs.
+
+## Country-evidence proposal — APP-006, 2026-10-13
+
+The latest app-only authorization adds synthetic promoted discovery and country exploration/personal decisions around the existing map. APP-006 asks Marry/Dave to review country/territory identifiers, evidence/review/revision conventions and a separately versioned future country-evidence supplement. This is awaiting their response; no shared contract or producer implementation is agreed by the proposal.
+
+The app demo uses its own clearly labelled invented country briefs and reserved example sources. Public exchange 1.0.0 and its importer remain unchanged. Country decisions are app-owned runtime state, separate from canonical factual acceptance and application stages. The user still relays mailbox messages manually. No real country transfer/research, private queue/artifacts or automatic agent invocation is authorized.

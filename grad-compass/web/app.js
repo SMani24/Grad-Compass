@@ -145,6 +145,7 @@ if (typeof document !== "undefined") {
   }
   function setMode(mode, record = true, clearSearch = true) {
     state.mode = mode;
+    document.querySelector(".results-panel").setAttribute("aria-label", mode === "countries" ? "Country results" : "University results");
     if (clearSearch) { elements.search.value = ""; editingSearch = false; }
     get("countries-mode").setAttribute("aria-pressed", String(mode === "countries"));
     get("universities-mode").setAttribute("aria-pressed", String(mode === "universities"));
@@ -226,6 +227,14 @@ if (typeof document !== "undefined") {
         } catch(error) { chooser.value = previous; if (sequence === state.detailSequence) saved.textContent = error.message; }
         finally { chooser.disabled = false; }
       });
+      const explore = node("button", "portal-link explore-country", "Explore universities here");
+      explore.id = "explore-country"; explore.type = "button";
+      explore.addEventListener("click", () => {
+        elements.status.value = "";
+        setMode("universities");
+        get("universities-mode").focus({preventScroll:true});
+      });
+      elements.inspector.append(explore);
       elements.inspector.append(node("h3", "", "Research summary"), node("p", "country-summary", detail.summary));
       elements.inspector.append(node("h3", "", "Sources"));
       if (!detail.sources.length) elements.inspector.append(node("p", "", "No country sources supplied yet."));
@@ -346,12 +355,16 @@ if (typeof document !== "undefined") {
     table.append(body);
     get("university-table").replaceChildren(countries.length ? table : node("p", "empty-state", "No countries match this search."));
   }
+  function universityEmptyMessage() {
+    const noSavedHere = elements.country.value && !state.universities.some(university => university.country_code === elements.country.value);
+    return noSavedHere ? "No universities saved here yet. Research coverage is incomplete; this does not establish suitability." : "No universities match these filters. Try another country or search.";
+  }
   function renderResults() {
     if (state.mode === "countries") { renderCountries(); return; }
     elements.results.replaceChildren();
     get("result-count").textContent = state.filtered.length;
     get("mapped-count").textContent = state.filtered.filter(hasCoordinates).length + " of " + state.filtered.length + " universities mapped";
-    if (!state.filtered.length) elements.results.append(node("p", "empty-state", "No universities match these filters. Try another country or search."));
+    if (!state.filtered.length) elements.results.append(node("p", "empty-state", universityEmptyMessage()));
     for (const university of state.filtered) {
       const card = node("button", "university-card" + (state.selected === university.id ? " selected" : ""));
       card.type = "button";
@@ -366,7 +379,7 @@ if (typeof document !== "undefined") {
       elements.results.append(card);
     }
     const container = get("university-table");
-    if (!state.filtered.length) { container.replaceChildren(node("p", "empty-state", "No matching universities. Your filters apply to both views.")); return; }
+    if (!state.filtered.length) { container.replaceChildren(node("p", "empty-state", universityEmptyMessage())); return; }
     const table = node("table");
     const head = node("thead"); const headings = node("tr");
     for (const title of ["University", "Location", "Stage"]) { const cell = node("th", "", title); cell.scope = "col"; headings.append(cell); }

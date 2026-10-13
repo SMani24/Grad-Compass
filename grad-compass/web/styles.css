@@ -950,3 +950,5 @@ html {
 .decision-badge { display: inline-block; margin-top: 8px; padding: 4px 7px; border-radius: 5px; background: #eef3f6; color: var(--ink); font-size: .625rem; }
 .country-source { overflow-wrap: anywhere; }
 .country-source a { color: var(--blue); font-size: .75rem; }
+
+.explore-country { width: 100%; }

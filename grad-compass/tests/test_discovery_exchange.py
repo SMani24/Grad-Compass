@@ -67,3 +67,18 @@ class DiscoveryExchangeTests(unittest.TestCase):
         self.assertEqual(len({row["id"] for row in rows}), 4)
         self.assertEqual(university(self.workspace, self.exchange, "exchange-1")["university"]["name"], "Existing Demo University")
         self.assertEqual(university(self.workspace, self.exchange, "1")["university"]["name"], "Northbridge Example University")
+
+    def test_country_decision_is_independent_of_promoted_research_and_application_stage(self):
+        from web.country_evidence import detail
+        self.promote()
+        before = overview(self.workspace,self.exchange)
+        exchange_digest = hashlib.sha256(self.exchange.database.read_bytes()).hexdigest()
+        self.workspace.country_decisions("CAN", "Excluded")
+        self.assertEqual(overview(self.workspace,self.exchange),before)
+        self.assertEqual(detail(self.workspace,self.exchange,"CAN")["decision"],"Excluded")
+        self.assertEqual(detail(self.workspace,self.exchange,"CAN")["university_count"],3)
+        promoted = university(self.workspace,self.exchange,"exchange-2")["university"]
+        self.assertEqual(promoted["research"]["review"],"accepted")
+        self.assertEqual(promoted["status"],"Researching")
+        self.assertEqual(hashlib.sha256(self.exchange.database.read_bytes()).hexdigest(),exchange_digest)
+        self.assertEqual(hashlib.sha256(self.workspace.database.read_bytes()).hexdigest(),self.map_digest)

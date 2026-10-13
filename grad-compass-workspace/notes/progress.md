@@ -41,3 +41,12 @@ Private queue/manifests and artifact transfers remain proposals outside this imp
 - Kept app typography, details and research dialogs consistent; header/panel layouts adapt to larger text and mobile zoom controls remain reachable.
 - Verification: 73 automated regression cases and native UI checks for four sizes, reload persistence, intermediate/minimum widths and the synthetic exchange workflow with duplicate-free replay. Review notes and local screenshots are under `reviews/2026-10-13-readability.md`.
 - Display preferences are confined to ignored synthetic runtime storage. Production data/configuration, Research Engine, approved profile/CV artifacts and shared exchange/importer files remain unchanged.
+
+## 2026-10-13 — map-based country exploration
+
+- Connected committed eligible synthetic institutions/programs to discovery through a read-only projection. Distinct namespaced IDs preserve base IDs, producer identities/revisions and replay stability; unlocated results remain accessible without fabricated markers. Programs stay under explicitly mapped institutions.
+- Added Countries / Universities to the left panel, independent of Map/List. Country cards/polygons frame the geography and open the existing right inspector. App-owned invented summaries/sources/uncertainties are labelled unreviewed; unsupported countries show missing research.
+- Saved personal country decisions in separate ignored preview state. Considering/Shortlisted/On hold/Excluded do not change factual review, application stages or import eligibility; Excluded remains accessible.
+- Added Explore universities here with preserved country/view/map position and explicit empty coverage. History, keyboard/Escape, text-size settings and narrow layouts are retained.
+- Demonstrated each increment before expanding it. Final checks: 80 automated regressions plus native import/discovery/replay, country evidence/decision persistence, context handoff and four-size responsive demonstrations. See `reviews/2026-10-13-country-discovery.md`.
+- APP-006 proposes a future country-evidence handoff to Marry/Dave, awaiting their response. Exchange 1.0.0/importer, producer ownership and manual mailbox boundaries remain unchanged. No real data, private transfers, production changes or automatic agents are included.
