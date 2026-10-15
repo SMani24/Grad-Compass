@@ -133,6 +133,22 @@ class WebPreviewTests(unittest.TestCase):
         self.assertEqual(self.preference_request({"country_code":"CAN","decision":"Considering"},path=path)["status"],409)
         self.assertEqual(file.read_text(),'{broken')
 
+    def test_research_http_rejects_cross_origin_and_unsafe_payloads(self):
+        from uuid import uuid4
+        path="/api/research/submit"
+        payload={"submission_key":str(uuid4()),"countries":["FRA"],"scope":"country_conditions","preferences":{},"remember_preferences":True}
+        self.assertEqual(self.preference_request(payload,path=path,Origin="https://example.com")["status"],403)
+        self.assertEqual(self.preference_request(payload,path=path,**{"X-Grad-Compass-Session":"wrong"})["status"],403)
+        self.assertEqual(self.preference_request({**payload,"file":"/private/profile"},path=path)["status"],409)
+        self.assertEqual(self.workspace.research.snapshot()["requests"],[])
+        self.assertEqual(self.preference_request(payload,path=path)["status"],200)
+        self.assertEqual(len(self.workspace.research.snapshot()["requests"]),1)
+        self.assertEqual(self.route("/research.sqlite")["status"],404)
+        handler=object.__new__(server.handler_for(self.workspace))
+        handler.path="/api/research";handler.headers={"Host":"example.com"};handler.server=SimpleNamespace(server_port=8765)
+        result={};handler.respond=lambda status,payload:result.update(status=status,payload=payload)
+        handler.do_GET();self.assertEqual(result["status"],403)
+
     def test_overview_and_details_return_linked_synthetic_records(self):
         overview = self.route("/api/workspace")
         self.assertEqual(overview["status"],200)

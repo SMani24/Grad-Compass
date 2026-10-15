@@ -33,6 +33,7 @@ textarea:focus-visible { outline: 3px solid #56b9d5; outline-offset: 3px; }
   width: min(1080px,calc(100vw - 48px));
   max-height: calc(100dvh - 48px);
   overflow: auto;
+  overflow-wrap: anywhere;
   padding: 28px;
   color: var(--ink);
   border: 1px solid var(--line);
@@ -83,4 +84,9 @@ textarea:focus-visible { outline: 3px solid #56b9d5; outline-offset: 3px; }
   .request-fields,.research-layout { grid-template-columns: minmax(0,1fr); }
   #research-request-list { display: flex; overflow: auto; gap: 10px; max-height: 180px; }
   .request-row { flex: 0 0 220px; }
+}
+
+.response-review > summary { cursor: pointer; color: var(--blue); font-weight: 650; }
+@media(min-width:701px) {
+  #research-request-list { position: sticky; top: 0; align-self: start; max-height: calc(100dvh - 100px); overflow: auto; }
 }

@@ -50,7 +50,7 @@
         button.setAttribute("aria-pressed",String(watch));
         button.setAttribute("aria-label",`${watch ? "Unwatch" : "Watch"} ${code}`);
         status(watch ? "Added to your watchlist. Research and assessment are unchanged." : "Removed from watchlist. Your note and assessment are kept.");
-        if (restoreFocus) get(button.id)?.focus({preventScroll:true});
+        if (restoreFocus && (document.activeElement===button || document.activeElement===document.body)) get(button.id)?.focus({preventScroll:true});
       } catch(error) { status(error.message); }
       finally { busy.delete(code); button.disabled = false; }
     });
@@ -72,6 +72,7 @@
   }
   function detailControls(code) {
     const box=node("section",undefined,"country-watch-detail");box.append(watchButton(code,"detail"));
+    const editor=node("details");editor.id="country-note-editor";editor.append(node("summary",personal(code).note ? "Private note · edit" : "Add a private note"));
     const label=node("label","Private note");label.htmlFor="country-note";
     const note=node("textarea");note.id="country-note";note.value=personal(code).note;note.maxLength=4000;note.rows=3;
     note.placeholder="Your context — kept separately from research evidence";
@@ -83,7 +84,7 @@
       catch(error){message.textContent=error.message;}
       finally{save.disabled=false;note.disabled=false;}
     });
-    box.append(label,note,save,message);return box;
+    editor.append(label,note,save,message);box.append(editor);return box;
   }
   const preferenceFields = ["intake","intake_alternatives","degree_routes","instruction_language","country_restrictions","funding_priorities","research_limits"];
   const preferenceLabels = {intake:"Intake",intake_alternatives:"Alternatives",degree_routes:"Degree routes",instruction_language:"Language",country_restrictions:"Country restrictions",funding_priorities:"Funding",research_limits:"Shared limits"};
@@ -96,7 +97,6 @@
   let current;
   let currentRevision;
   let currentFinding;
-  let pendingEnvelope;
   let openSequence = 0;
   function summary(preferences) {
     const values = preferenceFields.filter(key=>preferences?.[key]).map(key=>`${preferenceLabels[key]}: ${preferences[key]}`);
@@ -185,6 +185,8 @@
     const sequence=++openSequence;
     if(!researchDialog.open)researchDialog.showModal();
     get("research-message").className="";get("research-message").textContent="Loading…";
+    get("research-request-detail").dataset.request="";
+    get("research-request-detail").replaceChildren(node("p","Loading the selected request…"));
     try {
       await reload();if(sequence!==openSequence)return;
       identity=identity || data.requests?.[0]?.request_id;
@@ -193,13 +195,13 @@
       const response=await fetch("/api/research/requests/"+encodeURIComponent(identity),{cache:"no-store"});
       if(!response.ok)throw new Error("Could not load this request.");
       const detail=await response.json();if(sequence!==openSequence)return;
-      current=detail;currentRevision=revision;currentFinding=finding;pendingEnvelope=null;
+      current=detail;currentRevision=revision;currentFinding=finding;
       renderDetail();get("research-message").textContent="Manual synthetic pilot. No real research or automatic agent execution.";
     }catch(error){get("research-message").textContent=error.message;get("research-message").className="research-error";}
   }
   function renderDetail() {
     const request=current.request;
-    const section=get("research-request-detail");section.replaceChildren();
+    const section=get("research-request-detail");section.dataset.request=request.request_id;section.replaceChildren();
     const item=data.requests.find(item=>item.request_id===request.request_id);
     section.append(node("h3",scopeLabels[request.scope]),node("p",request.countries.map(countryLabel).join(" · ")),
       node("p",stateLabel(item?.state || "prepared"),"request-state"));
@@ -211,8 +213,13 @@
       action("Prepare follow-up",()=>openRequest({countries:request.countries,scope:"refresh",parent_request_id:request.request_id}),"request-follow-up"));
     if(request.parent_request_id)actions.append(action("View parent request",()=>openRequests(request.parent_request_id)));
     section.append(actions,technical("Identifiers & exact request binding",{request:request.request_id,revision:request.revision,digest:request.digest}));
-    // Response/revision controls are added by the result-review increment.
+    // Response and revision review shares this dialog through its synthetic adapter.
     if(window.GradCompassResearchReview)window.GradCompassResearchReview.render({section,current,revision:currentRevision,finding:currentFinding,openRequests,openRequest,handoff,post,reload,action,node,technical,notify:()=>window.dispatchEvent(new Event("grad-compass:discovery-updated"))});
+  }
+  function resultLink(origin,label="Review source research") {
+    const box=node("div",undefined,"result-origin");
+    const button=node("button",`${label} · revision ${origin.revision}`);button.type="button";
+    button.addEventListener("click",()=>openRequests(origin.request_id,origin.revision,origin.finding_id));box.append(button);return box;
   }
   get("open-research").addEventListener("click",()=>openRequests());
   get("close-research").addEventListener("click",()=>{++openSequence;researchDialog.close();});
@@ -220,5 +227,5 @@
   window.addEventListener("grad-compass:open-result",event=>openRequests(event.detail.request_id,event.detail.revision,event.detail.finding_id));
   // Changing map filters never changes the pending multi-country selection.
   get("research-selected").addEventListener("click",()=>window.dispatchEvent(new CustomEvent("grad-compass:prepare-request",{detail:{countries:[...selected]}})));
-  window.GradCompassResearch=Object.freeze({hydrate,personal,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests});
+  window.GradCompassResearch=Object.freeze({hydrate,personal,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests,resultLink});
 })();

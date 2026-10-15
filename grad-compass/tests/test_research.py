@@ -148,3 +148,40 @@ class ResearchTests(unittest.TestCase):
         self.assertEqual(follow["prior_results"],[ref])
         with closing(self.store.connect()) as db:
             with self.assertRaises(sqlite3.IntegrityError):db.execute("DELETE FROM research_results")
+
+    def test_response_bindings_versions_exact_types_and_old_replay_cannot_downgrade_evidence(self):
+        from uuid import uuid4
+        from web.research_envelopes import seal
+        request=self.store.submit(self.submission())["request"]
+        identity=request["request_id"]
+        ack=self.store.demo_response(identity,"accepted")
+        for invalid in ({**ack,"request_revision":True},{**ack,"private_schema_version":"1.0.0"},
+                        {**ack,"request_digest":"0"*64},{**ack,"execution_progress":"running"}):
+            with self.assertRaises(ValueError):self.store.receive(invalid)
+        self.assertEqual(self.store.snapshot()["requests"][0]["state"],"prepared")
+        self.store.receive(ack)
+        self.assertFalse(self.store.receive(ack)["changed"])
+        before_prefs=self.store.snapshot()["preferences"]
+        first=self.store.demo_response(identity,"result-1")
+        forged={key:value for key,value in first.items() if key!="digest"}
+        forged["findings"]=[{**first["findings"][0],"funding_routes":"An unapproved arbitrary real claim"}]
+        with self.assertRaises(ValueError):self.store.receive(seal(forged))
+        self.store.receive(first)
+        with self.assertRaises(ValueError):self.store.feedback(identity,first["result_id"],1,"country:ATA","Wrong finding",str(uuid4()))
+        key=str(uuid4())
+        saved=self.store.feedback(identity,first["result_id"],1,"country:CAN","Only funding routes please",key)
+        self.assertEqual(self.store.feedback(identity,first["result_id"],1,"country:CAN","Only funding routes please",key),saved)
+        with self.assertRaises(ValueError):self.store.feedback(identity,first["result_id"],1,"country:CAN","Changed comment",key)
+        self.store.receive(self.store.demo_response(identity,"result-2"))
+        self.assertFalse(self.store.receive(first)["changed"])
+        self.assertEqual(self.store.latest_country("CAN")["source_revision"],"demo-CAN-r2")
+        self.assertEqual(self.store.snapshot()["preferences"],before_prefs)
+
+    def test_explicit_rejection_and_clarification_do_not_claim_execution(self):
+        for state in ("rejected","needs_clarification"):
+            request=self.store.submit(self.submission())["request"]
+            self.store.receive(self.store.demo_response(request["request_id"],state))
+            row=next(item for item in self.store.snapshot()["requests"] if item["request_id"]==request["request_id"])
+            self.assertEqual(row["state"],state)
+            self.assertIsNone(row["execution_progress"])
+            with self.assertRaises(ValueError):self.store.receive(self.store.demo_response(request["request_id"],"result-1"))

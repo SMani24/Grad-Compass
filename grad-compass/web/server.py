@@ -22,6 +22,7 @@ STATIC_FILES = {
     "/": (APP_ROOT / "web" / "index.html", "text/html; charset=utf-8"),
     "/styles.css": (APP_ROOT / "web" / "styles.css", "text/css; charset=utf-8"),
     "/app.js": (APP_ROOT / "web" / "app.js", "text/javascript; charset=utf-8"),
+    "/research_review.js": (APP_ROOT / "web" / "research_review.js", "text/javascript; charset=utf-8"),
     "/research.js": (APP_ROOT / "web" / "research.js", "text/javascript; charset=utf-8"),
     "/research.css": (APP_ROOT / "web" / "research.css", "text/css; charset=utf-8"),
     "/settings.js": (APP_ROOT / "web" / "settings.js", "text/javascript; charset=utf-8"),

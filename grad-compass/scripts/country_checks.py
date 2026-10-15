@@ -57,7 +57,17 @@ def verify_countries(window, capture=None):
     expect(detail="France",decision="Shortlisted")
     screenshot("country-evidence")
     # The handoff changes exploration only; country geometry stays in the same place.
-    before = json.loads(run("""JSON.stringify((() => {const r=document.querySelector('.country-outline[data-country="FRA"]').getBoundingClientRect();return [r.x,r.y,r.width,r.height];})())"""))
+    bounds_probe = """JSON.stringify((() => {const r=document.querySelector('.country-outline[data-country="FRA"]').getBoundingClientRect();return [r.x,r.y,r.width,r.height];})())"""
+    previous = None
+    stable = 0
+    stop = time.monotonic() + 5
+    while time.monotonic() < stop:
+        before = json.loads(run(bounds_probe))
+        stable = stable + 1 if previous and all(abs(a-b)<.01 for a,b in zip(before,previous)) else 0
+        if stable >= 3: break
+        previous = before
+        time.sleep(.1)
+    else: raise AssertionError("Country framing animation did not settle")
     click("explore-country")
     expect(mode="universities",view="map",country="FRA",universities=0)
     after = json.loads(run("""JSON.stringify((() => {const r=document.querySelector('.country-outline[data-country="FRA"]').getBoundingClientRect();return [r.x,r.y,r.width,r.height];})())"""))

@@ -31,3 +31,9 @@ Tests never point to the original application database or private Research Engin
 Increment 3 is authorized as an end-to-end **synthetic** app UI workflow only. It reuses unchanged exchange 1.0.0 and its importer on an explicitly marked disposable database, with selection, validation/staging, explicit institution mapping, simulated dry-run changes, operational approval, eligible promotion and idempotent replay. Real discovery, real publishing/importing and activation on production storage remain outside this increment.
 
 Dave's verified status supersedes stale enrichment/CV assumptions: the existing frozen profile remains valid, the applicant-specific v8 CV package is board accepted, and no additional enrichment task is approved or underway. Increment 4 still needs a separately approved private artifact handoff; increment 5's queue/manifests remain proposals. No regeneration or private transfer is needed to complete this synthetic proof.
+
+## Synthetic watchlist/request pilot — 2026-10-15
+
+The user authorized the bounded app portion of increment 5: country watchlist/private notes, multi-selection, inline remembered preferences, immutable requests/manual handoffs, explicit synthetic acknowledgements/results, feedback/follow-ups and revision review. The complete synthetic round trip is demonstrated and tested around the existing map, floating panels and Map/List toggle.
+
+This is an app-owned synthetic pilot using provisional, separately versioned private/country formats proposed in APP-007. It does not finalize a producer contract or authorize real country/research/applicant transfers. Exchange 1.0.0 remains unchanged and public facts still pass its existing mapping/dry-run/promotion safeguards. Live producer integration waits for compatibility/ownership/private-location agreement and separately authorized scope. Other roadmap increments retain their previous boundaries.

@@ -239,6 +239,16 @@ if (typeof document !== "undefined") {
       });
       elements.inspector.append(explore);
       elements.inspector.append(node("h3", "", "Research summary"), node("p", "country-summary", detail.summary));
+      for(const [field,title] of [["funding_routes","Funding routes"],["costs","Costs"],["work_rules","Work rules"]]) {
+        elements.inspector.append(node("h3","",title),node("p","",detail[field] || "Unknown — no evidence supplied."));
+      }
+      if(detail.observed_at) elements.inspector.append(metadata("Observed",detail.observed_at));
+      if(detail.origin) {
+        elements.inspector.append(window.GradCompassResearch.resultLink(detail.origin));
+        const history=node("details","source-details");history.append(node("summary","","Earlier research revisions"));
+        for(const origin of detail.history || []) history.append(window.GradCompassResearch.resultLink(origin,"Research result"));
+        elements.inspector.append(history);
+      }
       elements.inspector.append(node("h3", "", "Sources"));
       if (!detail.sources.length) elements.inspector.append(node("p", "", "No country sources supplied yet."));
       for (const source of detail.sources) {
@@ -251,7 +261,11 @@ if (typeof document !== "undefined") {
       elements.inspector.append(node("h3", "", "Uncertainties & coverage"));
       for (const uncertainty of detail.uncertainties) elements.inspector.append(node("p", "", "• " + uncertainty));
       elements.inspector.append(node("p", "country-coverage", detail.university_count + " saved universities here. Empty results indicate missing coverage, not unsuitability."));
-      if (detail.revision) elements.inspector.append(node("p", "source-revision", "Demo source revision: " + detail.revision));
+      if (detail.revision) {
+        const revision=node("details","source-details");
+        revision.append(node("summary","","Source revision details"),node("p","source-revision","Demo source revision: "+detail.revision));
+        elements.inspector.append(revision);
+      }
       elements.inspector.focus({preventScroll:true});
     } catch {
       if (sequence !== state.detailSequence) return;
@@ -298,14 +312,16 @@ if (typeof document !== "undefined") {
         source.append(node("summary", "", "Source identity & revision"), node("p", "", "ID: " + university.research.external_id), node("p", "", "Revision: " + university.research.revision));
         research.append(source); elements.inspector.append(research);
       }
+      for(const origin of (detail.research_results || []).slice(0,1)) elements.inspector.append(window.GradCompassResearch.resultLink(origin));
       elements.inspector.append(node("h3", "", "Programs"));
       if (!detail.programs?.length) elements.inspector.append(node("p", "", "No promoted programs saved yet."));
       for (const program of detail.programs || []) {
         const card = node("div", "detail-card program-card");
-        card.dataset.program = program.id;
+        card.dataset.program = program.id; card.dataset.externalProgram = program.external_id;
         card.append(node("strong", "", program.name), node("p", "", program.degree_level), node("p", "", "Research review: " + program.review + " · Promoted synthetic record"));
         for (const claim of program.requirements) card.append(node("p", "", claim.kind.replaceAll("_", " ") + " · " + claim.intake + ": " + claim.value));
         if (!program.requirements.length) card.append(node("p", "", "No eligible intake claims supplied. This is incomplete evidence."));
+        for(const origin of (program.research_results || []).slice(0,1))card.append(window.GradCompassResearch.resultLink(origin));
         elements.inspector.append(card);
       }
       elements.inspector.append(node("h3", "", "Faculty contacts"));
@@ -349,7 +365,7 @@ if (typeof document !== "undefined") {
       const selected = elements.country.value === country.code;
       const card = node("button", "country-card" + (selected ? " selected" : ""));
       card.type = "button"; card.dataset.country = country.code; card.setAttribute("aria-pressed", String(selected));
-      card.append(node("span", "country-tag", country.code), node("span", "university-name", country.flag + " " + country.name), node("span", "card-meta", count + " saved universities"), node("span", "coverage-hint", "Research coverage incomplete"), node("span", "decision-badge", state.decisions[country.code] || "No personal decision"));
+      card.append(node("span", "country-tag", /^[A-Z]{3}$/.test(country.code) ? country.code : "Country / territory"), node("span", "university-name", country.flag + " " + country.name), node("span", "card-meta", count + " saved universities"), node("span", "coverage-hint", "Research coverage incomplete"), node("span", "decision-badge", state.decisions[country.code] || "No personal decision"));
       card.addEventListener("click", () => selectCountry(country.code));
       const entry = node("div", "country-entry"); entry.append(card,window.GradCompassResearch.cardControls(country.code)); elements.results.append(entry);
       const row = node("tr", selected ? "selected" : ""); row.dataset.country = country.code;
@@ -499,6 +515,18 @@ if (typeof document !== "undefined") {
       get("error-text").textContent = "Could not load the workspace. Please try again."; get("error").hidden = false;
     }
   }
+  window.addEventListener("grad-compass:show-country",event=>{
+    setMode("countries",false);setView("map",false);selectCountry(event.detail.code);
+  });
+  window.addEventListener("grad-compass:show-university",async event=>{
+    try {
+      const result=await api("/api/workspace");state.universities=result.universities;
+      const university=state.universities.find(item=>item.id===event.detail.id);if(!university)return;
+      elements.country.value=university.country_code;elements.status.value="";
+      setMode("universities",false);await selectUniversity(university.id);
+      if(event.detail.program)[...elements.inspector.querySelectorAll(".program-card")].find(card=>card.dataset.externalProgram===event.detail.program)?.scrollIntoView({block:"nearest"});
+    }catch {get("error-text").textContent="Could not open the promoted research record.";get("error").hidden=false;}
+  });
   get("country-list-scope").addEventListener("change",() => { render(); updateUrl(); });
   window.addEventListener("grad-compass:personal-updated",renderResults);
   get("countries-mode").addEventListener("click", () => setMode("countries"));

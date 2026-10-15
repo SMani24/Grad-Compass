@@ -24,3 +24,11 @@ Dave's consolidated 2026-10-12 replies confirm Marry's GRA-37 verification of th
 Codex owns app development and operational import decisions; Marry is the technical contact for shared exchange/importer compatibility. Paperclip retains factual acceptance and canonical profile/CV ownership. Shared files are unchanged; coordinate with Marry before any overlapping edits.
 
 The user authorized an end-to-end synthetic exchange workflow through the app UI: select a finalized invented batch, validate/stage, explicitly map institutions, inspect a dry run, approve eligible promotion, inspect outcomes and verify replay. Use a separately marked disposable SQLite workspace. Reuse unchanged v1.0.0 and its importer; keep institution/program identities and staged/promoted states distinct. No real-data import, production migration, discovery, private queue or artifact transfer is included.
+
+## Watchlist/manual research milestone — 2026-10-15
+
+The user authorized synthetic app-owned watchlists, private notes, batch country selection, request preparation/manual handoff, remembered explicit preferences, acknowledgement/result receipt, finding feedback, follow-ups and revision review around the existing map workspace. This supersedes earlier “no private queue implementation” wording only for the bounded synthetic app pilot; no real transfer or producer deployment is authorized.
+
+Watchlist membership, assessment, notes, factual review and operational import remain separate. Preference memory changes only after a successful explicit submission unless request-only is chosen; cancellation and casual feedback never change remembered restrictions. Each request freezes its exact snapshot. App preferences never modify the canonical Applicant Profile.
+
+APP-007 proposes private envelopes 0.1.0 and independently versioned country evidence 0.1.0 for compatibility review. App-generated fixtures may exercise these provisional adapters; exchange 1.0.0 and its importer remain unchanged. The app does not poll the mailbox, infer agent progress, invoke agents or mark manual handoffs delivered without a response.

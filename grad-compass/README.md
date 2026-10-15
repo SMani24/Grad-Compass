@@ -8,7 +8,7 @@ Press **Super**, search for **Grad Compass**, and open it. The installed desktop
 
 Escape moves up from university or country details to the country/filter view, then to the world view (and from the list to the map). Back/forward buttons, Alt+Left/Right and mouse side buttons restore the full workspace context. Ctrl+W closes the desktop app after a confirmation; cancellation keeps the window open.
 
-Open **Settings → Text size** to choose Standard (100%), Comfortable (115%), Large (130%) or Extra large (150%). The choice applies to the map/list workspace, university details and research-import dialog, and survives relaunches. It is saved in the ignored synthetic runtime as `display-preferences.json`; production configuration is untouched. At larger sizes, the header wraps and panels scroll as needed. Antarctica is excluded from the discovery map.
+Open **Settings → Text size** to choose Standard (100%), Comfortable (115%), Large (130%) or Extra large (150%). The choice applies to the map/list workspace, details, request forms and research/import dialogs, and survives relaunches. It is saved in the ignored synthetic runtime as `display-preferences.json`; production configuration is untouched. At larger sizes, the header wraps and panels scroll as needed. Antarctica is excluded from the discovery map.
 
 The launcher uses `../grad-compass-workspace/runtime/preview/`, creates synthetic data only if that folder is new or empty, and refuses existing unmarked data. Its local server binds to a random loopback port and stops when the window closes. Browser storage and launch logs stay in that ignored runtime. The original application database and configuration are not used.
 
@@ -38,6 +38,38 @@ grad-compass/envGradCompass/bin/python -B grad-compass/scripts/launch_preview.py
 
 All smoke modes now use new temporary map and exchange workspaces and clean them up. Normal launches retain the existing marked synthetic runtime. Review notes are in `../grad-compass-workspace/reviews/2026-10-13-country-discovery.md`. The country-evidence handoff proposal is APP-006 in the local Paperclip mailbox, awaiting Marry/Dave; shared exchange/importer files remain unchanged.
 
+## Country watchlist and manual research requests
+
+Choose **Countries** in the left exploration panel. **Watch country / Unwatch** works from country details, cards and country List rows, even where no universities or research are saved. **My watchlist** filters the same exploration panel; check several countries and choose **Research selected**. Map/List remains an independent presentation choice. Unwatching removes that country from the pending research selection but keeps its private note and personal assessment.
+
+Country details have an optional **Private note** disclosure and explicit Save note. Watchlist membership and notes are separate from Considering/Shortlisted/On hold/Excluded, evidence review and application stages.
+
+The request flow supports **Update country conditions**, **Find universities and programs**, and **Refresh or follow up**. It collects shared intake/alternatives, degree routes, instruction language, country restrictions, funding priorities and shared research limits inline. There is no Research preferences page in Settings. Successful submissions remember explicit shared entries automatically; later forms show a compact editable summary. **Only for this request** preserves remembered values, and cancelling writes no preferences. Empty values remain unknown. Countries, scope, request-specific limits and contextual feedback are not inferred into permanent preferences. Every saved request retains its exact snapshot; the canonical Applicant Profile is not changed.
+
+A saved request starts **Prepared locally — not acknowledged**. Open **Requests** in the country panel to view it, then **Prepare private handoff** and copy the reference-only prompt to Dave manually. The app writes the immutable JSON export under the ignored preview runtime's `research-handoff/`; the prompt contains its path, opaque ID and exact digest, not the preference/context contents. The index is a local snapshot regenerated on manual export, with opaque IDs/revisions and local states only. It is not an automatic delivery queue or progress feed.
+
+### Synthetic acknowledgement/result review
+
+The current adapter is provisional and **accepts only app-generated synthetic responses**. APP-007 in the local mailbox proposes independently versioned private request/ack/result/feedback envelopes and a separate country-evidence supplement (both draft `0.1.0`). Marry/Dave compatibility review and separately authorized producer/real-data integration are still required. Public exchange 1.0.0 remains unchanged.
+
+1. In a saved request, expand **Receive a manual response**, choose a demo acknowledgement, and click **Load demo response**. Previewing does not acknowledge anything. Click **Receive this response** to record the exact request/revision/digest binding.
+2. Load/receive **First result (demo)**. Country evidence includes summaries, funding routes, costs, work rules, sources, observed dates, caveats and unknowns. Its unreviewed-demo label remains independent of personal decisions. Repeating a receipt makes no duplicate changes.
+3. Give feedback on a particular finding, then **Save feedback & prepare handoff**. Copy that private reference manually; the app does not label it delivered. **Request an update** opens a prefilled refresh request with exact lineage; the comment stays request-specific.
+4. Receive **Revised result (demo)** for the original request after feedback. The revision selector preserves both versions, with before/after changes and source/date changes. Earlier feedback remains attached to its exact finding/revision. The demo deliberately changes funding/cost scenarios while keeping work rules unknown.
+5. For requests including Canada and university/program research, **Review institution/program import** opens the existing importer workflow. Explicit mapping, validation, dry run and operational approval remain required. Only eligible promoted records enter discovery; unlocated institutions have cards/List rows without fabricated pins. Institution/program panels link back to the originating request result. Public batch replay remains duplicate-free.
+
+Loading or receiving responses is manual. The adapter can also read saved app-generated demo JSON files; arbitrary real/custom response payloads are rejected. Loading a demo, copying a prompt or saving feedback never implies agent execution, delivery, acknowledgement or factual acceptance. Execution progress is shown only when explicitly supported; the demo acknowledgement reports no execution progress.
+
+App-owned state is in marked `runtime/preview/research.sqlite`, separate from the read-only map DB and `country-decisions.json`. Requests, acknowledgements, results and feedback are immutable records; preference updates and personal notes have separate storage. All development state, exports, SQLite sidecars, browser files, logs and screenshots remain Git-excluded. Up to 20 countries can be included per request; shared fields allow 1,200 characters, request limits 2,000, and notes/context/feedback 4,000.
+
+The unattended demonstration creates and removes its own disposable map/exchange/research storage and exercises the complete round trip, preference autofill/cancellation/exceptions, result history, public import/replay, persistence and four-size desktop/mobile layouts:
+
+```bash
+grad-compass/envGradCompass/bin/python -B grad-compass/scripts/launch_preview.py --research-smoke-test --review-screenshots grad-compass-workspace/reviews
+```
+
+Interactive review steps and limitations are in [`2026-10-15-watchlist-research.md`](../grad-compass-workspace/reviews/2026-10-15-watchlist-research.md). No real research, private applicant artifact transfer, automatic agent invocation, scheduling, accounts, billing or deployment is included.
+
 ## Synthetic research imports
 
 Open **Research imports** in the desktop workspace. The launcher explicitly configures the separate, disposable `../grad-compass-workspace/runtime/exchange-ui/exchange.sqlite` database and synthetic outbox. New/empty storage is initialized with its own scope markers; existing unmarked storage is refused. The map's preview database remains read-only and separate.
@@ -50,7 +82,7 @@ Open **Research imports** in the desktop workspace. The launcher explicitly conf
 
 Committed promoted institutions are connected to discovery through a read-only projection, with IDs distinct from the original map rows and retained producer identities/revisions. Their promoted programs appear inside the parent institution's details. Staged records and the unreferenced exchange seed remain absent. Promotion/replay refreshes the current discovery results without resetting the map; reopening reads the same stable records. The unchanged v1 fixture supplies no coordinates, so its added institution appears in cards/List without an invented pin. The map database is not copied into, migrated or written by this connection.
 
-Only the reviewed bundled synthetic fixture is selectable in this increment. A schema-valid real batch is not sufficient input. Unknown/stale/expired requirement claims remain staged according to the unchanged importer; the default freshness window is 30 days. Map geocoding, applicant artifacts and the proposed private queue are outside this workflow.
+Only the reviewed bundled synthetic fixture is selectable in this increment. A schema-valid real batch is not sufficient input. Unknown/stale/expired requirement claims remain staged according to the unchanged importer; the default freshness window is 30 days. Map geocoding, applicant artifacts and real private producer integration remain outside this workflow. The app-owned synthetic request pilot above is separate from public batch promotion.
 
 To try the alternative mapping from a fresh disposable workspace, use `launch_preview.py --exchange-dir /tmp/grad-compass-exchange-alternative`. The app never deletes or resets an existing workspace automatically. Browser state/logs and exchange runtime files remain ignored.
 
@@ -77,7 +109,7 @@ To review the same synthetic workspace in a regular browser:
 grad-compass/envGradCompass/bin/python -B grad-compass/web/server.py --data-dir grad-compass-workspace/runtime/preview --exchange-dir grad-compass-workspace/runtime/exchange-ui --port 8765
 ```
 
-Open `http://127.0.0.1:8765/`; stop the server with Ctrl+C. Search, country and stage filters work across both views. Select a university to inspect its metadata, saved contacts and linked tasks. Universities without coordinates remain visible in the results and list. The map is read-only; Research imports writes only its separately configured synthetic database. Personal country decisions and text preferences write only local runtime files. Real-data import, applicant-data editing, authentication and deployment remain later increments.
+Open `http://127.0.0.1:8765/`; stop the server with Ctrl+C. Search, country and stage filters work across both views. Select a university to inspect its metadata, saved contacts and linked tasks. Universities without coordinates remain visible in the results and list. The map is read-only; Research imports writes only its separately configured synthetic database. Personal country decisions, text preferences and synthetic watchlist/request state write only local runtime storage. Real-data import, applicant-data editing, authentication and deployment remain later increments.
 
 ## Isolated development
 

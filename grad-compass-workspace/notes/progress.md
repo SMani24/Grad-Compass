@@ -50,3 +50,13 @@ Private queue/manifests and artifact transfers remain proposals outside this imp
 - Added Explore universities here with preserved country/view/map position and explicit empty coverage. History, keyboard/Escape, text-size settings and narrow layouts are retained.
 - Demonstrated each increment before expanding it. Final checks: 80 automated regressions plus native import/discovery/replay, country evidence/decision persistence, context handoff and four-size responsive demonstrations. See `reviews/2026-10-13-country-discovery.md`.
 - APP-006 proposes a future country-evidence handoff to Marry/Dave, awaiting their response. Exchange 1.0.0/importer, producer ownership and manual mailbox boundaries remain unchanged. No real data, private transfers, production changes or automatic agents are included.
+
+## 2026-10-15 — country watchlists and manual research round trip
+
+- Added watch/unwatch and optional private notes to country details/cards/List, a watchlist filter and multi-country research selection within the map panel. Personal assessments remain separate and survive updates/unwatching.
+- Added first-request inline preference collection, compact editable autofill, success-only remembering, request-only exceptions and immutable per-request snapshots. Request-specific scope/countries/limits/context stay independent; canonical profile/CV artifacts are untouched.
+- Added local request/feedback handoff exports referencing private files/digests without repeating sensitive contents. Local preparation is separate from explicit acknowledgement; no agent progress is fabricated.
+- Added provisional synthetic-only response receipt, request-linked country evidence, public institution/program origin links through unchanged importer safeguards, finding feedback, exact follow-up lineage and immutable result revisions/material changes.
+- Demonstrated the full round trip, including cancelled forms, autofill, exception, acknowledgement/results, feedback, revision 2, old revision/feedback, public promotion/replay and personal state after reload. Four-size desktop/mobile request/result checks and existing country/university navigation checks passed.
+- Verification: 90 regressions (50 app Python, 22 unchanged shared exchange, 15 JavaScript, three Qt input), native demonstrations and local visual captures. See `reviews/2026-10-15-watchlist-research.md`.
+- APP-007 was published early in the ignored manual mailbox. Producer compatibility and real/private destination authorization remain pending; app-owned synthetic adapters are not a finalized producer integration. No real data, production changes, private artifact transfer, deployment, account/billing/faculty/outreach work or automatic execution is included.

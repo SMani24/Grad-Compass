@@ -52,7 +52,8 @@ def verify_exchange(window, capture=None):
             time.sleep(0.15)
             capture(name)
 
-    click("open-exchange")
+    if not run("document.getElementById('exchange-dialog').open"):
+        click("open-exchange")
     expect(lambda state: state["options"] == 2, "registered finalized fixture")
     run(f"document.getElementById('exchange-batch').value = {json.dumps(BATCH_ID)}; document.getElementById('exchange-batch').dispatchEvent(new Event('change'))")
     expect(lambda state: not state["stageDisabled"], "batch selected")
