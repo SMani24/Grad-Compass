@@ -29,3 +29,58 @@ textarea:focus-visible { outline: 3px solid #56b9d5; outline-offset: 3px; }
   .research-toolbar { flex-wrap: nowrap; }
   .research-toolbar button { flex: 1; padding: 8px 5px; }
 }
+#request-dialog,#research-dialog {
+  width: min(1080px,calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  padding: 28px;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 24px 100px #15304438;
+}
+#request-dialog { width: min(780px,calc(100vw - 48px)); }
+#request-dialog::backdrop,#research-dialog::backdrop { background: #15304450; backdrop-filter: blur(4px); }
+#request-dialog h2,#research-dialog h2 { font-size: 1.5rem; margin: 8px 0; }
+#request-form label { margin-top: 16px; font-size: .75rem; }
+#request-form input,#request-form select,#request-form textarea { font: inherit; font-size: .8125rem; }
+#request-form textarea,.feedback-form textarea,.handoff-text { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; resize: vertical; color: var(--ink); background: #f7f9fa; font: inherit; font-size: .8125rem; }
+.request-fields { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 0 16px; }
+.full-field { grid-column: 1/-1; }
+.request-hint,#request-form-status,#research-message { font-size: .75rem; line-height: 1.6; }
+.request-country-summary { font-size: .875rem; font-weight: 650; color: var(--ink); }
+#request-preferences { margin: 20px 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
+#request-preferences summary { cursor: pointer; font-size: .8125rem; color: var(--blue); }
+#request-form .request-exception { display: flex; gap: 10px; align-items: flex-start; line-height: 1.6; font-weight: 450; }
+#request-only { width: 18px; height: 18px; min-height: 18px; flex-shrink: 0; padding: 0; margin-top: 3px; }
+.request-actions,.result-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+.request-actions button,.result-actions button,.finding-actions button,.feedback-form button,.request-row { font: inherit; font-size: .75rem; padding: 10px 12px; border: 1px solid #c6dfe8; background: #edf6f9; border-radius: 8px; color: var(--blue); }
+#request-submit { color: white; background: var(--blue); border: 0; }
+#request-form button:disabled { opacity: .5; cursor: default; }
+.research-layout { display: grid; grid-template-columns: minmax(180px,240px) minmax(0,1fr); gap: 24px; }
+#research-request-list { min-width: 0; }
+.request-row { display: block; width: 100%; text-align: left; margin: 0 0 10px; line-height: 1.6; overflow-wrap: anywhere; }
+.request-row[aria-current=true] { border-color: var(--blue); background: #e4f1f6; }
+.request-row strong,.request-row span { display: block; }
+#research-request-detail { min-width: 0; overflow-wrap: anywhere; }
+#research-request-detail h3 { font-size: 1.125rem; margin: 16px 0; }
+#research-request-detail p,#research-request-detail li,#research-request-detail summary { font-size: .75rem; line-height: 1.6; }
+.request-state { padding: 12px; border-radius: 8px; background: #eef5f8; color: var(--ink); }
+.request-technical { margin: 16px 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; font-size: .6875rem; }
+#research-handoff { min-height: 120px; }
+.research-error { color: #984438; background: #fff1ee; padding: 12px; border-radius: 8px; }
+.finding-card { padding: 16px; border: 1px solid var(--line); border-radius: 10px; margin: 14px 0; }
+.finding-card h4 { font-size: .875rem; margin: 0 0 10px; }
+.finding-card.highlighted { border-color: var(--blue); }
+.finding-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.feedback-form { margin-top: 16px; }
+.material-change { border-left: 3px solid #d99d30; padding: 8px 12px; margin: 10px 0; background: #fffaf0; }
+.response-review { border: 1px solid var(--line); padding: 16px; border-radius: 10px; margin: 24px 0; }
+.result-origin { margin: 12px 0; }
+.result-origin button { border: 0; background: #edf6f9; color: var(--blue); font: inherit; font-size: .75rem; padding: 9px; border-radius: 7px; text-align: left; }
+@media(max-width:700px) {
+  #request-dialog,#research-dialog { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); padding: 20px 16px; }
+  .request-fields,.research-layout { grid-template-columns: minmax(0,1fr); }
+  #research-request-list { display: flex; overflow: auto; gap: 10px; max-height: 180px; }
+  .request-row { flex: 0 0 220px; }
+}

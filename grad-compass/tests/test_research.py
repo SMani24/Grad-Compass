@@ -59,3 +59,92 @@ class ResearchTests(unittest.TestCase):
         with closing(sqlite3.connect(self.workspace.database)) as db,db:
             db.execute("DELETE FROM app_synthetic_demo_guard")
         with self.assertRaises(ValueError): self.store.snapshot()
+
+    def submission(self,**changes):
+        from uuid import uuid4
+        return {"submission_key":str(uuid4()),"countries":["CAN","FRA"],"scope":"universities_programs",
+                "preferences":{"intake":"Fall 2027","funding_priorities":"Need funding"},"remember_preferences":True,
+                "limits":"Two examples per country","context":None,"parent_request_id":None,"prior_results":[],**changes}
+
+    def test_successful_submission_remembers_explicit_values_and_freezes_old_snapshots(self):
+        payload=self.submission()
+        first=self.store.submit(payload)["request"]
+        self.assertIsNone(first["preferences"]["country_restrictions"])
+        self.assertIsNone(first["profile_reference"])
+        self.assertEqual(self.store.submit(payload)["request"],first,"Retry must not duplicate or rewrite a request")
+        snapshot=self.store.snapshot()
+        self.assertEqual(snapshot["preferences"]["intake"],"Fall 2027")
+        self.assertEqual(snapshot["requests"][0]["state"],"prepared")
+        self.store.submit(self.submission(preferences={"intake":"Spring 2028"},remember_preferences=False))
+        self.assertEqual(self.store.snapshot()["preferences"]["intake"],"Fall 2027")
+        self.store.submit(self.submission(preferences={"intake":"Fall 2029","degree_routes":"Master or PhD"}))
+        self.assertEqual(self.store.snapshot()["preferences"]["intake"],"Fall 2029")
+        self.assertEqual(self.store.request(first["request_id"])["request"],first)
+        with closing(self.store.connect()) as db:
+            with self.assertRaises(sqlite3.IntegrityError): db.execute("UPDATE research_requests SET body='{}'")
+
+    def test_invalid_submission_and_ambiguous_retry_do_not_change_remembered_values(self):
+        payload=self.submission()
+        self.store.submit(payload)
+        before=self.store.snapshot()
+        for changes in ({"countries":[]},{"scope":"faculty"},{"preferences":{"invented":"restriction"}},
+                        {"remember_preferences":"yes"},{"scope":"refresh","parent_request_id":None},
+                        {"prior_results":[{"result_id":"unknown"}]}):
+            with self.assertRaises(ValueError):self.store.submit(self.submission(**changes))
+        with self.assertRaises(ValueError):self.store.submit({**payload,"context":"Changed after the same submission key"})
+        self.assertEqual(self.store.snapshot(),before)
+
+    def test_private_handoff_is_immutable_and_prompt_does_not_repeat_preferences(self):
+        request=self.store.submit(self.submission(context="SENSITIVE_CONTEXT",preferences={"intake":"PRIVATE_INTAKE"}))["request"]
+        exported=self.store.export(request["request_id"])
+        from web.research_envelopes import verify
+        import json
+        file=Path(exported["path"])
+        self.assertEqual(verify(json.loads(file.read_text())),request)
+        self.assertEqual(file.stat().st_mode & 0o777,0o600)
+        self.assertNotIn("PRIVATE_INTAKE",exported["prompt"])
+        self.assertNotIn("SENSITIVE_CONTEXT",exported["prompt"])
+        self.assertEqual(self.store.export(request["request_id"]),exported)
+        index=json.loads((file.parent/"index.json").read_text())
+        self.assertNotIn("preferences",str(index))
+        file.write_text("existing private contents")
+        with self.assertRaises(ValueError):self.store.export(request["request_id"])
+        self.assertEqual(file.read_text(),"existing private contents")
+
+    def test_bound_receipts_revision_history_feedback_and_replay_preserve_personal_state(self):
+        from uuid import uuid4
+        from web.country_evidence import detail
+        request=self.store.submit(self.submission())["request"]
+        identity=request["request_id"]
+        self.store.save_country({"country_code":"CAN","watched":True,"note":"Keep this note"})
+        self.workspace.country_decisions("CAN","On hold")
+        result1=self.store.demo_response(identity,"result-1")
+        with self.assertRaises(ValueError):self.store.receive(result1)
+        ack=self.store.demo_response(identity,"accepted")
+        self.assertEqual(self.store.snapshot()["requests"][0]["state"],"prepared","Preparing a response must not acknowledge a request")
+        self.store.receive(ack)
+        self.assertIsNone(self.store.snapshot()["requests"][0]["execution_progress"])
+        with self.assertRaises(ValueError):self.store.receive({**result1,"request_digest":"wrong"})
+        with self.assertRaises(ValueError):self.store.receive({**result1,"synthetic":False})
+        self.store.receive(result1)
+        result2=self.store.demo_response(identity,"result-2")
+        with self.assertRaises(ValueError):self.store.receive(result2)
+        feedback=self.store.feedback(identity,result1["result_id"],1,"country:CAN","Please check the funding route",str(uuid4()))
+        self.assertEqual(self.store.export(identity,feedback["feedback_id"])["kind"],"feedback")
+        self.store.receive(result2)
+        snapshot=self.store.snapshot()
+        self.assertFalse(self.store.receive(result2)["changed"])
+        self.assertEqual(self.store.snapshot(),snapshot)
+        current=self.store.request(identity)
+        self.assertEqual(current["results"][0]["envelope"],result1)
+        self.assertEqual(current["results"][1]["envelope"],result2)
+        self.assertIn("funding_routes",[change["field"] for change in current["results"][1]["changes"]])
+        self.assertEqual(detail(self.workspace,None,"CAN")["revision"],"demo-CAN-r2")
+        self.assertEqual(detail(self.workspace,None,"CAN")["decision"],"On hold")
+        self.assertEqual(self.store.snapshot()["countries"]["CAN"],{"watched":True,"note":"Keep this note"})
+        self.assertEqual(hashlib.sha256(self.workspace.database.read_bytes()).hexdigest(),self.before)
+        ref={"result_id":result2["result_id"],"revision":2,"digest":result2["digest"],"finding_id":"country:CAN"}
+        follow=self.store.submit(self.submission(scope="refresh",parent_request_id=identity,prior_results=[ref]))["request"]
+        self.assertEqual(follow["prior_results"],[ref])
+        with closing(self.store.connect()) as db:
+            with self.assertRaises(sqlite3.IntegrityError):db.execute("DELETE FROM research_results")

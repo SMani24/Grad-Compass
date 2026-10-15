@@ -53,7 +53,12 @@ def overview(workspace, exchange):
 
 def university(workspace, exchange, identity):
     if identity.startswith("exchange-"):
-        return promoted_discovery(exchange).get(identity)
+        result = promoted_discovery(exchange).get(identity)
+        if result:
+            result["research_results"] = workspace.research.links("institution",result["university"]["research"]["external_id"])
+            for program in result["programs"]:
+                program["research_results"] = workspace.research.links("program",program["external_id"])
+        return result
     result = workspace.university(int(identity))
     if result is not None:
         result["programs"] = []

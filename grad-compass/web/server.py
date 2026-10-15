@@ -184,6 +184,8 @@ def handler_for(workspace, exchange=None, session_token=None):
 
         def do_GET(self):
             route = urlsplit(self.path).path
+            if hasattr(self, "server") and self.headers.get("Host") != f"127.0.0.1:{self.server.server_port}":
+                return self.respond(403,{"error":"Open the local app address to read this workspace"})
             try:
                 if route in STATIC_FILES:
                     filename, content_type = STATIC_FILES[route]
@@ -193,6 +195,9 @@ def handler_for(workspace, exchange=None, session_token=None):
                 if route == "/api/workspace":
                     from web.discovery import overview
                     return self.respond(200,{**overview(workspace, exchange), "country_decisions": workspace.country_decisions(), "research": workspace.research.snapshot(), "session": session_token})
+                request_match = re.fullmatch(r"/api/research/requests/([a-f0-9-]{36})",route)
+                if request_match:
+                    return self.respond(200,workspace.research.request(request_match[1]))
                 if route == "/api/research":
                     return self.respond(200,{**workspace.research.snapshot(), "session": session_token})
                 if route == "/api/display-preferences":
@@ -220,10 +225,12 @@ def handler_for(workspace, exchange=None, session_token=None):
             route = urlsplit(self.path).path
             actions = {"stage", "map", "preview", "promote", "replay"}
             action = route.removeprefix("/api/exchange/")
-            research_country = route == "/api/research/country"
+            research_actions = {"country","submit","export","demo-response","receive","feedback"}
+            research_action = route.removeprefix("/api/research/")
+            research_operation = research_action in research_actions and route == "/api/research/"+research_action
             personal_decision = route == "/api/country-decisions"
             preferences = route == "/api/display-preferences"
-            if not (preferences or personal_decision or research_country) and (not exchange or action not in actions or route != "/api/exchange/" + action):
+            if not (preferences or personal_decision or research_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
                 return self.respond(405,{"error":"This preview endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"
             if (self.headers.get("Host") != origin.removeprefix("http://")
@@ -233,11 +240,21 @@ def handler_for(workspace, exchange=None, session_token=None):
                 return self.respond(403, {"error": "Use this app session to save changes in the disposable workspace"})
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 16384 or self.headers.get("Content-Type") != "application/json":
+                if not 0 < length <= (196608 if research_operation else 16384) or self.headers.get("Content-Type") != "application/json":
                     raise ValueError("A small JSON request is required")
                 payload = json.loads(self.rfile.read(length))
-                if research_country:
-                    return self.respond(200,workspace.research.save_country(payload))
+                if research_operation:
+                    if not isinstance(payload,dict): raise ValueError("Review the research form fields")
+                    if research_action == "country": result = workspace.research.save_country(payload)
+                    elif research_action == "submit": result = workspace.research.submit(payload)
+                    else:
+                        allowed = {"export":{"request_id","feedback_id"},"demo-response":{"request_id","choice"},
+                                   "receive":{"envelope"},"feedback":{"request_id","result_id","revision","finding_id","comment","submission_key"}}[research_action]
+                        required = allowed - ({"feedback_id"} if research_action=="export" else set())
+                        if set(payload)-allowed or not required <= set(payload): raise ValueError("Review the selected research item")
+                        method = {"export":"export","demo-response":"demo_response","receive":"receive","feedback":"feedback"}[research_action]
+                        result = getattr(workspace.research,method)(**payload) if research_action!="receive" else workspace.research.receive(payload["envelope"])
+                    return self.respond(200,result)
                 if personal_decision:
                     if not isinstance(payload, dict) or set(payload) != {"country_code", "decision"} or not isinstance(payload["country_code"], str) or not isinstance(payload["decision"], str):
                         raise ValueError("Choose a displayed country and personal decision")

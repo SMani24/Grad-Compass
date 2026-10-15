@@ -35,7 +35,7 @@ def detail(workspace, exchange, code):
     if code not in COUNTRY_CODES:
         return None
     supplied = code in SUMMARIES
-    return {"code": code, "synthetic": True, "revision": f"app-country-demo-{code}-r1" if supplied else None,
+    result = {"code": code, "synthetic": True, "revision": f"app-country-demo-{code}-r1" if supplied else None,
         "review_status": "unreviewed_demo" if supplied else "not_researched",
         "coverage": "partial" if supplied else "not_researched",
         "summary": SUMMARIES.get(code, "No country research has been supplied in this synthetic workspace."),
@@ -45,3 +45,11 @@ def detail(workspace, exchange, code):
                           "Saved university counts describe coverage, not applicant suitability."],
         "decision": workspace.country_decisions().get(code, ""),
         "university_count": sum(row["country_code"] == code for row in overview(workspace, exchange)["universities"])}
+
+    latest = workspace.research.latest_country(code)
+    if latest:
+        result.update({key:latest[key] for key in ("summary","sources","uncertainties","review_status","funding_routes","costs","work_rules","observed_at")})
+        result.update(revision=latest["source_revision"],origin=latest["origin"],history=latest["history"],coverage="partial")
+    else:
+        result.update(funding_routes=None,costs=None,work_rules=None,observed_at=None,history=[])
+    return result

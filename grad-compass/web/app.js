@@ -550,7 +550,10 @@ if (typeof document !== "undefined") {
       if (event.key === "ArrowLeft") goBack(); else goForward();
     } else if (event.key === "Escape") {
       event.preventDefault();
-      if (get("settings-dialog")?.open) get("settings-dialog").close();
+      if (get("request-dialog")?.open) {
+        if (get("request-form").dataset.submitting !== "true") get("request-dialog").close();
+      } else if (get("research-dialog")?.open) get("research-dialog").close();
+      else if (get("settings-dialog")?.open) get("settings-dialog").close();
       else if (get("exchange-dialog")?.open) get("exchange-dialog").close();
       else if (state.selected || state.selectedCountry) closeInspector();
       else if (elements.country.value || elements.status.value || elements.search.value) {

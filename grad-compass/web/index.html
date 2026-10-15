@@ -56,6 +56,35 @@
     </div>
     <div id="error" class="error-banner" hidden role="alert"><span id="error-text"></span><button id="retry">Try again</button></div>
   </main>
+  <dialog id="request-dialog" aria-labelledby="request-title">
+    <header class="exchange-header"><div><span class="eyebrow">MANUAL RESEARCH HANDOFF · SYNTHETIC PILOT</span><h2 id="request-title">Prepare a research request</h2></div><button id="close-request" type="button" class="inspector-close" aria-label="Close request form">×</button></header>
+    <form id="request-form">
+      <p id="request-countries" class="request-country-summary"></p><p id="request-lineage" class="request-hint" hidden></p>
+      <label for="request-scope">What would you like researched?</label><select id="request-scope" required><option value="country_conditions">Update country conditions</option><option value="universities_programs">Find universities and programs</option><option value="refresh">Refresh or follow up on previous research</option></select>
+      <p id="request-preference-summary" class="request-hint"></p>
+      <details id="request-preferences"><summary>Shared preferences · edit</summary><p class="request-hint">Leave undecided values blank. These app-owned preferences do not change the Applicant Profile.</p>
+        <div class="request-fields">
+          <div><label for="request-intake">Target intake</label><input id="request-intake" maxlength="1200" placeholder="e.g. Fall 2027, or leave unknown"></div>
+          <div><label for="request-intake_alternatives">Acceptable intake alternatives</label><input id="request-intake_alternatives" maxlength="1200" placeholder="Only alternatives you explicitly accept"></div>
+          <div><label for="request-degree_routes">Degree routes</label><input id="request-degree_routes" maxlength="1200" placeholder="e.g. master's, doctorate, either"></div>
+          <div><label for="request-instruction_language">Instruction language</label><input id="request-instruction_language" maxlength="1200" placeholder="Leave blank if undecided"></div>
+          <div><label for="request-country_restrictions">Shared country restrictions</label><input id="request-country_restrictions" maxlength="1200" placeholder="Separate from countries in this request"></div>
+          <div><label for="request-funding_priorities">Funding priorities</label><input id="request-funding_priorities" maxlength="1200" placeholder="e.g. funded routes first"></div>
+          <div class="full-field"><label for="request-research_limits">Shared research limits</label><input id="request-research_limits" maxlength="1200" placeholder="Limits you want reused on later requests"></div>
+        </div>
+      </details>
+      <label class="request-exception"><input id="request-only" type="checkbox">Only for this request — keep my remembered preferences unchanged</label>
+      <label for="request-limits">Limits for this request</label><textarea id="request-limits" maxlength="2000" rows="2" placeholder="e.g. up to five universities per country"></textarea>
+      <label for="request-context">Context or feedback for this request</label><textarea id="request-context" maxlength="4000" rows="3" placeholder="This stays request-specific and never becomes a permanent restriction"></textarea>
+      <p id="request-form-status" role="status" aria-live="polite"></p>
+      <div class="request-actions"><button id="request-submit" type="submit">Save request for handoff</button><button id="cancel-request" type="button" class="quiet-action">Cancel</button></div>
+    </form>
+  </dialog>
+  <dialog id="research-dialog" aria-labelledby="research-title">
+    <header class="exchange-header"><div><span class="eyebrow">YOUR MANUAL RESEARCH WORKSPACE</span><h2 id="research-title">Requests &amp; findings</h2><p class="request-hint">Synthetic pilot. Nothing invokes Paperclip. A prepared handoff stays local until an explicit response is received.</p></div><button id="close-research" type="button" class="inspector-close" aria-label="Close requests">×</button></header>
+    <p id="research-message" role="status" aria-live="polite"></p>
+    <div class="research-layout"><nav id="research-request-list" aria-label="Saved research requests"></nav><section id="research-request-detail" aria-label="Request and result review"><p>Choose a request, or select countries on the map to prepare one.</p></section></div>
+  </dialog>
   <dialog id="settings-dialog" aria-labelledby="settings-title">
     <header class="exchange-header"><h2 id="settings-title">Settings</h2><button id="close-settings" class="inspector-close" type="button" aria-label="Close settings">×</button></header>
     <label for="text-size">Text size</label>
