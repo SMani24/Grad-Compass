@@ -8,8 +8,9 @@ from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 class PreviewCapture(QObject):
     requested = pyqtSignal(str)
 
-    def __init__(self, window, directory):
+    def __init__(self, window, directory, prefix="2026-10-13-exchange-"):
         super().__init__()
+        self.prefix = prefix
         self.window = window
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -19,7 +20,7 @@ class PreviewCapture(QObject):
 
     def save(self, name):
         self.complete.clear()
-        self.requested.emit(str(self.directory / ("2026-10-13-exchange-" + name + ".local.png")))
+        self.requested.emit(str(self.directory / (self.prefix + name + ".local.png")))
         if not self.complete.wait(10) or not self.saved:
             raise RuntimeError("Could not capture the synthetic review screen")
 

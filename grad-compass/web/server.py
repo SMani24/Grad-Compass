@@ -22,6 +22,8 @@ STATIC_FILES = {
     "/": (APP_ROOT / "web" / "index.html", "text/html; charset=utf-8"),
     "/styles.css": (APP_ROOT / "web" / "styles.css", "text/css; charset=utf-8"),
     "/app.js": (APP_ROOT / "web" / "app.js", "text/javascript; charset=utf-8"),
+    "/research.js": (APP_ROOT / "web" / "research.js", "text/javascript; charset=utf-8"),
+    "/research.css": (APP_ROOT / "web" / "research.css", "text/css; charset=utf-8"),
     "/settings.js": (APP_ROOT / "web" / "settings.js", "text/javascript; charset=utf-8"),
     "/exchange.js": (APP_ROOT / "web" / "exchange.js", "text/javascript; charset=utf-8"),
     "/exchange.css": (APP_ROOT / "web" / "exchange.css", "text/css; charset=utf-8"),
@@ -36,6 +38,7 @@ class DemoWorkspace:
         self.directory = validate_data_directory(directory)
         self.database = self.directory / "grad_compass.db"
         self.state_lock = threading.RLock()
+        self._research = None
         with closing(self.connect()) as connection:
             pass
 
@@ -123,6 +126,14 @@ class DemoWorkspace:
                     os.unlink(temporary)
             return saved
 
+    @property
+    def research(self):
+        with self.state_lock:
+            if self._research is None:
+                from web.research import ResearchWorkspace
+                self._research = ResearchWorkspace(self)
+            return self._research
+
     def overview(self):
         with closing(self.connect()) as connection:
             universities = [dict(row) for row in connection.execute("""
@@ -181,7 +192,9 @@ def handler_for(workspace, exchange=None, session_token=None):
                     return self.respond(200,(APP_ROOT/"ui/data/countries.geo.json").read_bytes())
                 if route == "/api/workspace":
                     from web.discovery import overview
-                    return self.respond(200,{**overview(workspace, exchange), "country_decisions": workspace.country_decisions(), "session": session_token})
+                    return self.respond(200,{**overview(workspace, exchange), "country_decisions": workspace.country_decisions(), "research": workspace.research.snapshot(), "session": session_token})
+                if route == "/api/research":
+                    return self.respond(200,{**workspace.research.snapshot(), "session": session_token})
                 if route == "/api/display-preferences":
                     return self.respond(200, {**workspace.display_preferences(), "session": session_token})
                 if route == "/api/exchange":
@@ -207,9 +220,10 @@ def handler_for(workspace, exchange=None, session_token=None):
             route = urlsplit(self.path).path
             actions = {"stage", "map", "preview", "promote", "replay"}
             action = route.removeprefix("/api/exchange/")
+            research_country = route == "/api/research/country"
             personal_decision = route == "/api/country-decisions"
             preferences = route == "/api/display-preferences"
-            if not (preferences or personal_decision) and (not exchange or action not in actions or route != "/api/exchange/" + action):
+            if not (preferences or personal_decision or research_country) and (not exchange or action not in actions or route != "/api/exchange/" + action):
                 return self.respond(405,{"error":"This preview endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"
             if (self.headers.get("Host") != origin.removeprefix("http://")
@@ -222,6 +236,8 @@ def handler_for(workspace, exchange=None, session_token=None):
                 if not 0 < length <= 16384 or self.headers.get("Content-Type") != "application/json":
                     raise ValueError("A small JSON request is required")
                 payload = json.loads(self.rfile.read(length))
+                if research_country:
+                    return self.respond(200,workspace.research.save_country(payload))
                 if personal_decision:
                     if not isinstance(payload, dict) or set(payload) != {"country_code", "decision"} or not isinstance(payload["country_code"], str) or not isinstance(payload["decision"], str):
                         raise ValueError("Choose a displayed country and personal decision")

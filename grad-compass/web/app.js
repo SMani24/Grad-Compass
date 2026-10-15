@@ -116,6 +116,7 @@ if (typeof document !== "undefined") {
   function updateUrl(replace = false) {
     const url = new URL(location.href);
     if (state.mode === "countries") url.searchParams.set("mode", "countries"); else url.searchParams.delete("mode");
+    if (get("country-list-scope").value === "watched") url.searchParams.set("watchlist", "1"); else url.searchParams.delete("watchlist");
     if (state.view === "list") url.searchParams.set("view", "list"); else url.searchParams.delete("view");
     if (state.selectedCountry) url.searchParams.set("countryDetails", "1"); else url.searchParams.delete("countryDetails");
     if (state.selected) url.searchParams.set("university", state.selected); else url.searchParams.delete("university");
@@ -150,6 +151,7 @@ if (typeof document !== "undefined") {
     get("countries-mode").setAttribute("aria-pressed", String(mode === "countries"));
     get("universities-mode").setAttribute("aria-pressed", String(mode === "universities"));
     document.querySelector(".filter-row").hidden = mode === "countries";
+    get("country-tools").hidden = mode !== "countries";
     get("atlas-label").textContent = mode === "countries" ? "YOUR COUNTRY ATLAS" : "YOUR UNIVERSITY ATLAS";
     get("exploration-title").textContent = mode === "countries" ? "Explore countries" : "Explore universities";
     get("results-title").textContent = mode === "countries" ? "Countries" : "Saved universities";
@@ -205,6 +207,7 @@ if (typeof document !== "undefined") {
       top.append(node("span", "eyebrow", "COUNTRY DETAILS"), close);
       elements.inspector.replaceChildren(top, node("div", "institution-symbol", country?.flag || "🌐"), node("h2", "", country?.name || code));
       elements.inspector.append(node("p", "research-state", detail.review_status === "unreviewed_demo" ? "Invented evidence · unreviewed demo" : "Country evidence not researched"));
+      elements.inspector.append(window.GradCompassResearch.detailControls(code));
       const personal = node("section", "country-personal");
       const label = node("label", "", "Your personal decision"); label.htmlFor = "country-decision";
       const chooser = node("select"); chooser.id = "country-decision";
@@ -332,13 +335,14 @@ if (typeof document !== "undefined") {
     }
   }
   function renderCountries() {
-    const countries = filterCountries(state.countries, elements.search.value);
+    const countries = filterCountries(state.countries, elements.search.value).filter(country => get("country-list-scope").value !== "watched" || window.GradCompassResearch.personal(country.code).watched);
     elements.results.replaceChildren();
     get("result-count").textContent = countries.length;
     get("mapped-count").textContent = "Saved university counts describe coverage, not suitability";
-    if (!countries.length) elements.results.append(node("p", "empty-state", state.geometry ? "No countries match this search." : "Loading countries…"));
+    const emptyCountryText = get("country-list-scope").value === "watched" && !elements.search.value ? "No countries on your watchlist yet. Select any country on the map to watch it." : "No countries match this search.";
+    if (!countries.length) elements.results.append(node("p", "empty-state", state.geometry ? emptyCountryText : "Loading countries…"));
     const table = node("table"); const head = node("thead"); const headings = node("tr");
-    for (const title of ["Country", "Saved universities", "Personal decision"]) { const cell = node("th", "", title); cell.scope = "col"; headings.append(cell); }
+    for (const title of ["Country", "Saved universities", "Personal decision", "Watchlist"]) { const cell = node("th", "", title); cell.scope = "col"; headings.append(cell); }
     head.append(headings); table.append(head); const body = node("tbody");
     for (const country of countries) {
       const count = state.universities.filter(university => university.country_code === country.code).length;
@@ -346,14 +350,17 @@ if (typeof document !== "undefined") {
       const card = node("button", "country-card" + (selected ? " selected" : ""));
       card.type = "button"; card.dataset.country = country.code; card.setAttribute("aria-pressed", String(selected));
       card.append(node("span", "country-tag", country.code), node("span", "university-name", country.flag + " " + country.name), node("span", "card-meta", count + " saved universities"), node("span", "coverage-hint", "Research coverage incomplete"), node("span", "decision-badge", state.decisions[country.code] || "No personal decision"));
-      card.addEventListener("click", () => selectCountry(country.code)); elements.results.append(card);
+      card.addEventListener("click", () => selectCountry(country.code));
+      const entry = node("div", "country-entry"); entry.append(card,window.GradCompassResearch.cardControls(country.code)); elements.results.append(entry);
       const row = node("tr", selected ? "selected" : ""); row.dataset.country = country.code;
       const name = node("td"); const button = node("button", "", country.flag + " " + country.name);
       button.addEventListener("click", () => selectCountry(country.code)); name.append(button);
-      row.append(name, node("td", "", count), node("td", "", state.decisions[country.code] || "No decision")); body.append(row);
+      const watch = node("td"); watch.append(window.GradCompassResearch.watchButton(country.code,"list"));
+      if (window.GradCompassResearch.personal(country.code).watched) watch.append(window.GradCompassResearch.selection(country.code));
+      row.append(name, node("td", "", count), node("td", "", state.decisions[country.code] || "No decision"),watch); body.append(row);
     }
     table.append(body);
-    get("university-table").replaceChildren(countries.length ? table : node("p", "empty-state", "No countries match this search."));
+    get("university-table").replaceChildren(countries.length ? table : node("p", "empty-state", emptyCountryText));
   }
   function universityEmptyMessage() {
     const noSavedHere = elements.country.value && !state.universities.some(university => university.country_code === elements.country.value);
@@ -435,6 +442,7 @@ if (typeof document !== "undefined") {
   function applyLocation() {
     const url = new URL(location.href);
     setMode(url.searchParams.get("mode") === "countries" ? "countries" : "universities", false, false);
+    get("country-list-scope").value = url.searchParams.get("watchlist") === "1" ? "watched" : "all";
     for (const name of ["country", "status", "search"]) elements[name].value = url.searchParams.get(name) || "";
     setView(url.searchParams.get("view") === "list" ? "list" : "map", false);
     closeInspector(false, false);
@@ -483,6 +491,7 @@ if (typeof document !== "undefined") {
       const result = await api("/api/workspace");
       state.universities = result.universities;
       state.decisions = result.country_decisions || {}; state.session = result.session;
+      window.GradCompassResearch.hydrate(result.research,state.session);
       render();
       await loadMap();
     } catch {
@@ -490,13 +499,15 @@ if (typeof document !== "undefined") {
       get("error-text").textContent = "Could not load the workspace. Please try again."; get("error").hidden = false;
     }
   }
+  get("country-list-scope").addEventListener("change",() => { render(); updateUrl(); });
+  window.addEventListener("grad-compass:personal-updated",renderResults);
   get("countries-mode").addEventListener("click", () => setMode("countries"));
   get("universities-mode").addEventListener("click", () => setMode("universities"));
   get("map-view").addEventListener("click", () => setView("map"));
   get("list-view").addEventListener("click", () => setView("list"));
   document.querySelector(".brand").addEventListener("click", event => {
     event.preventDefault();
-    elements.country.value = ""; elements.status.value = ""; elements.search.value = "";
+    elements.country.value = ""; elements.status.value = ""; elements.search.value = ""; get("country-list-scope").value = "all";
     editingSearch = false; setMode("universities", false); setView("map", false); closeInspector(false, false); resetMap(); updateUrl();
   });
   for (const element of [elements.country, elements.status]) element.addEventListener("change", () => {
@@ -524,7 +535,8 @@ if (typeof document !== "undefined") {
     try {
       const result = await api("/api/workspace");
       state.universities = result.universities;
-      state.decisions = result.country_decisions || {}; state.session = result.session; render();
+      state.decisions = result.country_decisions || {}; state.session = result.session;
+      window.GradCompassResearch.hydrate(result.research,state.session); render();
       if (state.selected) selectUniversity(state.selected, false, false);
       else if (state.selectedCountry) showCountry(state.selectedCountry);
     } catch {
