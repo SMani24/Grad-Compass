@@ -32,3 +32,9 @@ The user authorized synthetic app-owned watchlists, private notes, batch country
 Watchlist membership, assessment, notes, factual review and operational import remain separate. Preference memory changes only after a successful explicit submission unless request-only is chosen; cancellation and casual feedback never change remembered restrictions. Each request freezes its exact snapshot. App preferences never modify the canonical Applicant Profile.
 
 APP-007 proposes private envelopes 0.1.0 and independently versioned country evidence 0.1.0 for compatibility review. App-generated fixtures may exercise these provisional adapters; exchange 1.0.0 and its importer remain unchanged. The app does not poll the mailbox, infer agent progress, invoke agents or mark manual handoffs delivered without a response.
+
+## Saved countries and compatibility clarification — 2026-10-15
+
+“Saved countries” is interface wording over the existing membership field; it needs no migration. Ephemeral map selection, personal saved membership, research-request selection, personal decisions and factual review are distinct. Bulk save changes membership only and preserves notes/decisions even for existing memberships. Done discards unsaved selection; saving/selection never initiates research. An accessible country checkbox list complements polygon selection.
+
+Marry/Dave's APP-006/APP-007 replies have been read and reconciled in APP-008. The existing `9bfe9c6` deterministic fixture and native demonstration remain the app evidence. Producer compatibility is **reviewed with gaps**, not verified: exact-byte external digests, duplicate JSON keys, wire fields, revision/review provenance, completion, timestamps, public revision associations and territory mappings need alignment. No competing evidence/profile/CV review gate, protocol migration, producer activation or shared exchange change is authorized by this map work. Coordinate any shared edits with Marry first.

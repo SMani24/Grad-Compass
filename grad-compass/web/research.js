@@ -22,6 +22,12 @@
     data = next || {countries:{}};
     if (token) session = token;
     for (const code of selected) if (!personal(code).watched) selected.delete(code);
+    for (const button of document.querySelectorAll("[data-saved-country]")) {
+      const code = button.dataset.savedCountry;
+      button.textContent = personal(code).watched ? "Remove from saved" : "Save country";
+      button.setAttribute("aria-pressed", String(personal(code).watched));
+      button.setAttribute("aria-label", `${button.textContent}: ${code}`);
+    }
     toolbar();
   }
   async function post(path, payload) {
@@ -35,10 +41,11 @@
     window.dispatchEvent(new Event("grad-compass:personal-updated"));
   }
   function watchButton(code, context) {
-    const button = node("button",personal(code).watched ? "Unwatch" : "Watch country","watch-toggle");
+    const button = node("button",personal(code).watched ? "Remove from saved" : "Save country","watch-toggle");
     button.type = "button"; button.id = `watch-${context}-${code}`;
+    button.dataset.savedCountry = code;
     button.setAttribute("aria-pressed",String(personal(code).watched));
-    button.setAttribute("aria-label",`${personal(code).watched ? "Unwatch" : "Watch"} ${code}`);
+    button.setAttribute("aria-label",`${personal(code).watched ? "Remove from saved" : "Save country"}: ${code}`);
     button.addEventListener("click",async () => {
       if (busy.has(code)) return;
       const restoreFocus = document.activeElement === button;
@@ -46,10 +53,10 @@
       try {
         const watch = !personal(code).watched;
         await saveCountry({country_code:code,watched:watch});
-        button.textContent = watch ? "Unwatch" : "Watch country";
+        button.textContent = watch ? "Remove from saved" : "Save country";
         button.setAttribute("aria-pressed",String(watch));
-        button.setAttribute("aria-label",`${watch ? "Unwatch" : "Watch"} ${code}`);
-        status(watch ? "Added to your watchlist. Research and assessment are unchanged." : "Removed from watchlist. Your note and assessment are kept.");
+        button.setAttribute("aria-label",`${watch ? "Remove from saved" : "Save country"}: ${code}`);
+        status(watch ? "Added to Saved countries. Research and assessment are unchanged." : "Removed from saved. Your note and assessment are kept.");
         if (restoreFocus && (document.activeElement===button || document.activeElement===document.body)) get(button.id)?.focus({preventScroll:true});
       } catch(error) { status(error.message); }
       finally { busy.delete(code); button.disabled = false; }
@@ -111,7 +118,7 @@
     try {
       await reload();
       draft={countries:context.countries || [...selected],parent_request_id:context.parent_request_id || null,prior_results:context.prior_results || [],submission_key:crypto.randomUUID()};
-      if(!draft.countries.length) { status("Watch and select countries first.");return; }
+      if(!draft.countries.length) { status("Save countries and select them for research first.");return; }
       get("request-form").reset();get("request-form").dataset.submitting="false";
       get("request-countries").textContent=draft.countries.map(countryLabel).join(" · ");
       get("request-scope").value=context.scope || "country_conditions";

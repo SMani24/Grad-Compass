@@ -45,6 +45,36 @@ class ResearchTests(unittest.TestCase):
             with self.assertRaises(ValueError): self.store.save_country(payload)
         self.assertEqual(self.store.snapshot()["countries"],{})
 
+    def test_bulk_save_preserves_existing_notes_decisions_and_research_state(self):
+        self.store.save_country({"country_code":"FRA","watched":True,"note":"Keep the saved note"})
+        self.store.save_country({"country_code":"CAN","note":"Keep the unsaved note"})
+        self.workspace.country_decisions("FRA","Excluded")
+        self.workspace.country_decisions("CAN","On hold")
+        before = self.store.snapshot()
+        payload = {"countries":["FRA","CAN","DEU"]}
+        saved = self.store.save_countries(payload)
+        self.assertEqual(saved["countries"], {
+            "FRA":{"watched":True,"note":"Keep the saved note"},
+            "CAN":{"watched":True,"note":"Keep the unsaved note"},
+            "DEU":{"watched":True,"note":""}})
+        for field in ("requests","preferences","has_preferences"):
+            self.assertEqual(saved[field],before[field])
+        self.assertEqual(self.store.save_countries(payload),saved)
+        self.assertEqual(ResearchWorkspace(DemoWorkspace(self.root)).snapshot(),saved)
+        self.assertEqual(self.workspace.country_decisions(),{"FRA":"Excluded","CAN":"On hold"})
+        self.assertEqual(hashlib.sha256(self.workspace.database.read_bytes()).hexdigest(),self.before)
+
+    def test_bulk_save_validates_every_country_and_rolls_back_a_failed_write(self):
+        for payload in ({"countries":[]},{"countries":["FRA","ATA"]},{"countries":["FRA","FRA"]},
+                        {"countries":["FRA",None]},{"countries":"FRA"},{"countries":["FRA"],"note":"no"},[]):
+            with self.assertRaises(ValueError): self.store.save_countries(payload)
+            self.assertEqual(self.store.snapshot()["countries"],{})
+        with closing(self.store.connect()) as db, db:
+            db.execute("CREATE TRIGGER fail_save BEFORE INSERT ON country_personal WHEN NEW.code='CAN' "
+                       "BEGIN SELECT RAISE(ABORT,'simulated failure'); END")
+        with self.assertRaises(sqlite3.IntegrityError): self.store.save_countries({"countries":["FRA","CAN"]})
+        self.assertEqual(self.store.snapshot()["countries"],{},"A failed save must not leave partial memberships")
+
     def test_unmarked_or_linked_state_and_removed_preview_marker_are_refused(self):
         with closing(sqlite3.connect(self.store.database)) as db,db:
             db.execute("DELETE FROM app_research_guard")

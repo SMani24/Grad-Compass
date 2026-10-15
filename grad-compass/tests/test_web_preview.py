@@ -25,6 +25,17 @@ class WebPreviewTests(unittest.TestCase):
         subprocess.run([sys.executable,"-B",str(APP_ROOT/"scripts/create_demo.py"),str(self.directory)],check=True,capture_output=True)
         self.workspace = server.DemoWorkspace(self.directory)
 
+    def test_bulk_country_save_requires_app_session_and_validates_without_partial_writes(self):
+        path = "/api/research/save-countries"
+        self.assertEqual(self.preference_request({"countries":["FRA"]},path,**{"X-Grad-Compass-Session":"wrong"})["status"],403)
+        self.assertEqual(self.preference_request({"countries":["FRA","ATA"]},path)["status"],409)
+        self.assertEqual(self.workspace.research.snapshot()["countries"],{})
+        saved = self.preference_request({"countries":["FRA","CAN"]},path)
+        self.assertEqual(saved["status"],200)
+        self.assertTrue(saved["payload"]["countries"]["CAN"]["watched"])
+        self.assertEqual(self.preference_request({"countries":["FRA","CAN"]},path)["payload"],saved["payload"])
+        self.assertEqual(saved["payload"]["requests"],[])
+
     def route(self, path, method="GET"):
         handler = object.__new__(server.handler_for(self.workspace))
         handler.path = path

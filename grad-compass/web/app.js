@@ -88,6 +88,87 @@ if (typeof document !== "undefined") {
   let navigationIndex = 0;
   let navigationEnd = 0;
   let editingSearch = false;
+  // A temporary save selection, independent of location and research-request selections.
+  const saveSelection = new Set();
+  let selectingCountries = false;
+  let savingCountries = false;
+
+  function selectionMessage(text) {
+    get("country-selection-status").textContent = text;
+    get("country-selection-status").hidden = !text;
+  }
+  function updateCountrySelection() {
+    get("map-selection-controls").hidden = state.view !== "map" && !selectingCountries;
+    get("select-countries").setAttribute("aria-pressed", String(selectingCountries));
+    get("select-countries").hidden = selectingCountries;
+    get("select-countries").disabled = savingCountries;
+    get("country-selection-actions").hidden = !selectingCountries;
+    get("country-selection-count").textContent = `${saveSelection.size} selected`;
+    get("country-selection-list-count").textContent = `${saveSelection.size} selected to save`;
+    for (const id of ["save-selected-countries", "clear-selected-countries"]) get(id).disabled = savingCountries || !saveSelection.size;
+    get("done-selecting-countries").disabled = savingCountries;
+    for (const input of get("country-selection-options").querySelectorAll("input")) {
+      input.checked = saveSelection.has(input.value); input.disabled = savingCountries;
+    }
+    document.querySelector(".workspace").classList.toggle("selecting-countries", selectingCountries);
+    renderMap();
+  }
+  function setCountrySelection(active) {
+    if (savingCountries) return;
+    selectingCountries = active;
+    if (!active) saveSelection.clear();
+    selectionMessage(active ? "Purple: selected to save. Blue: active location." : "");
+    updateCountrySelection();
+    renderResults();
+    get(active ? "country-selection-list" : state.view === "list" ? "list-view" : "select-countries").focus({preventScroll:true});
+  }
+  function activateCountry(code) {
+    if (!selectingCountries) { selectCountry(code); return; }
+    if (savingCountries) return;
+    if (saveSelection.has(code)) saveSelection.delete(code); else saveSelection.add(code);
+    updateCountrySelection();
+    // Update only selection state on existing cards, keeping keyboard focus in place.
+    for (const card of document.querySelectorAll(".country-card")) {
+      card.classList.toggle("bulk-selected", saveSelection.has(card.dataset.country));
+      card.setAttribute("aria-pressed", String(saveSelection.has(card.dataset.country)));
+    }
+  }
+  function renderCountrySelectionList() {
+    const countries = filterCountries(state.countries, get("country-selection-search").value);
+    const options = get("country-selection-options"); options.replaceChildren();
+    for (const country of countries) {
+      const label = node("label", "country-selection-option");
+      const input = node("input"); input.type = "checkbox"; input.value = country.code;
+      input.checked = saveSelection.has(country.code); input.disabled = savingCountries;
+      input.addEventListener("change", () => activateCountry(country.code));
+      label.append(input, node("span", "", country.flag + " " + country.name),
+        node("small", "", window.GradCompassResearch.personal(country.code).watched ? "Saved" : ""));
+      options.append(label);
+    }
+    if (!countries.length) options.append(node("p", "empty-state", "No countries match this search."));
+  }
+  get("select-countries").addEventListener("click", () => setCountrySelection(!selectingCountries));
+  get("clear-selected-countries").addEventListener("click", () => {
+    saveSelection.clear(); updateCountrySelection(); renderResults(); get("country-selection-list").focus({preventScroll:true});
+  });
+  get("done-selecting-countries").addEventListener("click", () => setCountrySelection(false));
+  get("country-selection-list").addEventListener("click", () => {
+    get("country-selection-search").value = ""; renderCountrySelectionList();
+    get("country-selection-dialog").showModal(); get("country-selection-search").focus();
+  });
+  for (const id of ["close-country-selection-list", "return-country-selection"]) get(id).addEventListener("click", () => get("country-selection-dialog").close());
+  get("country-selection-search").addEventListener("input", renderCountrySelectionList);
+  get("save-selected-countries").addEventListener("click", async () => {
+    if (savingCountries || !saveSelection.size) return;
+    const countries = [...saveSelection]; savingCountries = true; updateCountrySelection();
+    selectionMessage("Saving selected countries…");
+    try {
+      window.GradCompassResearch.hydrate(await window.GradCompassResearch.post("/api/research/save-countries", {countries}));
+      window.dispatchEvent(new Event("grad-compass:personal-updated"));
+      selectionMessage(`${countries.length} ${countries.length === 1 ? "country is" : "countries are"} in Saved countries. Notes and decisions are kept.`);
+    } catch (error) { selectionMessage(error.message + " Your selection is kept; retry Save selected."); }
+    finally { savingCountries = false; updateCountrySelection(); get("save-selected-countries").focus({preventScroll:true}); }
+  });
 
   function node(tag, className, text) {
     const element = document.createElement(tag);
@@ -134,6 +215,7 @@ if (typeof document !== "undefined") {
   }
   function setView(view, record = true) {
     state.view = view;
+    get("map-selection-controls").hidden = view !== "map" && !selectingCountries;
     document.querySelector(".workspace").classList.toggle("list-view", view === "list");
     get("map").hidden = view !== "map";
     get("map-key").hidden = view !== "map";
@@ -355,22 +437,23 @@ if (typeof document !== "undefined") {
     elements.results.replaceChildren();
     get("result-count").textContent = countries.length;
     get("mapped-count").textContent = "Saved university counts describe coverage, not suitability";
-    const emptyCountryText = get("country-list-scope").value === "watched" && !elements.search.value ? "No countries on your watchlist yet. Select any country on the map to watch it." : "No countries match this search.";
+    const emptyCountryText = get("country-list-scope").value === "watched" && !elements.search.value ? "No saved countries yet. Use Save country in country details or Select countries on the map." : "No countries match this search.";
     if (!countries.length) elements.results.append(node("p", "empty-state", state.geometry ? emptyCountryText : "Loading countries…"));
     const table = node("table"); const head = node("thead"); const headings = node("tr");
-    for (const title of ["Country", "Saved universities", "Personal decision", "Watchlist"]) { const cell = node("th", "", title); cell.scope = "col"; headings.append(cell); }
+    for (const title of ["Country", "Saved universities", "Personal decision", "Saved countries"]) { const cell = node("th", "", title); cell.scope = "col"; headings.append(cell); }
     head.append(headings); table.append(head); const body = node("tbody");
     for (const country of countries) {
       const count = state.universities.filter(university => university.country_code === country.code).length;
       const selected = elements.country.value === country.code;
       const card = node("button", "country-card" + (selected ? " selected" : ""));
-      card.type = "button"; card.dataset.country = country.code; card.setAttribute("aria-pressed", String(selected));
+      card.type = "button"; card.dataset.country = country.code; card.setAttribute("aria-pressed", String(selectingCountries ? saveSelection.has(country.code) : selected));
+      card.classList.toggle("bulk-selected", selectingCountries && saveSelection.has(country.code));
       card.append(node("span", "country-tag", /^[A-Z]{3}$/.test(country.code) ? country.code : "Country / territory"), node("span", "university-name", country.flag + " " + country.name), node("span", "card-meta", count + " saved universities"), node("span", "coverage-hint", "Research coverage incomplete"), node("span", "decision-badge", state.decisions[country.code] || "No personal decision"));
-      card.addEventListener("click", () => selectCountry(country.code));
+      card.addEventListener("click", () => activateCountry(country.code));
       const entry = node("div", "country-entry"); entry.append(card,window.GradCompassResearch.cardControls(country.code)); elements.results.append(entry);
       const row = node("tr", selected ? "selected" : ""); row.dataset.country = country.code;
       const name = node("td"); const button = node("button", "", country.flag + " " + country.name);
-      button.addEventListener("click", () => selectCountry(country.code)); name.append(button);
+      button.addEventListener("click", () => activateCountry(country.code)); name.append(button);
       const watch = node("td"); watch.append(window.GradCompassResearch.watchButton(country.code,"list"));
       if (window.GradCompassResearch.personal(country.code).watched) watch.append(window.GradCompassResearch.selection(country.code));
       row.append(name, node("td", "", count), node("td", "", state.decisions[country.code] || "No decision"),watch); body.append(row);
@@ -424,18 +507,20 @@ if (typeof document !== "undefined") {
     state.polygons.eachLayer(layer => {
       const code = discoveryCountry(layer.feature).code;
       const selected = code === elements.country.value;
-      layer.setStyle({ fillColor: selected ? "#85c2d4" : countries.has(code) ? "#cce5ee" : "#fff",
-        fillOpacity: 1, color: selected ? "#087ba4" : "#b6cbd6", weight: selected ? 1.8 : .7 });
-      layer.getElement()?.setAttribute("aria-pressed", String(selected));
+      const bulk = selectingCountries && saveSelection.has(code);
+      layer.setStyle({ fillColor: bulk ? "#decdf4" : selected ? "#85c2d4" : countries.has(code) ? "#cce5ee" : "#fff",
+        fillOpacity: 1, color: bulk ? "#7040a0" : selected ? "#087ba4" : "#b6cbd6", weight: bulk ? 2.5 : selected ? 1.8 : .7, dashArray: bulk ? "5 3" : null });
+      layer.getElement()?.setAttribute("aria-pressed", String(selectingCountries ? bulk : selected));
+      layer.getElement()?.setAttribute("aria-label", (selectingCountries ? "Select to save " : "Explore ") + discoveryCountry(layer.feature).name);
       layer.getElement()?.setAttribute("tabindex", selected ? "0" : "-1");
-      if (selected) layer.bringToFront();
+      if (selected || bulk) layer.bringToFront();
     });
     state.markers.clearLayers();
     for (const university of state.filtered.filter(hasCoordinates)) {
       const selected = state.selected === university.id;
       const marker = L.circleMarker([university.latitude, university.longitude], { radius: selected ? 10 : 7, color: "#fff", weight: 3, fillColor: selected ? "#d99d30" : "#087ba4", fillOpacity: 1 });
       marker.bindTooltip(node("span", "", university.name), { direction: "top" });
-      marker.on("click", () => selectUniversity(university.id)); marker.addTo(state.markers);
+      marker.on("click", () => selectingCountries ? activateCountry(university.country_code) : selectUniversity(university.id)); marker.addTo(state.markers);
     }
     requestAnimationFrame(() => state.map.invalidateSize());
   }
@@ -491,7 +576,7 @@ if (typeof document !== "undefined") {
             });
           });
           layer.bindTooltip(node("span", "", country.name), { sticky: true });
-          layer.on("click", () => selectCountry(country.code));
+          layer.on("click", () => activateCountry(country.code));
         }
       }).addTo(state.map);
       state.markers = L.layerGroup().addTo(state.map);
@@ -583,6 +668,8 @@ if (typeof document !== "undefined") {
       } else if (get("research-dialog")?.open) get("research-dialog").close();
       else if (get("settings-dialog")?.open) get("settings-dialog").close();
       else if (get("exchange-dialog")?.open) get("exchange-dialog").close();
+      else if (get("country-selection-dialog").open) get("country-selection-dialog").close();
+      else if (selectingCountries) { if (!savingCountries) setCountrySelection(false); }
       else if (state.selected || state.selectedCountry) closeInspector();
       else if (elements.country.value || elements.status.value || elements.search.value) {
         elements.country.value = ""; elements.status.value = ""; elements.search.value = "";

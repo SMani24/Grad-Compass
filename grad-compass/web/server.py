@@ -226,7 +226,7 @@ def handler_for(workspace, exchange=None, session_token=None):
             route = urlsplit(self.path).path
             actions = {"stage", "map", "preview", "promote", "replay"}
             action = route.removeprefix("/api/exchange/")
-            research_actions = {"country","submit","export","demo-response","receive","feedback"}
+            research_actions = {"country","save-countries","submit","export","demo-response","receive","feedback"}
             research_action = route.removeprefix("/api/research/")
             research_operation = research_action in research_actions and route == "/api/research/"+research_action
             personal_decision = route == "/api/country-decisions"
@@ -247,6 +247,7 @@ def handler_for(workspace, exchange=None, session_token=None):
                 if research_operation:
                     if not isinstance(payload,dict): raise ValueError("Review the research form fields")
                     if research_action == "country": result = workspace.research.save_country(payload)
+                    elif research_action == "save-countries": result = workspace.research.save_countries(payload)
                     elif research_action == "submit": result = workspace.research.submit(payload)
                     else:
                         allowed = {"export":{"request_id","feedback_id"},"demo-response":{"request_id","choice"},

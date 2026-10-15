@@ -37,7 +37,7 @@
           <label class="search-label" for="search">Search your universities</label>
           <input id="search" type="search" placeholder="University or city…" autocomplete="off">
           <div id="country-tools" hidden>
-            <label for="country-list-scope">Explore</label><select id="country-list-scope"><option value="all">All countries</option><option value="watched">My watchlist</option></select>
+            <label for="country-list-scope">Explore</label><select id="country-list-scope"><option value="all">All countries</option><option value="watched">Saved countries</option></select>
             <div class="research-toolbar"><button id="research-selected" type="button" disabled>Research selected (0)</button><button id="open-research" type="button">Requests</button></div>
             <p id="research-toolbar-status" role="status" aria-live="polite"></p>
           </div>
@@ -49,6 +49,17 @@
       </aside>
       <section class="discovery-canvas" aria-label="Geographic exploration">
         <div id="map" aria-label="World map"></div>
+        <div class="map-selection-controls" id="map-selection-controls" role="group" aria-label="Save countries from the map">
+          <button id="select-countries" type="button" aria-pressed="false">Select countries</button>
+          <div id="country-selection-actions" hidden>
+            <span id="country-selection-count" role="status" aria-live="polite">0 selected</span>
+            <button id="save-selected-countries" type="button" disabled>Save selected</button>
+            <button id="clear-selected-countries" type="button" disabled>Clear</button>
+            <button id="country-selection-list" type="button" aria-haspopup="dialog">Choose from list</button>
+            <button id="done-selecting-countries" type="button">Done</button>
+          </div>
+          <p id="country-selection-status" role="status" aria-live="polite" hidden></p>
+        </div>
         <div class="map-key" id="map-key"><span class="key-pin"></span> Your universities <span class="key-country"></span> Saved locations</div>
         <div id="map-message" class="map-message" hidden></div>
         <div id="list-container" class="list-container" hidden><div class="list-intro"><span id="list-label" class="eyebrow">YOUR SAVED UNIVERSITIES</span><h2 id="list-title">Compare your universities</h2></div><div id="university-table"></div></div>
@@ -57,6 +68,14 @@
     </div>
     <div id="error" class="error-banner" hidden role="alert"><span id="error-text"></span><button id="retry">Try again</button></div>
   </main>
+  <dialog id="country-selection-dialog" aria-labelledby="country-selection-title" aria-describedby="country-selection-hint">
+    <header class="exchange-header"><h2 id="country-selection-title">Select countries</h2><button id="close-country-selection-list" type="button" class="inspector-close" aria-label="Return to map selection">×</button></header>
+    <p id="country-selection-hint">Choose countries to save. Selection does not change your map location or request research.</p>
+    <label for="country-selection-search">Search countries</label><input id="country-selection-search" type="search" autocomplete="off" placeholder="Country or code…">
+    <p id="country-selection-list-count" role="status" aria-live="polite"></p>
+    <div id="country-selection-options" role="group" aria-label="Countries to save"></div>
+    <button id="return-country-selection" type="button">Return to map</button>
+  </dialog>
   <dialog id="request-dialog" aria-labelledby="request-title">
     <header class="exchange-header"><div><span class="eyebrow">MANUAL RESEARCH HANDOFF · SYNTHETIC PILOT</span><h2 id="request-title">Prepare a research request</h2></div><button id="close-request" type="button" class="inspector-close" aria-label="Close request form">×</button></header>
     <form id="request-form">

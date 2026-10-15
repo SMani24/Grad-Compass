@@ -152,7 +152,7 @@ class ResearchWorkspace:
             or not isinstance(payload["country_code"], str) or payload["country_code"] not in COUNTRY_CODES
             or ("watched" in payload and type(payload["watched"]) is not bool)
             or ("note" in payload and (not isinstance(payload["note"], str) or len(payload["note"]) > 4000))):
-            raise ValueError("Choose a displayed country and a valid watchlist choice or note")
+            raise ValueError("Choose a displayed country and a valid saved-country choice or note")
         with self.lock, closing(self.connect()) as db, db:
             db.execute("BEGIN IMMEDIATE")
             previous = db.execute("SELECT watched,note FROM country_personal WHERE code=?", (payload["country_code"],)).fetchone()
@@ -160,6 +160,21 @@ class ResearchWorkspace:
             note = payload.get("note", previous["note"] if previous else "")
             db.execute("INSERT INTO country_personal(code,watched,note) VALUES(?,?,?) ON CONFLICT(code) DO UPDATE SET watched=excluded.watched,note=excluded.note",
                        (payload["country_code"], int(watched), note))
+        return self.snapshot()
+
+    def save_countries(self, payload):
+        """Save memberships together; leave existing notes and all other state intact."""
+        countries = payload.get("countries") if isinstance(payload, dict) else None
+        if (not isinstance(payload, dict) or set(payload) != {"countries"}
+            or not isinstance(countries, list) or not 1 <= len(countries) <= len(COUNTRY_CODES)
+            or any(not isinstance(code, str) or code not in COUNTRY_CODES for code in countries)
+            or len(set(countries)) != len(countries)):
+            raise ValueError("Select distinct countries from the map or country list")
+        with self.lock, closing(self.connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            db.executemany("INSERT INTO country_personal(code,watched,note) VALUES(?,1,'') "
+                           "ON CONFLICT(code) DO UPDATE SET watched=1 WHERE watched=0",
+                           [(code,) for code in countries])
         return self.snapshot()
 
     def _write_private_file(self, name, value, replace=False):

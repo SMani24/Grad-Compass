@@ -12,18 +12,27 @@
     select.value = size;
   }
   function layout() {
-    const top = document.querySelector(".topbar").getBoundingClientRect().bottom + 20;
+    const toolsTop = document.querySelector(".topbar").getBoundingClientRect().bottom + 12;
+    root.style.setProperty("--map-tools-top", `${toolsTop}px`);
+    const tools = document.getElementById("map-selection-controls");
+    const top = tools.hidden ? toolsTop + 8 : toolsTop + tools.getBoundingClientRect().height + 12;
     root.style.setProperty("--content-top", `${top}px`);
     const filters = document.querySelector(".filter-controls").getBoundingClientRect().height;
     root.style.setProperty("--mobile-list-top", `${top + filters + 14}px`);
     const panel = document.querySelector(".results-panel").getBoundingClientRect();
     root.style.setProperty("--map-controls-bottom", `${innerHeight - panel.top + 12}px`);
   }
-  const observer = new ResizeObserver(layout);
+  let layoutFrame;
+  function scheduleLayout() {
+    if (layoutFrame) return;
+    layoutFrame = requestAnimationFrame(() => { layoutFrame = null; layout(); });
+  }
+  const observer = new ResizeObserver(scheduleLayout);
   observer.observe(document.querySelector(".topbar"));
   observer.observe(document.querySelector(".filter-controls"));
   observer.observe(document.querySelector(".results-panel"));
-  addEventListener("resize", layout);
+  observer.observe(document.getElementById("map-selection-controls"));
+  addEventListener("resize", scheduleLayout);
   layout();
   document.getElementById("open-settings").addEventListener("click", () => dialog.showModal());
   document.getElementById("close-settings").addEventListener("click", () => dialog.close());
