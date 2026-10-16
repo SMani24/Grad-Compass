@@ -952,3 +952,8 @@ html {
 .country-source a { color: var(--blue); font-size: .75rem; }
 
 .explore-country { width: 100%; }
+
+/* Keep comparison rows reachable when the narrow filter panel needs to scroll. */
+@media(max-width:580px) {
+  .workspace.list-view .results-panel { max-height: calc(100dvh - var(--content-top,130px) - 140px); }
+}

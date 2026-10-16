@@ -19,7 +19,7 @@
     let pending=null;
     const receive=action("Receive this response",async()=>{
       if(!pending)throw new Error("Load a synthetic response first.");
-      const saved=await post("/api/research/receive",{envelope:pending});
+      const saved=await post("/api/research/receive",{envelope:pending._transport});
       await openRequests(request.request_id,pending.envelope_kind==="result" ? pending.revision : null);
       get("research-message").textContent=saved.changed ? "Synthetic response received. Its exact request binding was checked." : "Already received — no duplicate changes.";
       notify();
@@ -38,16 +38,16 @@
       try {
         const chosen=file.files?.[0];if(!chosen)return;
         if(chosen.size>180000)throw new Error("Choose a small app-generated demo response file.");
-        showEnvelope(JSON.parse(await chosen.text()));
+        showEnvelope(await post("/api/research/preview-response",{transport_json:await chosen.text()}));
       }catch(error){pending=null;receive.disabled=true;preview.replaceChildren();responseStatus.textContent=error.message;}
     });
     const buttons=node("div",undefined,"result-actions");buttons.append(load,receive);
     const saveDemo=action("Save demo response JSON",async()=>{
       if(!pending)throw new Error("Load a demo response first.");
-      const link=node("a");const url=URL.createObjectURL(new Blob([JSON.stringify(pending,null,2)],{type:"application/json"}));
+      const link=node("a");const url=URL.createObjectURL(new Blob([JSON.stringify(pending._transport,null,2)],{type:"application/json"}));
       link.href=url;link.download="grad-compass-synthetic-response.json";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     },"research-save-response");
-    responseBox.append(chooser,buttons,preview,responseStatus,fileLabel,file,saveDemo);section.append(responseBox);
+    responseBox.append(chooser,buttons,preview,responseStatus,fileLabel,file,saveDemo);if(!request.legacy)section.append(responseBox);
 
     if(!current.results.length){section.append(node("p","No findings received yet. Request state changes only when an explicit response is recorded."));return;}
     const versions=node("select");versions.id="research-result-revision";versions.setAttribute("aria-label","Result revision to review");
@@ -72,7 +72,7 @@
     }
     for(const finding of result.findings){
       const card=node("article",undefined,"finding-card"+(ctx.finding===finding.finding_id ? " highlighted" : ""));card.dataset.finding=finding.finding_id;
-      card.append(node("h4",finding.name || countryName(finding.country_code)),node("p",finding.kind==="country" ? "Invented country evidence · unreviewed demo" : "Synthetic institution/program finding · separate import review required"),node("p",finding.summary));
+      card.append(node("h4",finding.name || countryName(finding.country_code)),node("p",finding.kind==="country" ? `Invented country evidence · review ${finding.review_status}` : "Synthetic institution/program finding · separate import review required"),node("p",finding.summary));
       if(finding.kind==="country"){
         for(const key of ["funding_routes","costs","work_rules"]){card.append(node("strong",fieldNames[key]),node("p",readable(finding[key])));}
         card.append(node("p","Observed: "+finding.observed_at));
@@ -92,7 +92,7 @@
       feedbackForm.addEventListener("submit",async event=>{
         event.preventDefault();save.disabled=true;
         try {
-          const feedback=await post("/api/research/feedback",{request_id:request.request_id,result_id:result.result_id,revision:result.revision,finding_id:finding.finding_id,comment:comment.value,submission_key:submissionKey});
+          const feedback=await post("/api/research/feedback",{request_id:request.request_id,result_id:result.result_id,revision:result.revision,finding_id:finding.finding_id,finding_revision:finding.finding_revision,request_revision:request.revision,request_digest:request.digest,result_digest:result.digest,comment:comment.value,submission_key:submissionKey});
           await openRequests(request.request_id,result.revision,finding.finding_id);
           await handoff(request.request_id,feedback.feedback_id);
           get("research-message").textContent="Feedback saved locally with its exact finding/revision. Copy its handoff to Dave; delivery is not assumed.";
@@ -101,9 +101,9 @@
       const feedbackButton=action("Give feedback",()=>{feedbackForm.hidden=!feedbackForm.hidden;if(!feedbackForm.hidden)comment.focus();});feedbackButton.className="feedback-open";
       const follow=action("Request an update",()=>{
         const last=[...current.feedback].reverse().find(item=>item.result_id===result.result_id && item.result_revision===result.revision && item.finding_id===finding.finding_id);
-        return openRequest({countries:[finding.country_code],scope:"refresh",parent_request_id:request.request_id,
-          prior_results:[{result_id:result.result_id,revision:result.revision,digest:result.digest,finding_id:finding.finding_id}],context:last?.comment || ""});
-      });follow.className="follow-up-finding";controls.append(feedbackButton,follow);
+        return openRequest({countries:[finding.country_code],scope:"refresh",parent_request_id:request.request_id,parent_request_revision:request.revision,parent_request_digest:request.digest,
+          prior_results:[{result_id:result.result_id,revision:result.revision,digest:result.digest,finding_id:finding.finding_id,finding_revision:finding.finding_revision}],context:last?.comment || ""});
+      });follow.className="follow-up-finding";controls.append(feedbackButton,follow);if(request.legacy){feedbackButton.disabled=true;follow.disabled=true;}
       const discovery=action(finding.kind==="country" ? "View country on map" : "Open discovery record",async()=>{
         if(finding.kind==="country"){
           get("research-dialog").close();window.dispatchEvent(new CustomEvent("grad-compass:show-country",{detail:{code:finding.country_code}}));return;

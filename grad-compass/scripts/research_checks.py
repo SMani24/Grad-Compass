@@ -141,6 +141,19 @@ def verify_round_trip(window,identity,capture=None):
     click("research-load-response")
     wait("JSON.stringify(document.getElementById('research-response-preview').textContent)",lambda text:text.startswith("Preview only"),"acknowledgement preview")
     assert run("document.querySelector('.request-state').textContent").startswith("Prepared locally")
+    # File upload must retain original text until server-side duplicate-key validation.
+    run(f"""window.GradCompassResearch.post('/api/research/demo-response',{{request_id:{json.dumps(identity)},choice:'accepted'}}).then(value=>{{
+      window.__gra55Packet=value._transport;
+      const original=JSON.stringify(value._transport);
+      const duplicate=original.slice(0,-1)+',"sha256":'+JSON.stringify(value._transport.sha256)+'}}';
+      const transfer=new DataTransfer();transfer.items.add(new File([duplicate],'duplicate.json',{{type:'application/json'}}));
+      const input=document.getElementById('research-response-file');input.files=transfer.files;input.dispatchEvent(new Event('change'));
+    }})""")
+    wait("JSON.stringify(document.getElementById('research-response-status').textContent)",lambda text:"Duplicate JSON" in text,"duplicate-key file rejected")
+    assert run("document.getElementById('research-receive-response').disabled")
+    assert run("document.querySelector('.request-state').textContent").startswith("Prepared locally")
+    run("const transfer=new DataTransfer();transfer.items.add(new File([JSON.stringify(window.__gra55Packet)],'valid.json',{type:'application/json'}));const input=document.getElementById('research-response-file');input.files=transfer.files;input.dispatchEvent(new Event('change'))")
+    wait("JSON.stringify(!document.getElementById('research-receive-response').disabled)",bool,"exact-byte file preview")
     click("research-receive-response")
     wait("JSON.stringify(document.querySelector('.request-state')?.textContent)",lambda text:text.startswith("Acknowledged"),"explicit accepted acknowledgement")
     assert "no execution progress reported" in run("document.querySelector('.request-state').textContent")
@@ -151,6 +164,8 @@ def verify_round_trip(window,identity,capture=None):
     response("result-1",1)
     wait("JSON.stringify(document.getElementById('research-message').textContent)",lambda text:text.startswith("Already received"),"result receipt replay")
     assert run("document.getElementById('research-result-revision').options.length")==1
+    response("result-2",2)
+    assert "complete" in run("document.getElementById('research-result-revision').selectedOptions[0].textContent")
     run("document.querySelector('.finding-card[data-finding=\"country:CAN\"] .feedback-open').click()")
     comment="Please clarify the funding route. This is feedback, not a standing country restriction."
     run(f"document.querySelector('.finding-card[data-finding=\"country:CAN\"] .finding-comment').value={json.dumps(comment)};document.querySelector('.finding-card[data-finding=\"country:CAN\"] .save-finding-feedback').click()")
@@ -167,13 +182,13 @@ def verify_round_trip(window,identity,capture=None):
     click("request-submit")
     wait("JSON.stringify(document.querySelectorAll('.request-row').length)",lambda count:count==3,"saved lineage-preserving follow-up")
     run(f"document.querySelector('.request-row[data-request=\"{identity}\"]').click()")
-    wait("JSON.stringify(document.getElementById('research-result-revision')?.value)",lambda value:value=="1","original result remains")
+    wait("JSON.stringify(document.getElementById('research-result-revision')?.value)",lambda value:value=="2","complete result remains")
     response("result-2",2)
     assert run("document.getElementById('research-result-revision').options.length")==2
     assert run("!!document.querySelector('.material-change[data-field=\"funding_routes\"]') && !!document.querySelector('.material-change[data-field=\"costs\"]')")
     screenshot("revised-changes","#research-material-changes")
     run("document.getElementById('research-result-revision').value='1';document.getElementById('research-result-revision').dispatchEvent(new Event('change'))")
-    wait("JSON.stringify(document.querySelector('.finding-card[data-finding=\"country:CAN\"]')?.textContent)",lambda text:"Invented route A" in text and comment in text,"old revision and feedback preserved")
+    wait("JSON.stringify(document.querySelector('.finding-card[data-finding=\"country:CAN\"]')?.textContent)",lambda text:"Invented route A" in text and comment not in text,"old revision preserved; later feedback stays on r2")
     screenshot("earlier-revision","#research-findings-title")
     click("close-research")
     # Use the unchanged public importer safeguards from the received result.
@@ -192,7 +207,7 @@ def verify_round_trip(window,identity,capture=None):
     assert run("document.getElementById('country-note').value")=="Synthetic private note; do not treat this as research evidence."
     assert run("document.getElementById('country-decision').value")=="Shortlisted"
     assert run("document.getElementById('watch-detail-FRA').getAttribute('aria-pressed')")=="true"
-    assert run("document.querySelector('.research-state').textContent")=="Invented evidence · unreviewed demo"
+    assert run("document.querySelector('.research-state').textContent")=="Invented evidence · review pending"
     screenshot("country-result","#inspector .country-summary")
     run("window.__roundTripOld=true;location.reload()")
     wait("JSON.stringify(window.__roundTripOld!==true && !!document.getElementById('country-note'))",bool,"new page after saved round trip")
@@ -251,6 +266,7 @@ def verify_research_layouts(window,identity,capture=None):
                 run("document.getElementById('research-material-changes').scrollIntoView({block:'start'})");time.sleep(.5);capture("results-mobile-large")
             click("close-research")
             click("list-view")
+            time.sleep(.2)
             value=json.loads(run("""JSON.stringify((()=>{const p=document.querySelector('.results-panel').getBoundingClientRect(),list=document.querySelector('.list-container').getBoundingClientRect();return {panelBottom:p.bottom,listTop:list.top,listHeight:list.height,width:innerWidth,overflow:document.body.scrollWidth>innerWidth};})())"""))
             assert not value["overflow"],value
             if width==390:assert value["listTop"]>=value["panelBottom"] and value["listHeight"]>=100,value

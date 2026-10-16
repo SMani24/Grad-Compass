@@ -1,0 +1,21 @@
+{
+  "fixture": "gra55-synthetic-0.1.0",
+  "schema_version": "0.1.0",
+  "sequence": [
+    "request.json",
+    "acknowledgement.json",
+    "result-1.json",
+    "result-2.json",
+    "feedback.json",
+    "refresh.json"
+  ],
+  "sha256": {
+    "acknowledgement.json": "6c360e95a0ecba7444edfd7cfeadfb97648508c9204efb345fa929bf5f1f8c8b",
+    "feedback.json": "39e37524cb64695c446a45d8e1fbb4e9d20d29fb7d4f44b2860ea4f300df1f3a",
+    "refresh.json": "146e347aa9dd3c69df171431e3dcd27c63da3497bdeb5e3251d7d902140ac7c0",
+    "request.json": "f399814887b7f2e298f16a6e8e17f1520a61b0fb0e690b6e5e73f7ce5595c6dd",
+    "result-1.json": "dfae4808f62d51424adaae068c954e9325fff2abdf47bc1faa949a6610cdaf65",
+    "result-2.json": "6ae69cdc489403004c27ceab97e06acb4e2d6a90ac0e112d8d824dc6c5b54f44"
+  },
+  "synthetic": true
+}

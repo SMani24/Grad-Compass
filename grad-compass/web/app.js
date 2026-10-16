@@ -288,7 +288,7 @@ if (typeof document !== "undefined") {
       close.addEventListener("click", closeInspector);
       top.append(node("span", "eyebrow", "COUNTRY DETAILS"), close);
       elements.inspector.replaceChildren(top, node("div", "institution-symbol", country?.flag || "🌐"), node("h2", "", country?.name || code));
-      elements.inspector.append(node("p", "research-state", detail.review_status === "unreviewed_demo" ? "Invented evidence · unreviewed demo" : "Country evidence not researched"));
+      elements.inspector.append(node("p", "research-state", detail.review_status === "unreviewed_demo" ? "Invented evidence · unreviewed demo" : ["pending","accepted","rejected"].includes(detail.review_status) ? `Invented evidence · review ${detail.review_status}` : "Country evidence not researched"));
       elements.inspector.append(window.GradCompassResearch.detailControls(code));
       const personal = node("section", "country-personal");
       const label = node("label", "", "Your personal decision"); label.htmlFor = "country-decision";

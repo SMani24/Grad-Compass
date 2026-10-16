@@ -117,7 +117,7 @@
   async function openRequest(context={}) {
     try {
       await reload();
-      draft={countries:context.countries || [...selected],parent_request_id:context.parent_request_id || null,prior_results:context.prior_results || [],submission_key:crypto.randomUUID()};
+      draft={countries:context.countries || [...selected],parent_request_id:context.parent_request_id || null,parent_request_revision:context.parent_request_revision ?? null,parent_request_digest:context.parent_request_digest || null,prior_results:context.prior_results || [],submission_key:crypto.randomUUID()};
       if(!draft.countries.length) { status("Save countries and select them for research first.");return; }
       get("request-form").reset();get("request-form").dataset.submitting="false";
       get("request-countries").textContent=draft.countries.map(countryLabel).join(" · ");
@@ -198,7 +198,7 @@
       await reload();if(sequence!==openSequence)return;
       identity=identity || data.requests?.[0]?.request_id;
       renderList(identity);
-      if(!identity){get("research-request-detail").replaceChildren(node("p","Watch countries and select them for research in the map panel to prepare your first request."));get("research-message").textContent="";return;}
+      if(!identity){get("research-request-detail").replaceChildren(node("p","Save countries and select them for research in the map panel to prepare your first request."));get("research-message").textContent="";return;}
       const response=await fetch("/api/research/requests/"+encodeURIComponent(identity),{cache:"no-store"});
       if(!response.ok)throw new Error("Could not load this request.");
       const detail=await response.json();if(sequence!==openSequence)return;
@@ -217,8 +217,9 @@
     snapshot.append(node("p",`Request-specific limits: ${request.limits || "Unknown"}`),node("p",`Context: ${request.context || "None supplied"}`));section.append(snapshot);
     const actions=node("div",undefined,"result-actions");
     actions.append(action("Prepare private handoff",()=>handoff(request.request_id),"prepare-research-handoff"),
-      action("Prepare follow-up",()=>openRequest({countries:request.countries,scope:"refresh",parent_request_id:request.request_id}),"request-follow-up"));
+      action("Prepare follow-up",()=>openRequest({countries:request.countries,scope:"refresh",parent_request_id:request.request_id,parent_request_revision:request.revision,parent_request_digest:request.digest,prior_results:current.results.length ? [{result_id:current.results.at(-1).envelope.result_id,revision:current.results.at(-1).envelope.revision,digest:current.results.at(-1).envelope.digest,finding_id:null,finding_revision:null}]:[]}),"request-follow-up"));
     if(request.parent_request_id)actions.append(action("View parent request",()=>openRequests(request.parent_request_id)));
+    if(request.legacy) { for(const id of ["prepare-research-handoff","request-follow-up"]) actions.querySelector("#"+id).disabled=true; section.append(node("p","Legacy synthetic history — original digest semantics preserved. Prepare a new request to use the corrected handoff.")); }
     section.append(actions,technical("Identifiers & exact request binding",{request:request.request_id,revision:request.revision,digest:request.digest}));
     // Response and revision review shares this dialog through its synthetic adapter.
     if(window.GradCompassResearchReview)window.GradCompassResearchReview.render({section,current,revision:currentRevision,finding:currentFinding,openRequests,openRequest,handoff,post,reload,action,node,technical,notify:()=>window.dispatchEvent(new Event("grad-compass:discovery-updated"))});

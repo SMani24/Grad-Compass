@@ -226,7 +226,7 @@ def handler_for(workspace, exchange=None, session_token=None):
             route = urlsplit(self.path).path
             actions = {"stage", "map", "preview", "promote", "replay"}
             action = route.removeprefix("/api/exchange/")
-            research_actions = {"country","save-countries","submit","export","demo-response","receive","feedback"}
+            research_actions = {"country","save-countries","submit","export","demo-response","preview-response","receive","feedback"}
             research_action = route.removeprefix("/api/research/")
             research_operation = research_action in research_actions and route == "/api/research/"+research_action
             personal_decision = route == "/api/country-decisions"
@@ -243,7 +243,8 @@ def handler_for(workspace, exchange=None, session_token=None):
                 length = int(self.headers.get("Content-Length", "0"))
                 if not 0 < length <= (196608 if research_operation else 16384) or self.headers.get("Content-Type") != "application/json":
                     raise ValueError("A small JSON request is required")
-                payload = json.loads(self.rfile.read(length))
+                from web.research_envelopes import loads
+                payload = loads(self.rfile.read(length))
                 if research_operation:
                     if not isinstance(payload,dict): raise ValueError("Review the research form fields")
                     if research_action == "country": result = workspace.research.save_country(payload)
@@ -251,10 +252,10 @@ def handler_for(workspace, exchange=None, session_token=None):
                     elif research_action == "submit": result = workspace.research.submit(payload)
                     else:
                         allowed = {"export":{"request_id","feedback_id"},"demo-response":{"request_id","choice"},
-                                   "receive":{"envelope"},"feedback":{"request_id","result_id","revision","finding_id","comment","submission_key"}}[research_action]
+                                   "preview-response":{"transport_json"},"receive":{"envelope"},"feedback":{"request_id","request_revision","request_digest","result_id","result_digest","revision","finding_id","finding_revision","comment","submission_key"}}[research_action]
                         required = allowed - ({"feedback_id"} if research_action=="export" else set())
                         if set(payload)-allowed or not required <= set(payload): raise ValueError("Review the selected research item")
-                        method = {"export":"export","demo-response":"demo_response","receive":"receive","feedback":"feedback"}[research_action]
+                        method = {"export":"export","demo-response":"demo_response","preview-response":"preview_response","receive":"receive","feedback":"feedback"}[research_action]
                         result = getattr(workspace.research,method)(**payload) if research_action!="receive" else workspace.research.receive(payload["envelope"])
                     return self.respond(200,result)
                 if personal_decision:

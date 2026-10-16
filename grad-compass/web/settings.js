@@ -18,7 +18,8 @@
     const top = tools.hidden ? toolsTop + 8 : toolsTop + tools.getBoundingClientRect().height + 12;
     root.style.setProperty("--content-top", `${top}px`);
     const filters = document.querySelector(".filter-controls").getBoundingClientRect().height;
-    root.style.setProperty("--mobile-list-top", `${top + filters + 14}px`);
+    const visibleFilters = document.querySelector(".workspace").classList.contains("list-view") ? document.querySelector(".results-panel").getBoundingClientRect().height : filters;
+    root.style.setProperty("--mobile-list-top", `${top + visibleFilters + 14}px`);
     const panel = document.querySelector(".results-panel").getBoundingClientRect();
     root.style.setProperty("--map-controls-bottom", `${innerHeight - panel.top + 12}px`);
   }

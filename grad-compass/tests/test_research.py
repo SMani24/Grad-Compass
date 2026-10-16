@@ -130,7 +130,8 @@ class ResearchTests(unittest.TestCase):
         from web.research_envelopes import verify
         import json
         file=Path(exported["path"])
-        self.assertEqual(verify(json.loads(file.read_text())),request)
+        self.assertEqual(verify({"body":file.read_text(),"sha256":exported["digest"]}),request)
+        self.assertEqual(hashlib.sha256(file.read_bytes()).hexdigest(),request["digest"])
         self.assertEqual(file.stat().st_mode & 0o777,0o600)
         self.assertNotIn("PRIVATE_INTAKE",exported["prompt"])
         self.assertNotIn("SENSITIVE_CONTEXT",exported["prompt"])
@@ -141,29 +142,39 @@ class ResearchTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.store.export(request["request_id"])
         self.assertEqual(file.read_text(),"existing private contents")
 
-    def test_bound_receipts_revision_history_feedback_and_replay_preserve_personal_state(self):
+    def record(self, value):
+        return self.store.receive(value["_transport"])
+
+    def comment(self, request, result, comment="Please check the funding route", key=None, **changes):
         from uuid import uuid4
+        fields={"request_id":request["request_id"],"request_revision":request["revision"],"request_digest":request["digest"],
+                "result_id":result["result_id"],"revision":result["revision"],"result_digest":result["digest"],
+                "finding_id":"country:CAN","finding_revision":result["findings"][0]["finding_revision"],
+                "comment":comment,"submission_key":key or str(uuid4()),**changes}
+        return self.store.feedback(**fields)
+
+    def test_bound_receipts_revision_history_feedback_and_replay_preserve_personal_state(self):
         from web.country_evidence import detail
         request=self.store.submit(self.submission())["request"]
         identity=request["request_id"]
         self.store.save_country({"country_code":"CAN","watched":True,"note":"Keep this note"})
         self.workspace.country_decisions("CAN","On hold")
         result1=self.store.demo_response(identity,"result-1")
-        with self.assertRaises(ValueError):self.store.receive(result1)
-        ack=self.store.demo_response(identity,"accepted")
-        self.assertEqual(self.store.snapshot()["requests"][0]["state"],"prepared","Preparing a response must not acknowledge a request")
-        self.store.receive(ack)
-        self.assertIsNone(self.store.snapshot()["requests"][0]["execution_progress"])
-        with self.assertRaises(ValueError):self.store.receive({**result1,"request_digest":"wrong"})
-        with self.assertRaises(ValueError):self.store.receive({**result1,"synthetic":False})
-        self.store.receive(result1)
+        with self.assertRaises(ValueError):self.record(result1)
         result2=self.store.demo_response(identity,"result-2")
-        with self.assertRaises(ValueError):self.store.receive(result2)
-        feedback=self.store.feedback(identity,result1["result_id"],1,"country:CAN","Please check the funding route",str(uuid4()))
+        ack=self.store.demo_response(identity,"accepted")
+        self.assertEqual(self.store.snapshot()["requests"][0]["state"],"prepared")
+        self.record(ack)
+        self.assertIsNone(self.store.snapshot()["requests"][0]["execution_progress"])
+        with self.assertRaises(ValueError):self.record(result2)
+        self.record(result1); self.record(result2)
+        self.assertEqual(result1["completion"],"partial")
+        self.assertEqual(result2["completion"],"complete")
+        self.assertEqual(result2["previous_result_digest"],result1["digest"])
+        feedback=self.comment(request,result2)
         self.assertEqual(self.store.export(identity,feedback["feedback_id"])["kind"],"feedback")
-        self.store.receive(result2)
         snapshot=self.store.snapshot()
-        self.assertFalse(self.store.receive(result2)["changed"])
+        self.assertFalse(self.record(result2)["changed"])
         self.assertEqual(self.store.snapshot(),snapshot)
         current=self.store.request(identity)
         self.assertEqual(current["results"][0]["envelope"],result1)
@@ -171,47 +182,48 @@ class ResearchTests(unittest.TestCase):
         self.assertIn("funding_routes",[change["field"] for change in current["results"][1]["changes"]])
         self.assertEqual(detail(self.workspace,None,"CAN")["revision"],"demo-CAN-r2")
         self.assertEqual(detail(self.workspace,None,"CAN")["decision"],"On hold")
+        self.assertEqual(detail(self.workspace,None,"CAN")["review_status"],"pending")
         self.assertEqual(self.store.snapshot()["countries"]["CAN"],{"watched":True,"note":"Keep this note"})
         self.assertEqual(hashlib.sha256(self.workspace.database.read_bytes()).hexdigest(),self.before)
-        ref={"result_id":result2["result_id"],"revision":2,"digest":result2["digest"],"finding_id":"country:CAN"}
-        follow=self.store.submit(self.submission(scope="refresh",parent_request_id=identity,prior_results=[ref]))["request"]
+        ref={"result_id":result2["result_id"],"revision":2,"digest":result2["digest"],"finding_id":"country:CAN","finding_revision":result2["findings"][0]["finding_revision"]}
+        follow=self.store.submit(self.submission(scope="refresh",parent_request_id=identity,
+            parent_request_revision=request["revision"],parent_request_digest=request["digest"],prior_results=[ref]))["request"]
         self.assertEqual(follow["prior_results"],[ref])
+        self.assertEqual(follow["parent_request_digest"],request["digest"])
         with closing(self.store.connect()) as db:
             with self.assertRaises(sqlite3.IntegrityError):db.execute("DELETE FROM research_results")
 
     def test_response_bindings_versions_exact_types_and_old_replay_cannot_downgrade_evidence(self):
         from uuid import uuid4
-        from web.research_envelopes import seal
+        from web.research_envelopes import loads,packet
         request=self.store.submit(self.submission())["request"]
-        identity=request["request_id"]
-        ack=self.store.demo_response(identity,"accepted")
-        for invalid in ({**ack,"request_revision":True},{**ack,"private_schema_version":"1.0.0"},
-                        {**ack,"request_digest":"0"*64},{**ack,"execution_progress":"running"}):
-            with self.assertRaises(ValueError):self.store.receive(invalid)
+        identity=request["request_id"]; ack=self.store.demo_response(identity,"accepted")
+        body=loads(ack["_transport"]["body"])
+        for changes in ({"request_revision":True},{"schema_version":"1.0.0"},{"synthetic":False},
+                        {"request_digest":"0"*64},{"execution_progress":"running"}):
+            with self.assertRaises(ValueError):self.store.receive(packet({**body,**changes}))
         self.assertEqual(self.store.snapshot()["requests"][0]["state"],"prepared")
-        self.store.receive(ack)
-        self.assertFalse(self.store.receive(ack)["changed"])
+        self.record(ack);self.assertFalse(self.record(ack)["changed"])
         before_prefs=self.store.snapshot()["preferences"]
         first=self.store.demo_response(identity,"result-1")
-        forged={key:value for key,value in first.items() if key!="digest"}
-        forged["findings"]=[{**first["findings"][0],"funding_routes":"An unapproved arbitrary real claim"}]
-        with self.assertRaises(ValueError):self.store.receive(seal(forged))
-        self.store.receive(first)
-        with self.assertRaises(ValueError):self.store.feedback(identity,first["result_id"],1,"country:ATA","Wrong finding",str(uuid4()))
-        key=str(uuid4())
-        saved=self.store.feedback(identity,first["result_id"],1,"country:CAN","Only funding routes please",key)
-        self.assertEqual(self.store.feedback(identity,first["result_id"],1,"country:CAN","Only funding routes please",key),saved)
-        with self.assertRaises(ValueError):self.store.feedback(identity,first["result_id"],1,"country:CAN","Changed comment",key)
-        self.store.receive(self.store.demo_response(identity,"result-2"))
-        self.assertFalse(self.store.receive(first)["changed"])
+        forged=loads(first["_transport"]["body"])
+        forged["findings"][0]["funding_routes"]="An unapproved arbitrary real claim"
+        with self.assertRaises(ValueError):self.store.receive(packet(forged))
+        self.record(first)
+        with self.assertRaises(ValueError):self.comment(request,first,finding_id="country:ATA")
+        key=str(uuid4());saved=self.comment(request,first,key=key)
+        self.assertEqual(self.comment(request,first,key=key),saved)
+        with self.assertRaises(ValueError):self.comment(request,first,comment="Changed comment",key=key)
+        self.record(self.store.demo_response(identity,"result-2"))
+        self.assertFalse(self.record(first)["changed"])
         self.assertEqual(self.store.latest_country("CAN")["source_revision"],"demo-CAN-r2")
         self.assertEqual(self.store.snapshot()["preferences"],before_prefs)
 
     def test_explicit_rejection_and_clarification_do_not_claim_execution(self):
         for state in ("rejected","needs_clarification"):
             request=self.store.submit(self.submission())["request"]
-            self.store.receive(self.store.demo_response(request["request_id"],state))
+            self.record(self.store.demo_response(request["request_id"],state))
             row=next(item for item in self.store.snapshot()["requests"] if item["request_id"]==request["request_id"])
-            self.assertEqual(row["state"],state)
-            self.assertIsNone(row["execution_progress"])
-            with self.assertRaises(ValueError):self.store.receive(self.store.demo_response(request["request_id"],"result-1"))
+            self.assertEqual(row["state"],state);self.assertIsNone(row["execution_progress"])
+            for choice in ("accepted","result-1","result-2"):
+                with self.assertRaises(ValueError):self.record(self.store.demo_response(request["request_id"],choice))

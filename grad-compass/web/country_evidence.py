@@ -49,6 +49,7 @@ def detail(workspace, exchange, code):
     latest = workspace.research.latest_country(code)
     if latest:
         result.update({key:latest[key] for key in ("summary","sources","uncertainties","review_status","funding_routes","costs","work_rules","observed_at")})
+        result.update({key:latest[key] for key in ("country_record_id","record_revision","finding_id","finding_revision","review","human_approval","evidence_status","finding_ref") if key in latest})
         result.update(revision=latest["source_revision"],origin=latest["origin"],history=latest["history"],coverage="partial")
     else:
         result.update(funding_routes=None,costs=None,work_rules=None,observed_at=None,history=[])

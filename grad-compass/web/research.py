@@ -14,7 +14,9 @@ MARKER = "grad-compass-research-demo-v1"
 
 
 class ResearchWorkspace:
-    def __init__(self, workspace):
+    def __init__(self, workspace, clock=None, id_factory=None):
+        self.clock = clock or envelopes.now
+        self.id_factory = id_factory or uuid4
         self.workspace = workspace
         self.directory = workspace.directory
         self.database = self.directory / "research.sqlite"
@@ -46,7 +48,7 @@ class ResearchWorkspace:
                         result_id TEXT NOT NULL,result_revision INTEGER NOT NULL,body TEXT NOT NULL,
                         FOREIGN KEY(result_id,result_revision) REFERENCES research_results(id,revision));
                 """)
-                db.execute("INSERT OR IGNORE INTO research_meta VALUES('owner_id',?)",(str(uuid4()),))
+                db.execute("INSERT OR IGNORE INTO research_meta VALUES('owner_id',?)",(str(self.id_factory()),))
                 for table in ("research_requests","research_acks","research_results","research_feedback"):
                     for action in ("UPDATE","DELETE"):
                         db.execute(f"CREATE TRIGGER IF NOT EXISTS immutable_{table}_{action} BEFORE {action} ON {table} BEGIN SELECT RAISE(ABORT,'Research envelopes are immutable'); END")
@@ -78,7 +80,7 @@ class ResearchWorkspace:
 
     @staticmethod
     def _body(row):
-        return envelopes.verify(json.loads(row["body"])) if row else None
+        return envelopes.saved(row["body"]) if row else None
 
     def snapshot(self):
         with self.lock, closing(self.connect()) as db:
@@ -118,7 +120,7 @@ class ResearchWorkspace:
 
     def submit(self, payload):
         values = envelopes.request_values(payload)
-        submission_digest = envelopes.digest({**values,"remember_preferences":payload["remember_preferences"]})
+        submission_digest = envelopes.fingerprint({**values,"remember_preferences":payload["remember_preferences"]})
         with self.lock, closing(self.connect()) as db, db:
             db.execute("BEGIN IMMEDIATE")
             previous = db.execute("SELECT * FROM research_requests WHERE submission_key=?",(payload["submission_key"],)).fetchone()
@@ -127,23 +129,41 @@ class ResearchWorkspace:
                     raise ValueError("This submission was already saved with different contents; reopen the form")
                 identity = previous["id"]
             else:
-                if values["parent_request_id"] and not db.execute("SELECT 1 FROM research_requests WHERE id=?",(values["parent_request_id"],)).fetchone():
-                    raise ValueError("Select an existing parent request")
+                parent = None
+                if values["parent_request_id"]:
+                    parent = self._body(db.execute("SELECT body FROM research_requests WHERE id=?",(values["parent_request_id"],)).fetchone())
+                    if (not parent or parent.get("legacy") or parent["revision"] != values["parent_request_revision"]
+                        or parent["digest"] != values["parent_request_digest"]):
+                        raise ValueError("The parent request revision/digest does not match the saved artifact")
+                    if db.execute("SELECT 1 FROM research_results WHERE request_id=?",(parent["request_id"],)).fetchone() and not values["prior_results"]:
+                        raise ValueError("Bind a saved prior result when refreshing returned research")
+                seen = set()
                 for ref in values["prior_results"]:
-                    envelopes.identifier(ref["result_id"])
+                    envelopes.identifier(ref["result_id"]); envelopes.digest_reference(ref["digest"])
                     if type(ref["revision"]) is not int or not isinstance(ref["finding_id"],(str,type(None))):
                         raise ValueError("Select an exact saved result revision")
+                    identity_key = (ref["result_id"],ref["revision"],ref["finding_id"])
+                    if identity_key in seen: raise ValueError("Do not duplicate prior finding references")
+                    seen.add(identity_key)
                     result = self._body(db.execute("SELECT body FROM research_results WHERE id=? AND revision=?",(ref["result_id"],ref["revision"])).fetchone())
-                    if (not result or result["digest"] != ref["digest"] or result["request_id"] != values["parent_request_id"]
-                        or (ref["finding_id"] and ref["finding_id"] not in {finding["finding_id"] for finding in result["findings"]})):
-                        raise ValueError("The follow-up reference does not match a saved result")
-                identity = str(uuid4())
-                request = envelopes.seal({"private_schema_version":envelopes.PRIVATE_VERSION,"synthetic":True,"envelope_kind":"request",
-                    "request_id":identity,"revision":1,"created_at":envelopes.now(),
-                    "owner_id":db.execute("SELECT value FROM research_meta WHERE key='owner_id'").fetchone()[0],"profile_reference":None,**values})
-                db.execute("INSERT INTO research_requests VALUES(?,?,?,?)",(identity,payload["submission_key"],submission_digest,envelopes.compact(request)))
+                    if (not result or result.get("legacy") or result["digest"] != ref["digest"] or result["request_id"] != parent["request_id"]
+                        or result["request_revision"] != parent["revision"] or result["request_digest"] != parent["digest"]):
+                        raise ValueError("The prior result does not bind the exact parent request")
+                    finding = next((item for item in result["findings"] if item["finding_id"]==ref["finding_id"]),None)
+                    if ref["finding_id"] is None:
+                        if ref["finding_revision"] is not None: raise ValueError("A finding revision requires its finding ID")
+                    elif (not finding or finding["finding_revision"] != ref["finding_revision"]
+                          or finding["country_code"] not in values["country_codes"]):
+                        raise ValueError("The prior finding revision does not match the selected country/result")
+                identity = str(self.id_factory())
+                request = envelopes.seal({"schema_version":envelopes.PRIVATE_VERSION,"synthetic":True,"envelope_kind":"request",
+                    "request_id":identity,"request_revision":1,"created_at":self.clock(),
+                    "owner_id":db.execute("SELECT value FROM research_meta WHERE key='owner_id'").fetchone()[0],"profile_reference":None,
+                    **values, "prior_results":[{"result_id":ref["result_id"],"result_revision":ref["revision"],"result_digest":ref["digest"],
+                                               "finding_id":ref["finding_id"],"finding_revision":ref["finding_revision"]} for ref in values["prior_results"]]})
+                db.execute("INSERT INTO research_requests VALUES(?,?,?,?)",(identity,payload["submission_key"],submission_digest,envelopes.storage(request)))
                 if payload["remember_preferences"]:
-                    db.execute("INSERT INTO research_preferences VALUES(1,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body",(envelopes.compact(values["preferences"]),))
+                    db.execute("INSERT INTO research_preferences VALUES(1,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body",(envelopes.compact(values["preference_snapshot"]),))
         return self.request(identity)
 
     def save_country(self, payload):
@@ -185,7 +205,7 @@ class ResearchWorkspace:
         path = root / name
         if path.is_symlink() or (path.exists() and (not path.is_file() or path.stat().st_nlink != 1)):
             raise ValueError("Private handoffs require unlinked files")
-        body = (envelopes.compact(value)+"\n").encode()
+        body = value if isinstance(value, bytes) else (envelopes.compact(value)+"\n").encode("utf-8")
         if path.exists() and not replace:
             if path.read_bytes() != body:
                 raise ValueError("An existing private handoff has different contents; it was preserved")
@@ -215,7 +235,10 @@ class ResearchWorkspace:
                 if value is None: raise ValueError("Select feedback from this request")
                 kind="feedback"
             identity=value["request_id"] if kind=="request" else value["feedback_id"]
-            path=self._write_private_file(kind+"-"+identity+".json",value)
+            if value.get("legacy"):
+                raise ValueError("Legacy synthetic records keep their original semantics; export a new corrected request instead")
+            path=self._write_private_file(kind+"-"+identity+".json",value["_transport"]["body"].encode("utf-8"))
+            self._write_private_file(kind+"-"+identity+".ref.json",{"file":path.name,"sha256":value["digest"],"synthetic":True})
             index={"synthetic":True,"requests":[{key:item[key] for key in ("request_id","revision","digest","state")} for item in self.snapshot()["requests"]]}
             self._write_private_file("index.json",index,replace=True)
             prompt=(f"Dave — synthetic app pilot only. Review the private {kind} file at {path}. "
@@ -228,60 +251,78 @@ class ResearchWorkspace:
     def demo_response(self, request_id, choice):
         return envelopes.demo_response(self.request(request_id)["request"],choice)
 
-    def receive(self, value):
-        if not isinstance(value,dict) or value.get("synthetic") is not True or value.get("private_schema_version")!=envelopes.PRIVATE_VERSION:
-            raise ValueError("Only app-owned synthetic responses are accepted in this pilot")
-        envelopes.verify(value)
-        request_id=value.get("request_id")
-        current=self.request(request_id)
-        request=current["request"]
-        kind=value.get("envelope_kind")
-        choice=value.get("state") if kind=="acknowledgement" else f"result-{value.get('revision')}" if kind=="result" else None
-        expected=envelopes.demo_response(request,choice)
-        if envelopes.compact(value)!=envelopes.compact(expected):
-            raise ValueError("The response does not match this exact request and app-owned demo fixture")
+    def preview_response(self, transport_json):
+        """Strictly decode original file text without recording acknowledgement/progress."""
+        if not isinstance(transport_json, str): raise ValueError("Choose a saved synthetic transport file")
+        try: size = len(transport_json.encode("utf-8", errors="strict"))
+        except UnicodeError: raise ValueError("Use valid UTF-8 transport text") from None
+        if size > 195000: raise ValueError("Choose a small app-generated synthetic transport file")
+        return self._validate_response(envelopes.loads(transport_json))
+
+    def _validate_response(self, transport):
+        value = envelopes.verify(transport)
+        request = self.request(value.get("request_id"))["request"]
+        kind = value.get("envelope_kind")
+        choice = value.get("state") if kind=="acknowledgement" else f"result-{value.get('revision')}" if kind=="result" else None
+        expected = envelopes.demo_response(request,choice)
+        if transport != expected["_transport"]:
+            raise ValueError("The original response bytes do not match this request and pinned synthetic fixture")
+        if kind=="result": envelopes.validate_result(value)
+        else: envelopes.utc(value["acknowledged_at"])
+        return value
+
+    def receive(self, transport):
+        value = self._validate_response(transport)
+        request_id = value["request_id"]; kind = value["envelope_kind"]
         with self.lock, closing(self.connect()) as db,db:
             db.execute("BEGIN IMMEDIATE")
             if kind=="acknowledgement":
                 previous=self._body(db.execute("SELECT body FROM research_acks WHERE request_id=?",(request_id,)).fetchone())
                 if previous:
-                    if previous!=value: raise ValueError("A different acknowledgement is already recorded; prepare a follow-up")
+                    if previous["_transport"]!=transport: raise ValueError("A different acknowledgement is already recorded; prepare a follow-up")
                     return {"changed":False,**self.request(request_id)}
-                db.execute("INSERT INTO research_acks VALUES(?,?,?)",(value["ack_id"],request_id,envelopes.compact(value)))
+                db.execute("INSERT INTO research_acks VALUES(?,?,?)",(value["ack_id"],request_id,envelopes.storage(value)))
             else:
                 previous=self._body(db.execute("SELECT body FROM research_results WHERE id=? AND revision=?",(value["result_id"],value["revision"])).fetchone())
                 if previous:
-                    if previous!=value: raise ValueError("This result revision already has different contents")
+                    if previous["_transport"]!=transport: raise ValueError("This result revision already has different contents")
                     return {"changed":False,**self.request(request_id)}
                 ack=self._body(db.execute("SELECT body FROM research_acks WHERE request_id=?",(request_id,)).fetchone())
                 if not ack or ack["state"]!="accepted": raise ValueError("Record an explicit accepted demo acknowledgement before results")
                 if value["revision"]>1:
-                    if not db.execute("SELECT 1 FROM research_results WHERE id=? AND revision=?",(value["result_id"],value["revision"]-1)).fetchone():
-                        raise ValueError("Receive the earlier result revision first")
-                    if not db.execute("SELECT 1 FROM research_feedback WHERE result_id=? AND result_revision=?",(value["result_id"],value["revision"]-1)).fetchone():
-                        raise ValueError("Save feedback on the previous result before the revised demo response")
-                db.execute("INSERT INTO research_results VALUES(?,?,?,?,?)",(value["result_id"],value["revision"],request_id,envelopes.compact(value),envelopes.now()))
+                    prior=self._body(db.execute("SELECT body FROM research_results WHERE id=? AND revision=?",(value["result_id"],value["previous_result_revision"])).fetchone())
+                    if not prior or prior["digest"]!=value["previous_result_digest"]:
+                        raise ValueError("Receive the exact earlier result revision/digest first")
+                    if prior["completion"]=="complete": raise ValueError("A complete result requires a new refresh request")
+                db.execute("INSERT INTO research_results VALUES(?,?,?,?,?)",(value["result_id"],value["revision"],request_id,envelopes.storage(value),self.clock()))
         return {"changed":True,**self.request(request_id)}
 
-    def feedback(self, request_id, result_id, revision, finding_id, comment, submission_key):
+    def feedback(self, request_id, result_id, revision, finding_id, comment, submission_key, *,
+                 request_revision, request_digest, result_digest, finding_revision):
         envelopes.identifier(submission_key)
-        current=self.request(request_id)
+        current=self.request(request_id); request=current["request"]
+        if (request.get("legacy") or type(request_revision) is not int or request_revision!=request["revision"]
+            or request_digest!=request["digest"]): raise ValueError("Feedback must bind the exact saved request revision/digest")
         result=next((item["envelope"] for item in current["results"] if item["envelope"]["result_id"]==result_id and item["envelope"]["revision"]==revision),None)
-        if type(revision) is not int or not result or finding_id not in {finding["finding_id"] for finding in result["findings"]}:
-            raise ValueError("Select a specific saved finding and result revision")
+        finding=next((item for item in result["findings"] if item["finding_id"]==finding_id),None) if result else None
+        if (type(revision) is not int or not result or result["digest"]!=result_digest
+            or not finding or finding["finding_revision"]!=finding_revision):
+            raise ValueError("Feedback must bind the exact saved result and finding revision")
         comment=envelopes.text(comment,4000)
         if not comment: raise ValueError("Write feedback before saving")
         with self.lock,closing(self.connect()) as db,db:
+            db.execute("BEGIN IMMEDIATE")
             previous=self._body(db.execute("SELECT body FROM research_feedback WHERE id=?",(submission_key,)).fetchone())
+            fields={"request_id":request_id,"request_revision":request_revision,"request_digest":request_digest,
+                    "result_id":result_id,"result_revision":revision,"result_digest":result_digest,
+                    "finding_id":finding_id,"finding_revision":finding_revision,"comment":comment}
             if previous:
-                if (previous["request_id"],previous["result_id"],previous["result_revision"],previous["finding_id"],previous["comment"])!=(request_id,result_id,revision,finding_id,comment):
+                if any(previous.get(key)!=val for key,val in fields.items()):
                     raise ValueError("This feedback submission was already saved with different contents")
                 return previous
-            value=envelopes.seal({"private_schema_version":envelopes.PRIVATE_VERSION,"synthetic":True,"envelope_kind":"feedback",
-                "feedback_id":submission_key,"created_at":envelopes.now(),"request_id":request_id,"request_revision":1,
-                "request_digest":current["request"]["digest"],"result_id":result_id,"result_revision":revision,
-                "result_digest":result["digest"],"finding_id":finding_id,"comment":comment})
-            db.execute("INSERT INTO research_feedback VALUES(?,?,?,?,?)",(submission_key,request_id,result_id,revision,envelopes.compact(value)))
+            value=envelopes.seal({"schema_version":envelopes.PRIVATE_VERSION,"synthetic":True,"envelope_kind":"feedback",
+                "feedback_id":submission_key,"created_at":self.clock(),"follow_up_request":None,**fields})
+            db.execute("INSERT INTO research_feedback VALUES(?,?,?,?,?)",(submission_key,request_id,result_id,revision,envelopes.storage(value)))
         return value
 
     def latest_country(self, code):
@@ -292,7 +333,7 @@ class ResearchWorkspace:
                 result=self._body(row)
                 finding=next((item for item in result["findings"] if item["kind"]=="country" and item["country_code"]==code),None)
                 if finding:
-                    origin={"request_id":result["request_id"],"result_id":result["result_id"],"revision":result["revision"],"digest":result["digest"],"finding_id":finding["finding_id"]}
+                    origin={"request_id":result["request_id"],"result_id":result["result_id"],"revision":result["revision"],"digest":result["digest"],"finding_id":finding["finding_id"],"finding_revision":finding.get("finding_revision")}
                     history.append(origin)
                     if latest is None: latest={**finding,"origin":origin}
             return {**latest,"history":history} if latest else None
@@ -305,5 +346,5 @@ class ResearchWorkspace:
                 if result["public_batch"]!={"batch_id":envelopes.BATCH_ID,"manifest_digest":envelopes.FIXTURE_DIGEST}: continue
                 for finding in result["findings"]:
                     if finding["kind"]==kind and finding.get("external_id")==external_id:
-                        links.append({"request_id":result["request_id"],"result_id":result["result_id"],"revision":result["revision"],"digest":result["digest"],"finding_id":finding["finding_id"]})
+                        links.append({"request_id":result["request_id"],"result_id":result["result_id"],"revision":result["revision"],"digest":result["digest"],"finding_id":finding["finding_id"],"finding_revision":finding.get("finding_revision")})
             return links
