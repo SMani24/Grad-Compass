@@ -87,7 +87,11 @@ def verify_country_selection(window, capture=None):
     run("document.querySelector('.leaflet-control-zoom-in').click()")
     zoomed = settled()
     assert zoomed != camera, "Zoom was disabled during selection"
-    run("document.getElementById('map').focus();document.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',keyCode:39,bubbles:true,cancelable:true}))")
+    run("document.getElementById('map').focus()")
+    wait("document.activeElement.id",lambda identity:identity=='map','keyboard map focus')
+    # Let the browser deliver focus to Leaflet before dispatching the key.
+    time.sleep(.15)
+    run("document.getElementById('map').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',keyCode:39,bubbles:true,cancelable:true}))")
     assert settled() != zoomed, "Keyboard map panning was disabled during selection"
     assert context() == before
     click("country-selection-list")

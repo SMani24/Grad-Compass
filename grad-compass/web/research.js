@@ -84,7 +84,7 @@
     const note=node("textarea");note.id="country-note";note.value=personal(code).note;note.maxLength=4000;note.rows=3;
     note.placeholder="Your context — kept separately from research evidence";
     const save=node("button","Save note","quiet-action");save.id="save-country-note";save.type="button";
-    const message=node("p","Notes stay in this local synthetic workspace.","private-note-status");message.setAttribute("role","status");
+    const message=node("p",data.synthetic===false ? "Notes stay in your private local workspace." : "Notes stay in this local synthetic workspace.","private-note-status");message.setAttribute("role","status");
     save.addEventListener("click",async()=>{
       save.disabled=true;note.disabled=true;
       try { await saveCountry({country_code:code,note:note.value});message.textContent="Note saved. Research and assessment are unchanged."; }
@@ -119,7 +119,8 @@
       await reload();
       draft={countries:context.countries || [...selected],parent_request_id:context.parent_request_id || null,parent_request_revision:context.parent_request_revision ?? null,parent_request_digest:context.parent_request_digest || null,prior_results:context.prior_results || [],submission_key:crypto.randomUUID()};
       if(!draft.countries.length) { status("Save countries and select them for research first.");return; }
-      get("request-form").reset();get("request-form").dataset.submitting="false";
+      get("request-form").reset();get("request-bounds").hidden=data.synthetic!==false;
+      get("request-max-institutions").value=context.bounds?.institutions ?? 5;get("request-max-programs").value=context.bounds?.programs ?? 5;get("request-form").dataset.submitting="false";
       get("request-countries").textContent=draft.countries.map(countryLabel).join(" · ");
       get("request-scope").value=context.scope || "country_conditions";
       get("request-scope").querySelector('option[value="refresh"]').disabled=!draft.parent_request_id;
@@ -142,7 +143,7 @@
   get("request-form").addEventListener("submit",async event=>{
     event.preventDefault();if(!draft || get("request-form").dataset.submitting==="true")return;
     const payload={...draft,scope:get("request-scope").value,preferences:Object.fromEntries(preferenceFields.map(key=>[key,get("request-"+key).value || null])),
-      remember_preferences:!get("request-only").checked,limits:get("request-limits").value || null,context:get("request-context").value || null};
+      ...(data.synthetic===false ? {bounds:{institutions:Number(get("request-max-institutions").value),programs:Number(get("request-max-programs").value)}} : {}),remember_preferences:!get("request-only").checked,limits:get("request-limits").value || null,context:get("request-context").value || null};
     get("request-form").dataset.submitting="true";get("request-submit").disabled=true;get("cancel-request").disabled=true;get("close-request").disabled=true;
     try {
       const saved=await post("/api/research/submit",payload);
@@ -176,19 +177,19 @@
     },"copy-research-handoff");
     box.append(prompt,copy);box.scrollIntoView({block:"nearest"});
   }
-  function renderList(identity) {
+  function renderList(identity,items=data.requests,archive=false) {
     const list=get("research-request-list");list.replaceChildren();
-    if(!data.requests?.length){list.append(node("p","No requests saved yet."));return;}
-    for(const item of data.requests){
+    if(!items?.length){list.append(node("p","No requests saved yet."));return;}
+    for(const item of items){
       const row=node("button",undefined,"request-row");row.type="button";row.dataset.request=item.request_id;row.setAttribute("aria-current",String(item.request_id===identity));
       row.append(node("strong",scopeLabels[item.scope]),node("span",item.countries.map(countryLabel).join(", ")),node("span",stateLabel(item.state)),node("span",dateLabel(item.created_at)));
-      row.addEventListener("click",()=>openRequests(item.request_id));list.append(row);
+      row.addEventListener("click",()=>openRequests(item.request_id,null,null,archive));list.append(row);
     }
   }
   function stateLabel(state) {
     return {prepared:"Prepared locally — not acknowledged",accepted:"Acknowledged — no execution progress reported",rejected:"Acknowledgement rejected",needs_clarification:"Clarification requested",results_received:"Results received — review findings"}[state] || state;
   }
-  async function openRequests(identity=null,revision=null,finding=null) {
+  async function openRequests(identity=null,revision=null,finding=null,archive=false) {
     const sequence=++openSequence;
     if(!researchDialog.open)researchDialog.showModal();
     get("research-message").className="";get("research-message").textContent="Loading…";
@@ -196,14 +197,16 @@
     get("research-request-detail").replaceChildren(node("p","Loading the selected request…"));
     try {
       await reload();if(sequence!==openSequence)return;
-      identity=identity || data.requests?.[0]?.request_id;
-      renderList(identity);
-      if(!identity){get("research-request-detail").replaceChildren(node("p","Save countries and select them for research in the map panel to prepare your first request."));get("research-message").textContent="";return;}
-      const response=await fetch("/api/research/requests/"+encodeURIComponent(identity),{cache:"no-store"});
+      const archiveItems=archive ? (await (await fetch("/api/local/history")).json()).requests : null;
+      const items=archive ? archiveItems : data.requests;
+      identity=identity || items?.[0]?.request_id;
+      renderList(identity,items,archive);
+      if(!identity){get("research-request-detail").replaceChildren(node("p",archive ? "No sample requests were saved. The original sample workspace remains preserved." : "Save countries and select them for research in the map panel to prepare your first request."));get("research-message").textContent=archive ? "Sample history · read only." : "";return;}
+      const response=await fetch((archive ? "/api/local/history/" : "/api/research/requests/")+encodeURIComponent(identity),{cache:"no-store"});
       if(!response.ok)throw new Error("Could not load this request.");
       const detail=await response.json();if(sequence!==openSequence)return;
       current=detail;currentRevision=revision;currentFinding=finding;
-      renderDetail();get("research-message").textContent="Manual synthetic pilot. No real research or automatic agent execution.";
+      renderDetail();get("research-message").textContent=archive ? "Sample history · read only. These are invented examples, separate from real research." : data.synthetic===false ? "Private local research. Dave runs only when you manually invoke him." : "Manual synthetic pilot. No real research or automatic agent execution.";
     }catch(error){get("research-message").textContent=error.message;get("research-message").className="research-error";}
   }
   function renderDetail() {
@@ -211,18 +214,18 @@
     const section=get("research-request-detail");section.dataset.request=request.request_id;section.replaceChildren();
     const item=data.requests.find(item=>item.request_id===request.request_id);
     section.append(node("h3",scopeLabels[request.scope]),node("p",request.countries.map(countryLabel).join(" · ")),
-      node("p",stateLabel(item?.state || "prepared"),"request-state"));
+      node("p",current.archive ? "Sample history · read only" : stateLabel(item?.state || "prepared"),"request-state"));
     const snapshot=node("details",undefined,"request-technical");snapshot.append(node("summary","Preference snapshot — fixed for this request"));
     for(const key of preferenceFields)snapshot.append(node("p",`${preferenceLabels[key]}: ${request.preferences[key] || "Unknown"}`));
     snapshot.append(node("p",`Request-specific limits: ${request.limits || "Unknown"}`),node("p",`Context: ${request.context || "None supplied"}`));section.append(snapshot);
     const actions=node("div",undefined,"result-actions");
     actions.append(action("Prepare private handoff",()=>handoff(request.request_id),"prepare-research-handoff"),
-      action("Prepare follow-up",()=>openRequest({countries:request.countries,scope:"refresh",parent_request_id:request.request_id,parent_request_revision:request.revision,parent_request_digest:request.digest,prior_results:current.results.length ? [{result_id:current.results.at(-1).envelope.result_id,revision:current.results.at(-1).envelope.revision,digest:current.results.at(-1).envelope.digest,finding_id:null,finding_revision:null}]:[]}),"request-follow-up"));
-    if(request.parent_request_id)actions.append(action("View parent request",()=>openRequests(request.parent_request_id)));
+      action("Prepare follow-up",()=>openRequest({countries:request.countries,scope:"refresh",bounds:request.bounds,parent_request_id:request.request_id,parent_request_revision:request.revision,parent_request_digest:request.digest,prior_results:current.results.length ? [{result_id:current.results.at(-1).envelope.result_id,revision:current.results.at(-1).envelope.revision,digest:current.results.at(-1).envelope.digest,finding_id:null,finding_revision:null}]:[]}),"request-follow-up"));
+    if(request.parent_request_id)actions.append(action("View parent request",()=>openRequests(request.parent_request_id,null,null,!!current.archive)));
     if(request.legacy) { for(const id of ["prepare-research-handoff","request-follow-up"]) actions.querySelector("#"+id).disabled=true; section.append(node("p","Legacy synthetic history — original digest semantics preserved. Prepare a new request to use the corrected handoff.")); }
     section.append(actions,technical("Identifiers & exact request binding",{request:request.request_id,revision:request.revision,digest:request.digest}));
     // Response and revision review shares this dialog through its synthetic adapter.
-    if(window.GradCompassResearchReview)window.GradCompassResearchReview.render({section,current,revision:currentRevision,finding:currentFinding,openRequests,openRequest,handoff,post,reload,action,node,technical,notify:()=>window.dispatchEvent(new Event("grad-compass:discovery-updated"))});
+    if(window.GradCompassResearchReview)window.GradCompassResearchReview.render({section,current,revision:currentRevision,finding:currentFinding,openRequests:(id,rev,find)=>openRequests(id,rev,find,!!current.archive),openRequest,handoff,post,reload,action,node,technical,notify:()=>window.dispatchEvent(new Event("grad-compass:discovery-updated"))});
   }
   function resultLink(origin,label="Review source research") {
     const box=node("div",undefined,"result-origin");
@@ -235,5 +238,5 @@
   window.addEventListener("grad-compass:open-result",event=>openRequests(event.detail.request_id,event.detail.revision,event.detail.finding_id));
   // Changing map filters never changes the pending multi-country selection.
   get("research-selected").addEventListener("click",()=>window.dispatchEvent(new CustomEvent("grad-compass:prepare-request",{detail:{countries:[...selected]}})));
-  window.GradCompassResearch=Object.freeze({hydrate,personal,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests,resultLink});
+  window.GradCompassResearch=Object.freeze({hydrate,personal,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests,resultLink,openArchive:()=>openRequests(null,null,null,true)});
 })();

@@ -1,4 +1,4 @@
-"""Marked app-owned synthetic research state; no producer access or agent execution."""
+"""Marked app-owned research state and manual exports; never executes agents."""
 from contextlib import closing
 import os
 import json
@@ -14,6 +14,8 @@ MARKER = "grad-compass-research-demo-v1"
 
 
 class ResearchWorkspace:
+    synthetic = True
+    marker = MARKER
     def __init__(self, workspace, clock=None, id_factory=None):
         self.clock = clock or envelopes.now
         self.id_factory = id_factory or uuid4
@@ -29,11 +31,11 @@ class ResearchWorkspace:
                 with closing(sqlite3.connect(self.database)) as db, db:
                     db.executescript("""
                         CREATE TABLE app_research_guard(marker TEXT NOT NULL);
-                        INSERT INTO app_research_guard VALUES('grad-compass-research-demo-v1');
                         CREATE TABLE country_personal(code TEXT PRIMARY KEY,
                             watched INTEGER NOT NULL DEFAULT 0 CHECK(watched IN (0,1)),
                             note TEXT NOT NULL DEFAULT '');
                     """)
+                    db.execute("INSERT INTO app_research_guard VALUES(?)", (self.marker,))
             with closing(self.connect()) as db, db:
                 db.executescript("""
                     CREATE TABLE IF NOT EXISTS research_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
@@ -55,7 +57,7 @@ class ResearchWorkspace:
 
     def _guard_paths(self):
         if any(path.is_symlink() for path in (self.directory, *self.directory.parents)):
-            raise ValueError("Research state requires an unlinked synthetic workspace")
+            raise ValueError("Research state requires an unlinked workspace")
         for suffix in ("", "-wal", "-shm", "-journal"):
             path = type(self.database)(str(self.database) + suffix)
             if path.is_symlink() or (path.exists() and (not path.is_file() or path.stat().st_nlink != 1)):
@@ -66,21 +68,20 @@ class ResearchWorkspace:
             pass
         self._guard_paths()
         if not self.database.is_file():
-            raise ValueError("The synthetic research workspace is missing")
+            raise ValueError("The research workspace is missing")
         db = sqlite3.connect(self.database.as_uri() + "?mode=rw", uri=True, timeout=10)
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA foreign_keys=ON")
         try:
-            if [row[0] for row in db.execute("SELECT marker FROM app_research_guard")] != [MARKER]:
-                raise ValueError("A marked synthetic research workspace is required")
+            if [row[0] for row in db.execute("SELECT marker FROM app_research_guard")] != [self.marker]:
+                raise ValueError("A marked research workspace is required")
         except (sqlite3.Error, ValueError):
             db.close()
-            raise ValueError("A marked synthetic research workspace is required") from None
+            raise ValueError("A marked research workspace is required") from None
         return db
 
-    @staticmethod
-    def _body(row):
-        return envelopes.saved(row["body"]) if row else None
+    def _body(self, row):
+        return envelopes.saved(row["body"], synthetic=self.synthetic) if row else None
 
     def snapshot(self):
         with self.lock, closing(self.connect()) as db:
@@ -94,7 +95,7 @@ class ResearchWorkspace:
                     "scope":request["scope"],"countries":request["countries"],"created_at":request["created_at"],
                     "state":"results_received" if count else ack["state"] if ack else "prepared", "result_count":count,
                     "execution_progress":ack.get("execution_progress") if ack else None})
-            return {"synthetic":True,"countries":{row["code"]:{"watched":bool(row["watched"]),"note":row["note"]}
+            return {"synthetic":self.synthetic,"countries":{row["code"]:{"watched":bool(row["watched"]),"note":row["note"]}
                     for row in db.execute("SELECT * FROM country_personal ORDER BY code")},"requests":requests,
                     "has_preferences":preference is not None,
                     "preferences":json.loads(preference[0]) if preference else {key:None for key in envelopes.PREFERENCE_FIELDS}}
@@ -156,7 +157,7 @@ class ResearchWorkspace:
                           or finding["country_code"] not in values["country_codes"]):
                         raise ValueError("The prior finding revision does not match the selected country/result")
                 identity = str(self.id_factory())
-                request = envelopes.seal({"schema_version":envelopes.PRIVATE_VERSION,"synthetic":True,"envelope_kind":"request",
+                request = envelopes.seal({"schema_version":envelopes.PRIVATE_VERSION,"synthetic":self.synthetic,"envelope_kind":"request",
                     "request_id":identity,"request_revision":1,"created_at":self.clock(),
                     "owner_id":db.execute("SELECT value FROM research_meta WHERE key='owner_id'").fetchone()[0],"profile_reference":None,
                     **values, "prior_results":[{"result_id":ref["result_id"],"result_revision":ref["revision"],"result_digest":ref["digest"],
@@ -238,14 +239,24 @@ class ResearchWorkspace:
             if value.get("legacy"):
                 raise ValueError("Legacy synthetic records keep their original semantics; export a new corrected request instead")
             path=self._write_private_file(kind+"-"+identity+".json",value["_transport"]["body"].encode("utf-8"))
-            self._write_private_file(kind+"-"+identity+".ref.json",{"file":path.name,"sha256":value["digest"],"synthetic":True})
-            index={"synthetic":True,"requests":[{key:item[key] for key in ("request_id","revision","digest","state")} for item in self.snapshot()["requests"]]}
+            self._write_private_file(kind+"-"+identity+".ref.json",{"file":path.name,"sha256":value["digest"],"synthetic":self.synthetic})
+            index={"synthetic":self.synthetic,"requests":[{key:item[key] for key in ("request_id","revision","digest","state")} for item in self.snapshot()["requests"]]}
             self._write_private_file("index.json",index,replace=True)
-            prompt=(f"Dave — synthetic app pilot only. Review the private {kind} file at {path}. "
-                    f"Reference: {identity}; digest: {value['digest']}. "
-                    f"Request: {request_id}, revision 1; request digest: {current['request']['digest']}. "
-                    "Acknowledge the exact request revision/digest. No real research or automatic agents are authorized by this handoff. "
-                    "Keep the private contents out of the public mailbox.")
+            if self.synthetic:
+                prompt=(f"Dave — synthetic app pilot only. Review the private {kind} file at {path}. "
+                        f"Reference: {identity}; digest: {value['digest']}. "
+                        f"Request: {request_id}, revision 1; request digest: {current['request']['digest']}. "
+                        "Acknowledge the exact request revision/digest. No real research or automatic agents are authorized by this handoff. "
+                        "Keep the private contents out of the public mailbox.")
+            else:
+                prompt=(f"Dave — manual Grad Compass request. Read {kind} file {path}. "
+                        f"Exact SHA-256: {value['digest']}. Request {request_id}, revision {current['request']['revision']}; "
+                        f"request SHA-256 {current['request']['digest']}. "
+                        "Stay within the saved request's countries, scope and limits. Coordinate research and Alex's independent review; "
+                        "preserve actual agent-review and human-approval states, evidence, caveats and unknowns. "
+                        f"Return bound acknowledgement/result transport JSON files to {self.directory / 'inbox'}. "
+                        "No automatic invocation, outreach, faculty investigation or profile/CV transfer is authorized. "
+                        "Request submission is not factual acceptance. Copying this handoff is not delivery or acknowledgement.")
             return {"prompt":prompt,"path":str(path),"digest":value["digest"],"kind":kind}
 
     def demo_response(self, request_id, choice):
@@ -288,7 +299,7 @@ class ResearchWorkspace:
                     if previous["_transport"]!=transport: raise ValueError("This result revision already has different contents")
                     return {"changed":False,**self.request(request_id)}
                 ack=self._body(db.execute("SELECT body FROM research_acks WHERE request_id=?",(request_id,)).fetchone())
-                if not ack or ack["state"]!="accepted": raise ValueError("Record an explicit accepted demo acknowledgement before results")
+                if not ack or ack["state"]!="accepted": raise ValueError("Record an explicit accepted producer acknowledgement before results")
                 if value["revision"]>1:
                     prior=self._body(db.execute("SELECT body FROM research_results WHERE id=? AND revision=?",(value["result_id"],value["previous_result_revision"])).fetchone())
                     if not prior or prior["digest"]!=value["previous_result_digest"]:
@@ -320,7 +331,7 @@ class ResearchWorkspace:
                 if any(previous.get(key)!=val for key,val in fields.items()):
                     raise ValueError("This feedback submission was already saved with different contents")
                 return previous
-            value=envelopes.seal({"schema_version":envelopes.PRIVATE_VERSION,"synthetic":True,"envelope_kind":"feedback",
+            value=envelopes.seal({"schema_version":envelopes.PRIVATE_VERSION,"synthetic":self.synthetic,"envelope_kind":"feedback",
                 "feedback_id":submission_key,"created_at":self.clock(),"follow_up_request":None,**fields})
             db.execute("INSERT INTO research_feedback VALUES(?,?,?,?,?)",(submission_key,request_id,result_id,revision,envelopes.storage(value)))
         return value

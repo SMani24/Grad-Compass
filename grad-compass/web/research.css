@@ -123,3 +123,5 @@ textarea:focus-visible { outline: 3px solid #56b9d5; outline-offset: 3px; }
   #country-selection-actions:not([hidden]) { gap: 6px; }
   #country-selection-dialog { padding: 18px 14px; }
 }
+.local-message { position: fixed; z-index: 9; bottom: 24px; right: 68px; max-width: min(600px,calc(100vw - 92px)); padding: 12px 16px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px #15304420; font-size: .75rem; overflow-wrap: anywhere; }
+#local-settings { margin: 18px 0; font-size: .75rem; line-height: 1.6; }

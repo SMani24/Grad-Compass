@@ -34,11 +34,12 @@ SUMMARIES = {
 def detail(workspace, exchange, code):
     if code not in COUNTRY_CODES:
         return None
-    supplied = code in SUMMARIES
-    result = {"code": code, "synthetic": True, "revision": f"app-country-demo-{code}-r1" if supplied else None,
+    operational=getattr(workspace,"operational",False)
+    supplied = code in SUMMARIES and not operational
+    result = {"code": code, "synthetic": not operational, "revision": f"app-country-demo-{code}-r1" if supplied else None,
         "review_status": "unreviewed_demo" if supplied else "not_researched",
         "coverage": "partial" if supplied else "not_researched",
-        "summary": SUMMARIES.get(code, "No country research has been supplied in this synthetic workspace."),
+        "summary": SUMMARIES[code] if supplied else "No country research has been received yet. You can save this country and request research.",
         "sources": [{"source_url": f"https://example.invalid/country-demo/{code.lower()}",
                      "locator": "Invented country briefing · demonstration only", "observed_at": "2026-10-13"}] if supplied else [],
         "uncertainties": ["No real eligibility, visa, tuition or funding evidence is supplied.",
@@ -48,7 +49,8 @@ def detail(workspace, exchange, code):
 
     latest = workspace.research.latest_country(code)
     if latest:
-        result.update({key:latest[key] for key in ("summary","sources","uncertainties","review_status","funding_routes","costs","work_rules","observed_at")})
+        result.update({key:latest.get(key) for key in ("summary","sources","uncertainties","review_status","funding_routes","costs","work_rules","observed_at")})
+        if "findings" in latest:result["findings"]=latest["findings"]
         result.update({key:latest[key] for key in ("country_record_id","record_revision","finding_id","finding_revision","review","human_approval","evidence_status","finding_ref") if key in latest})
         result.update(revision=latest["source_revision"],origin=latest["origin"],history=latest["history"],coverage="partial")
     else:

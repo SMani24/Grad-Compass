@@ -25,7 +25,7 @@ def entry_text():
         "Type=Application",
         "Name=Grad Compass",
         "GenericName=Graduate Application Workspace",
-        "Comment=Review the map workspace with synthetic sample data",
+        "Comment=Explore saved countries and review local graduate research",
         f"Exec={quoted(interpreter)} -B {quoted(APP_ROOT / 'scripts' / 'launch_preview.py')}",
         f"Path={string_value(APP_ROOT.parent)}",
         f"Icon={string_value(APP_ROOT / 'ui' / 'assets' / 'grad-compass.svg')}",

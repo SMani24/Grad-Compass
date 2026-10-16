@@ -46,12 +46,14 @@ def promoted_discovery(exchange):
 
 def overview(workspace, exchange):
     result = workspace.overview()
+    if getattr(workspace,"operational",False):return result
     promoted = promoted_discovery(exchange)
     result["universities"].extend(detail["university"] for detail in promoted.values())
     return result
 
 
 def university(workspace, exchange, identity):
+    if getattr(workspace,"operational",False):return workspace.university(identity)
     if identity.startswith("exchange-"):
         result = promoted_discovery(exchange).get(identity)
         if result:

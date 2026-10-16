@@ -21,6 +21,7 @@ DEMO_MARKER = "grad-compass-app-demo-v1"
 STATIC_FILES = {
     "/": (APP_ROOT / "web" / "index.html", "text/html; charset=utf-8"),
     "/styles.css": (APP_ROOT / "web" / "styles.css", "text/css; charset=utf-8"),
+    "/local_ui.js": (APP_ROOT / "web" / "local_ui.js", "text/javascript; charset=utf-8"),
     "/app.js": (APP_ROOT / "web" / "app.js", "text/javascript; charset=utf-8"),
     "/research_review.js": (APP_ROOT / "web" / "research_review.js", "text/javascript; charset=utf-8"),
     "/research.js": (APP_ROOT / "web" / "research.js", "text/javascript; charset=utf-8"),
@@ -195,7 +196,13 @@ def handler_for(workspace, exchange=None, session_token=None):
                     return self.respond(200,(APP_ROOT/"ui/data/countries.geo.json").read_bytes())
                 if route == "/api/workspace":
                     from web.discovery import overview
-                    return self.respond(200,{**overview(workspace, exchange), "country_decisions": workspace.country_decisions(), "research": workspace.research.snapshot(), "session": session_token})
+                    return self.respond(200,{**overview(workspace, exchange), "country_decisions": workspace.country_decisions(), "research": workspace.research.snapshot(), "session": session_token, "receipt": getattr(workspace,"last_receipt",None)})
+                if route == "/api/local/history" and getattr(workspace,"operational",False):
+                    return self.respond(200,workspace.archived_requests())
+                archive_match = re.fullmatch(r"/api/local/history/([a-f0-9-]{36})",route)
+                if archive_match and getattr(workspace,"operational",False):
+                    result=workspace.archived_requests(archive_match[1])
+                    return self.respond(200,result) if result else self.respond(404,{"error":"Archived request not found"})
                 request_match = re.fullmatch(r"/api/research/requests/([a-f0-9-]{36})",route)
                 if request_match:
                     return self.respond(200,workspace.research.request(request_match[1]))
@@ -213,14 +220,14 @@ def handler_for(workspace, exchange=None, session_token=None):
                     from web.country_evidence import detail
                     result = detail(workspace, exchange, country[1])
                     return self.respond(200,result) if result else self.respond(404,{"error":"Country not found"})
-                match = re.fullmatch(r"/api/universities/((?:exchange-)?[1-9][0-9]{0,9})",route)
+                match = re.fullmatch(r"/api/universities/((?:exchange-)?[1-9][0-9]{0,9}|local-[a-f0-9-]{36})",route)
                 if match:
                     from web.discovery import university
                     result = university(workspace, exchange, match[1])
                     return self.respond(200,result) if result else self.respond(404,{"error":"University not found"})
                 return self.respond(404,{"error":"Not found"})
             except (OSError,ValueError,sqlite3.Error):
-                self.respond(500,{"error":"Could not load the preview workspace"})
+                self.respond(500,{"error":"Could not load the workspace"})
 
         def do_POST(self):
             route = urlsplit(self.path).path
@@ -230,21 +237,29 @@ def handler_for(workspace, exchange=None, session_token=None):
             research_action = route.removeprefix("/api/research/")
             research_operation = research_action in research_actions and route == "/api/research/"+research_action
             personal_decision = route == "/api/country-decisions"
+            local_action = route.removeprefix("/api/local/")
+            local_operation = getattr(workspace,"operational",False) and route in ("/api/local/refresh","/api/local/backup")
             preferences = route == "/api/display-preferences"
-            if not (preferences or personal_decision or research_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
-                return self.respond(405,{"error":"This preview endpoint is read-only"})
+            if not (preferences or personal_decision or research_operation or local_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
+                return self.respond(405,{"error":"This endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"
             if (self.headers.get("Host") != origin.removeprefix("http://")
                 or self.headers.get("Origin", origin) != origin
                 or not session_token
                 or not secrets.compare_digest(self.headers.get("X-Grad-Compass-Session", ""), session_token or "")):
-                return self.respond(403, {"error": "Use this app session to save changes in the disposable workspace"})
+                return self.respond(403, {"error": "Use this app session to save workspace changes"})
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= (196608 if research_operation else 16384) or self.headers.get("Content-Type") != "application/json":
+                if not 0 < length <= (8_000_000 if getattr(workspace,"operational",False) and research_operation else 196608 if research_operation else 16384) or self.headers.get("Content-Type") != "application/json":
                     raise ValueError("A small JSON request is required")
                 from web.research_envelopes import loads
                 payload = loads(self.rfile.read(length))
+                if local_operation:
+                    if payload != {}:raise ValueError("Use the local workspace action without extra fields")
+                    if local_action == "backup":return self.respond(200,workspace.backup())
+                    workspace.backup()
+                    workspace.last_receipt=workspace.research.scan_inbox()
+                    return self.respond(200,workspace.last_receipt)
                 if research_operation:
                     if not isinstance(payload,dict): raise ValueError("Review the research form fields")
                     if research_action == "country": result = workspace.research.save_country(payload)

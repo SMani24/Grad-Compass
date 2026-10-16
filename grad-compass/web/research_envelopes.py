@@ -79,19 +79,19 @@ def packet(value):
     return {"body":body, "sha256":hashlib.sha256(body.encode("utf-8")).hexdigest()}
 
 
-def verify(transport):
+def verify(transport, *, synthetic=True, max_bytes=180000):
     """Hash original bytes before decoding; never canonicalize an incoming body."""
     if not isinstance(transport, dict) or set(transport) != {"body", "sha256"} or not isinstance(transport["body"], str):
         raise ValueError("Use an exact-byte body and its separate SHA-256 reference")
     digest_reference(transport["sha256"])
     try: raw = transport["body"].encode("utf-8", errors="strict")
     except UnicodeError: raise ValueError("Use valid UTF-8 envelope bytes") from None
-    if len(raw) > 180000 or hashlib.sha256(raw).hexdigest() != transport["sha256"]:
+    if len(raw) > max_bytes or hashlib.sha256(raw).hexdigest() != transport["sha256"]:
         raise ValueError("The original envelope bytes no longer match their digest")
     value = loads(raw)
-    if (not isinstance(value, dict) or value.get("synthetic") is not True
+    if (not isinstance(value, dict) or value.get("synthetic") is not synthetic
         or value.get("schema_version") != PRIVATE_VERSION or "digest" in value or "_transport" in value):
-        raise ValueError("Only corrected app-owned synthetic 0.1.0 envelopes are accepted")
+        raise ValueError("Use a 0.1.0 envelope with the workspace’s authorized data scope")
     try:
         # UI aliases are outside exchanged bytes. Wire names are the agreed schema names.
         view = {**value, "digest":transport["sha256"], "_transport":transport}
@@ -105,20 +105,21 @@ def verify(transport):
         elif value["envelope_kind"] == "acknowledgement": view["created_at"] = value["acknowledged_at"]
         return view
     except (KeyError, TypeError):
-        raise ValueError("The synthetic envelope is missing required typed fields") from None
+        raise ValueError("The envelope is missing required typed fields") from None
 
 
 def seal(value):
-    return verify(packet(value))
+    return verify(packet(value), synthetic=value.get("synthetic") is True, max_bytes=4_000_000 if value.get("synthetic") is False else 180000)
 
 
 def storage(value):
     return compact(value["_transport"])
 
 
-def saved(raw):
+def saved(raw, *, synthetic=True):
     value = loads(raw)
-    if isinstance(value, dict) and set(value) == {"body", "sha256"}: return verify(value)
+    if isinstance(value, dict) and set(value) == {"body", "sha256"}: return verify(value, synthetic=synthetic, max_bytes=4_000_000 if not synthetic else 180000)
+    if not synthetic: raise ValueError("Operational records require exact-byte transport storage")
     # Preserve old synthetic history without changing its bytes or claiming new semantics.
     if (not isinstance(value, dict) or value.get("synthetic") is not True or value.get("private_schema_version") != PRIVATE_VERSION
         or value.get("envelope_kind") not in {"request","acknowledgement","result","feedback"}
@@ -136,7 +137,7 @@ def text(value, maximum=2000):
 
 def request_values(payload):
     allowed = {"submission_key", "countries", "scope", "preferences", "remember_preferences", "limits", "context",
-               "parent_request_id", "parent_request_revision", "parent_request_digest", "prior_results"}
+               "parent_request_id", "parent_request_revision", "parent_request_digest", "prior_results", "bounds"}
     if not isinstance(payload, dict) or set(payload)-allowed: raise ValueError("Review the research request fields")
     identifier(payload.get("submission_key"))
     countries = payload.get("countries")
@@ -163,9 +164,15 @@ def request_values(payload):
         raise ValueError("Select an exact saved result and finding revision")
     if references and not parent: raise ValueError("Prior results must belong to the bound parent request")
     if payload["scope"] == "refresh" and not parent: raise ValueError("Choose the previous request for this follow-up")
-    return {"country_codes":countries, "scope":payload["scope"], "preference_snapshot":preferences,
+    result = {"country_codes":countries, "scope":payload["scope"], "preference_snapshot":preferences,
             "limits":text(payload.get("limits")), "context":text(payload.get("context"),4000),
             "parent_request_id":parent, "parent_request_revision":parent_revision, "parent_request_digest":parent_digest, "prior_results":references}
+    if "bounds" in payload:
+        bounds=payload["bounds"]
+        if not isinstance(bounds,dict) or set(bounds)!={"institutions","programs"} or any(type(v) is not int or not 0<=v<=200 for v in bounds.values()):
+            raise ValueError("Set bounded institution/program counts between 0 and 200")
+        result["bounds"]=bounds
+    return result
 
 
 def opaque(value):

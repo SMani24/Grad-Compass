@@ -83,7 +83,7 @@ if (typeof module !== "undefined") module.exports = { hasCoordinates, filterUniv
 
 if (typeof document !== "undefined") {
   const get = id => document.getElementById(id);
-  const state = { universities: [], filtered: [], selected: null, view: "map", mode: "universities", selectedCountry: null, decisions: {}, session: null, countries: [], geometry: null, map: null, polygons: null, markers: null, mapError: false, detailSequence: 0 };
+  const state = { operational: false, universities: [], filtered: [], selected: null, view: "map", mode: "universities", selectedCountry: null, decisions: {}, session: null, countries: [], geometry: null, map: null, polygons: null, markers: null, mapError: false, detailSequence: 0 };
   const elements = { search: get("search"), country: get("country"), status: get("status"), results: get("results"), inspector: get("inspector") };
   let navigationIndex = 0;
   let navigationEnd = 0;
@@ -196,7 +196,7 @@ if (typeof document !== "undefined") {
   }
   function updateUrl(replace = false) {
     const url = new URL(location.href);
-    if (state.mode === "countries") url.searchParams.set("mode", "countries"); else url.searchParams.delete("mode");
+    if (state.operational || state.mode === "countries") url.searchParams.set("mode",state.mode); else url.searchParams.delete("mode");
     if (get("country-list-scope").value === "watched") url.searchParams.set("watchlist", "1"); else url.searchParams.delete("watchlist");
     if (state.view === "list") url.searchParams.set("view", "list"); else url.searchParams.delete("view");
     if (state.selectedCountry) url.searchParams.set("countryDetails", "1"); else url.searchParams.delete("countryDetails");
@@ -288,7 +288,7 @@ if (typeof document !== "undefined") {
       close.addEventListener("click", closeInspector);
       top.append(node("span", "eyebrow", "COUNTRY DETAILS"), close);
       elements.inspector.replaceChildren(top, node("div", "institution-symbol", country?.flag || "🌐"), node("h2", "", country?.name || code));
-      elements.inspector.append(node("p", "research-state", detail.review_status === "unreviewed_demo" ? "Invented evidence · unreviewed demo" : ["pending","accepted","rejected"].includes(detail.review_status) ? `Invented evidence · review ${detail.review_status}` : "Country evidence not researched"));
+      elements.inspector.append(node("p", "research-state", detail.synthetic===false ? (detail.review_status==="not_researched" ? "Country research not received yet" : `Agent factual review · ${detail.review_status}`) : detail.review_status === "unreviewed_demo" ? "Invented evidence · unreviewed demo" : ["pending","accepted","rejected"].includes(detail.review_status) ? `Invented evidence · review ${detail.review_status}` : "Country evidence not researched"));
       elements.inspector.append(window.GradCompassResearch.detailControls(code));
       const personal = node("section", "country-personal");
       const label = node("label", "", "Your personal decision"); label.htmlFor = "country-decision";
@@ -321,10 +321,12 @@ if (typeof document !== "undefined") {
       });
       elements.inspector.append(explore);
       elements.inspector.append(node("h3", "", "Research summary"), node("p", "country-summary", detail.summary));
-      for(const [field,title] of [["funding_routes","Funding routes"],["costs","Costs"],["work_rules","Work rules"]]) {
+      if(detail.synthetic===false && detail.findings)window.GradCompassLocal?.countryFindings(elements.inspector,detail.findings);
+      for(const [field,title] of (detail.synthetic===false && detail.findings ? [] : [["funding_routes","Funding routes"],["costs","Costs"],["work_rules","Work rules"]])) {
         elements.inspector.append(node("h3","",title),node("p","",detail[field] || "Unknown — no evidence supplied."));
       }
       if(detail.observed_at) elements.inspector.append(metadata("Observed",detail.observed_at));
+      if(detail.synthetic===false && detail.human_approval)elements.inspector.append(metadata("Human approval",detail.human_approval.state));
       if(detail.origin) {
         elements.inspector.append(window.GradCompassResearch.resultLink(detail.origin));
         const history=node("details","source-details");history.append(node("summary","","Earlier research revisions"));
@@ -336,7 +338,7 @@ if (typeof document !== "undefined") {
       for (const source of detail.sources) {
         const card = node("div", "detail-card country-source");
         const url = safeExternalUrl(source.source_url);
-        const link = node(url ? "a" : "span", "", "Synthetic source · example only");
+        const link = node(url ? "a" : "span", "", detail.synthetic===false ? "Source · "+(source.source_id || "research evidence") : "Synthetic source · example only");
         if (url) { link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer"; }
         card.append(link, node("p", "", source.source_url), node("p", "", source.locator), node("p", "", "Observed " + source.observed_at)); elements.inspector.append(card);
       }
@@ -345,7 +347,7 @@ if (typeof document !== "undefined") {
       elements.inspector.append(node("p", "country-coverage", detail.university_count + " saved universities here. Empty results indicate missing coverage, not unsuitability."));
       if (detail.revision) {
         const revision=node("details","source-details");
-        revision.append(node("summary","","Source revision details"),node("p","source-revision","Demo source revision: "+detail.revision));
+        revision.append(node("summary","","Source revision details"),node("p","source-revision",(detail.synthetic===false ? "Source revision: " : "Demo source revision: ")+detail.revision));
         elements.inspector.append(revision);
       }
       elements.inspector.focus({preventScroll:true});
@@ -389,20 +391,23 @@ if (typeof document !== "undefined") {
       }
       if (university.research) {
         const research = node("div", "metadata");
-        research.append(metadata("Research review", university.research.review), metadata("Import status", "Promoted · synthetic"));
+        research.append(metadata("Research review", university.research.review), metadata("Import status", university.synthetic===false ? "Received · local workspace" : "Promoted · synthetic"));
         const source = node("details", "source-details");
         source.append(node("summary", "", "Source identity & revision"), node("p", "", "ID: " + university.research.external_id), node("p", "", "Revision: " + university.research.revision));
         research.append(source); elements.inspector.append(research);
+        if(university.synthetic===false)window.GradCompassLocal?.evidence(elements.inspector,university.research.private,"Institution evidence & caveats");
       }
+      if(university.synthetic===false)window.GradCompassLocal?.location(elements.inspector,university.location);
       for(const origin of (detail.research_results || []).slice(0,1)) elements.inspector.append(window.GradCompassResearch.resultLink(origin));
       elements.inspector.append(node("h3", "", "Programs"));
-      if (!detail.programs?.length) elements.inspector.append(node("p", "", "No promoted programs saved yet."));
+      if (!detail.programs?.length) elements.inspector.append(node("p", "", state.operational ? "No programs received yet." : "No promoted programs saved yet."));
       for (const program of detail.programs || []) {
         const card = node("div", "detail-card program-card");
         card.dataset.program = program.id; card.dataset.externalProgram = program.external_id;
-        card.append(node("strong", "", program.name), node("p", "", program.degree_level), node("p", "", "Research review: " + program.review + " · Promoted synthetic record"));
+        card.append(node("strong", "", program.name), node("p", "", program.degree_level), node("p", "", "Research review: " + program.review + (state.operational ? " · Received local record" : " · Promoted synthetic record")));
         for (const claim of program.requirements) card.append(node("p", "", claim.kind.replaceAll("_", " ") + " · " + claim.intake + ": " + claim.value));
         if (!program.requirements.length) card.append(node("p", "", "No eligible intake claims supplied. This is incomplete evidence."));
+        if(state.operational)window.GradCompassLocal?.evidence(card,program.private,"Program evidence & caveats");
         for(const origin of (program.research_results || []).slice(0,1))card.append(window.GradCompassResearch.resultLink(origin));
         elements.inspector.append(card);
       }
@@ -542,7 +547,7 @@ if (typeof document !== "undefined") {
   window.GradCompassNavigation = Object.freeze({ back: goBack, forward: goForward });
   function applyLocation() {
     const url = new URL(location.href);
-    setMode(url.searchParams.get("mode") === "countries" ? "countries" : "universities", false, false);
+    setMode(url.searchParams.get("mode") === "countries" || (state.operational && !url.searchParams.get("mode") && !url.searchParams.get("university")) ? "countries" : "universities", false, false);
     get("country-list-scope").value = url.searchParams.get("watchlist") === "1" ? "watched" : "all";
     for (const name of ["country", "status", "search"]) elements[name].value = url.searchParams.get(name) || "";
     setView(url.searchParams.get("view") === "list" ? "list" : "map", false);
@@ -590,6 +595,7 @@ if (typeof document !== "undefined") {
     get("error").hidden = true;
     try {
       const result = await api("/api/workspace");
+      state.operational=!!result.operational;window.GradCompassWorkspace=result;window.dispatchEvent(new CustomEvent("grad-compass:workspace-loaded",{detail:result}));
       state.universities = result.universities;
       state.decisions = result.country_decisions || {}; state.session = result.session;
       window.GradCompassResearch.hydrate(result.research,state.session);

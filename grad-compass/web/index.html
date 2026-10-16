@@ -13,6 +13,7 @@
   <script defer src="/research_review.js"></script>
   <script defer src="/research.js"></script>
   <script defer src="/app.js"></script>
+  <script defer src="/local_ui.js"></script>
   <script defer src="/exchange.js"></script>
   <script defer src="/settings.js"></script>
 </head>
@@ -21,6 +22,7 @@
     <a class="brand" href="/" aria-label="Grad Compass home"><span class="brand-icon" aria-hidden="true">✦</span><span>Grad<span class="brand-light">Compass</span></span></a>
     <div class="navigation" role="group" aria-label="Workspace history"><button id="nav-back" type="button" aria-label="Go back" title="Go back (Alt+Left)" disabled>‹</button><button id="nav-forward" type="button" aria-label="Go forward" title="Go forward (Alt+Right)" disabled>›</button></div>
     <span class="nav-current">Discover <span class="nav-dot" aria-hidden="true"></span></span>
+    <button id="refresh-local" type="button" class="research-link" hidden>Refresh results</button>
     <button id="open-exchange" class="research-link" type="button">Research imports</button>
     <button id="open-settings" class="research-link" type="button">Settings</button>
     <div class="view-switch" role="group" aria-label="Discovery view"><button id="map-view" aria-pressed="true">◉ Map</button><button id="list-view" aria-pressed="false">☷ List</button></div>
@@ -66,6 +68,7 @@
       </section>
       <aside id="inspector" class="inspector" hidden aria-label="University details" tabindex="-1"></aside>
     </div>
+    <p id="local-message" class="local-message" role="status" hidden></p>
     <div id="error" class="error-banner" hidden role="alert"><span id="error-text"></span><button id="retry">Try again</button></div>
   </main>
   <dialog id="country-selection-dialog" aria-labelledby="country-selection-title" aria-describedby="country-selection-hint">
@@ -94,6 +97,7 @@
         </div>
       </details>
       <label class="request-exception"><input id="request-only" type="checkbox">Only for this request — keep my remembered preferences unchanged</label>
+      <div id="request-bounds" class="request-fields" hidden><div><label for="request-max-institutions">Maximum universities</label><input id="request-max-institutions" type="number" min="0" max="200" value="5" required></div><div><label for="request-max-programs">Maximum programs</label><input id="request-max-programs" type="number" min="0" max="200" value="5" required></div></div>
       <label for="request-limits">Limits for this request</label><textarea id="request-limits" maxlength="2000" rows="2" placeholder="e.g. up to five universities per country"></textarea>
       <label for="request-context">Context or feedback for this request</label><textarea id="request-context" maxlength="4000" rows="3" placeholder="This stays request-specific and never becomes a permanent restriction"></textarea>
       <p id="request-form-status" role="status" aria-live="polite"></p>
@@ -109,6 +113,7 @@
     <header class="exchange-header"><h2 id="settings-title">Settings</h2><button id="close-settings" class="inspector-close" type="button" aria-label="Close settings">×</button></header>
     <label for="text-size">Text size</label>
     <select id="text-size" disabled><option value="standard">Standard · 100%</option><option value="comfortable">Comfortable · 115%</option><option value="large">Large · 130%</option><option value="extra-large">Extra large · 150%</option></select>
+    <div id="local-settings" hidden><button id="backup-local" type="button" class="quiet-action">Create backup</button> <button id="sample-history" type="button" class="quiet-action">View sample history</button><p id="backup-status" role="status"></p><details><summary>Recovery</summary><p>Backups stay in your private workspace. Restore into a new empty workspace using the documented restore command; the current workspace is preserved.</p></details></div>
     <p class="settings-sample">Explore universities with text that feels comfortable to read.</p>
     <p id="settings-status" role="status" aria-live="polite">Loading your preference…</p>
   </dialog>

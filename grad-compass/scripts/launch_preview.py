@@ -1,4 +1,4 @@
-"""Open the map workspace in a desktop window using synthetic data only."""
+"""Open the persistent local map workspace; --preview opens separate sample data."""
 import argparse
 import json
 import logging
@@ -13,6 +13,7 @@ import time
 APP_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = APP_ROOT.parent
 PREVIEW_DIR = REPO_ROOT / "grad-compass-workspace" / "runtime" / "preview"
+LOCAL_DIR = REPO_ROOT / "grad-compass-workspace" / "runtime" / "local"
 EXCHANGE_DIR = REPO_ROOT / "grad-compass-workspace" / "runtime" / "exchange-ui"
 sys.path.insert(0, str(APP_ROOT))
 
@@ -36,6 +37,8 @@ def prepare_workspace(preview_directory=PREVIEW_DIR):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--preview", action="store_true", help="open the separate synthetic sample workspace")
+    parser.add_argument("--local-dir",type=Path,default=LOCAL_DIR,help="persistent private local workspace")
     parser.add_argument("--smoke-test", action="store_true", help="verify rendering and close automatically")
     parser.add_argument("--selection-smoke-test", action="store_true", help="verify map country multi-selection in disposable storage")
     parser.add_argument("--research-smoke-test", action="store_true", help="demonstrate a synthetic manual research round trip")
@@ -53,19 +56,29 @@ def main():
     temporary_exchange = tempfile.TemporaryDirectory(prefix="grad-compass-exchange-ui-check-") if (args.smoke_test or args.exchange_smoke_test or args.readability_smoke_test or args.country_smoke_test or args.research_smoke_test or args.selection_smoke_test) else None
     if temporary_exchange:
         args.smoke_test = True
-    directory = prepare_workspace(Path(temporary_preview.name) / "preview" if temporary_preview else PREVIEW_DIR)
+    local_mode=not args.smoke_test and not args.preview
+    if local_mode:
+        from web.local import LocalWorkspace
+        workspace=LocalWorkspace(args.local_dir,PREVIEW_DIR)
+        directory=workspace.directory
+    else:
+        directory = prepare_workspace(Path(temporary_preview.name) / "preview" if temporary_preview else PREVIEW_DIR)
     logging.basicConfig(filename=directory / "launcher.log", level=logging.WARNING)
     os.environ["QT_API"] = "pyqt6"
     import webview
     from web.server import create_server
 
-    server = create_server(directory, port=0, exchange_directory=Path(temporary_exchange.name) if temporary_exchange else args.exchange_dir)
+    if local_mode:
+        from web.local import create_local_server
+        server=create_local_server(workspace,port=0)
+    else:
+        server = create_server(directory, port=0, exchange_directory=Path(temporary_exchange.name) if temporary_exchange else args.exchange_dir)
     worker = threading.Thread(target=server.serve_forever, daemon=True)
     worker.start()
     result = {"passed": False}
     try:
         window = webview.create_window(
-            "Grad Compass — Map preview",
+            "Grad Compass" if local_mode else "Grad Compass — Sample workspace",
             f"http://127.0.0.1:{server.server_port}/",
             width=1440,
             height=960,
@@ -116,11 +129,17 @@ def main():
                     time.sleep(0.2)
                 else:
                     raise RuntimeError("Desktop workspace did not render its synthetic results")
-                focus = json.loads(window.run_js("""
-                    document.getElementById('search').focus();
-                    JSON.stringify({outline: getComputedStyle(document.getElementById('search')).outlineWidth})
-                """))
-                if focus["outline"] != "3px":
+                # Window-manager focus can arrive after page load. Check the real focused style.
+                window.restore()
+                focus_deadline=time.monotonic()+5
+                while time.monotonic()<focus_deadline:
+                    focus=json.loads(window.run_js("""
+                        document.getElementById('search').focus();
+                        JSON.stringify({active:document.hasFocus(),outline:getComputedStyle(document.getElementById('search')).outlineWidth})
+                    """))
+                    if focus['active'] and focus['outline']=='3px':break
+                    time.sleep(.1)
+                else:
                     raise RuntimeError("Keyboard focus styling did not render")
                 window.run_js("""
                     document.getElementById('country').value = 'FRA';
@@ -185,6 +204,7 @@ def main():
         server.shutdown()
         server.server_close()
         worker.join(timeout=5)
+        if local_mode:workspace.backup()
         if temporary_exchange:
             temporary_exchange.cleanup()
         if temporary_preview:
