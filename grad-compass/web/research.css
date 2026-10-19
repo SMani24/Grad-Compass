@@ -125,6 +125,11 @@ textarea:focus-visible { outline: 3px solid #56b9d5; outline-offset: 3px; }
 }
 .local-message { position: fixed; z-index: 9; bottom: 24px; right: 68px; max-width: min(600px,calc(100vw - 92px)); padding: 12px 16px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px #15304420; font-size: .75rem; overflow-wrap: anywhere; }
 #local-settings { margin: 18px 0; font-size: .75rem; line-height: 1.6; }
+.inbox-receipt { font-size: .75rem; line-height: 1.5; margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; }
+.inbox-receipt p,#inbox-workspace-status { overflow-wrap: anywhere; }
+#inbox-workspace-status { font-size: .6875rem; line-height: 1.5; color: var(--muted); }
+#inbox-errors { color: #a52620; }
+#results-ready { font-weight: 700; }
 .local-settings-section { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
 .active-profile { margin: 0 0 8px; font-size: .6875rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .preview-label { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

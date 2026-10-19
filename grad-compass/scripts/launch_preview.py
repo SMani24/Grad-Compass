@@ -67,11 +67,12 @@ def main():
     logging.basicConfig(filename=directory / "launcher.log", level=logging.WARNING)
     os.environ["QT_API"] = "pyqt6"
     import webview
+    from desktop_clipboard import DesktopClipboard
     from web.server import create_server
 
     if local_mode:
         from web.local import create_local_server
-        server=create_local_server(workspace,port=0,profiles=profiles)
+        server=create_local_server(workspace,port=0,profiles=profiles,clipboard=DesktopClipboard())
     else:
         server = create_server(directory, port=0, exchange_directory=Path(temporary_exchange.name) if temporary_exchange else args.exchange_dir)
     worker = threading.Thread(target=server.serve_forever, daemon=True)

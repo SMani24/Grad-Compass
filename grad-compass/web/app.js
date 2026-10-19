@@ -658,8 +658,10 @@ if (typeof document !== "undefined") {
       state.universities = result.universities;
       state.decisions = result.country_decisions || {}; state.session = result.session;
       window.GradCompassResearch.hydrate(result.research,state.session); render();
-      if (state.selected) selectUniversity(state.selected, false, false);
-      else if (state.selectedCountry) showCountry(state.selectedCountry);
+      const note=get('country-note');
+      const editing=event.detail?.automatic && (elements.inspector.contains(document.activeElement) || (note && note.value!==window.GradCompassResearch.personal(state.selectedCountry).note));
+      if (!editing && state.selected) selectUniversity(state.selected, false, false);
+      else if (!editing && state.selectedCountry) showCountry(state.selectedCountry);
     } catch {
       get("error-text").textContent = "Could not refresh promoted research. Please try again.";
       get("error").hidden = false;

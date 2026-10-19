@@ -169,25 +169,31 @@
     const exported=await post("/api/research/export",{request_id:requestId,...(feedbackId?{feedback_id:feedbackId}:{})});
     let box=get("research-handoff-box");
     if(!box){box=node("section");box.id="research-handoff-box";get("research-request-detail").prepend(box);}
-    box.replaceChildren(node("h3",feedbackId?"Feedback handoff ready":"Request handoff ready"),node("p","Prepared locally. Copy this reference to Dave manually; copying it does not record acknowledgement."));
+    box.replaceChildren(node("h3","Instructions for Dave"),node("p","Your request is already saved. Use these instructions to invoke Dave manually. Copying does not record acknowledgement. Responses will appear automatically."));
     const prompt=node("textarea",undefined,"handoff-text");prompt.id="research-handoff";prompt.readOnly=true;prompt.value=exported.prompt;prompt.rows=5;
-    const copy=action("Copy handoff",async()=>{
-      try {await navigator.clipboard.writeText(prompt.value);get("research-message").textContent="Copied. No delivery or acknowledgement has been assumed.";}
-      catch {prompt.focus();prompt.select();get("research-message").textContent="Select and copy the handoff text manually.";}
-    },"copy-research-handoff");
+    async function copyInstructions(){
+      try {
+        if(data.synthetic===false)await post('/api/local/copy-instructions',{request_id:requestId,...(feedbackId?{feedback_id:feedbackId}:{})});
+        else {prompt.focus();prompt.select();if(!document.execCommand('copy'))throw new Error('Select and copy the displayed instructions');}
+        get("research-message").textContent="Copied. Invoke Dave manually with these instructions. No acknowledgement has been assumed.";
+      }
+      catch {prompt.focus();prompt.select();get("research-message").textContent="Instructions ready. Select and copy the text, then manually invoke Dave.";}
+    }
+    const copy=action("Copy instructions for Dave",copyInstructions,"copy-research-handoff");
     box.append(prompt,copy);box.scrollIntoView({block:"nearest"});
+    await copyInstructions();
   }
   function renderList(identity,items=data.requests,archive=false) {
     const list=get("research-request-list");list.replaceChildren();
     if(!items?.length){list.append(node("p","No requests saved yet."));return;}
     for(const item of items){
       const row=node("button",undefined,"request-row");row.type="button";row.dataset.request=item.request_id;row.setAttribute("aria-current",String(item.request_id===identity));
-      row.append(node("strong",scopeLabels[item.scope]),node("span",item.countries.map(countryLabel).join(", ")),node("span",stateLabel(item.state)),node("span",dateLabel(item.created_at)));
+      row.append(node("strong",scopeLabels[item.scope]),node("span",item.countries.map(countryLabel).join(", ")),node("span",stateLabel(item.state,item.completion)),node("span",dateLabel(item.created_at)));
       row.addEventListener("click",()=>openRequests(item.request_id,null,null,archive));list.append(row);
     }
   }
-  function stateLabel(state) {
-    return {prepared:"Prepared locally — not acknowledged",accepted:"Acknowledged — no execution progress reported",rejected:"Acknowledgement rejected",needs_clarification:"Clarification requested",results_received:"Results received — review findings"}[state] || state;
+  function stateLabel(state,completion) {
+    return {prepared:"Saved — awaiting Dave’s acknowledgement",accepted:"Acknowledged — awaiting findings",rejected:"Acknowledgement rejected",needs_clarification:"Clarification requested",results_received:completion==='partial' ? "Partial results ready — research continues" : "Results ready — review findings"}[state] || state;
   }
   async function openRequests(identity=null,revision=null,finding=null,archive=false) {
     const sequence=++openSequence;
@@ -196,6 +202,7 @@
     get("research-request-detail").dataset.request="";
     get("research-request-detail").replaceChildren(node("p","Loading the selected request…"));
     try {
+      if(!archive && window.GradCompassWorkspace?.operational)await window.GradCompassLocal.checkInbox();
       await reload();if(sequence!==openSequence)return;
       const archiveItems=archive ? (await (await fetch("/api/local/history")).json()).requests : null;
       const items=archive ? archiveItems : data.requests;
@@ -206,7 +213,7 @@
       if(!response.ok)throw new Error("Could not load this request.");
       const detail=await response.json();if(sequence!==openSequence)return;
       current=detail;currentRevision=revision;currentFinding=finding;
-      renderDetail();get("research-message").textContent=archive ? "Sample history · read only. These are invented examples, separate from real research." : data.synthetic===false ? "Private local research. Dave runs only when you manually invoke him." : "Manual synthetic pilot. No real research or automatic agent execution.";
+      renderDetail();get("research-message").textContent=archive ? "Sample history · read only. These are invented examples, separate from real research." : data.synthetic===false ? "" : "Manual synthetic pilot. No real research or automatic agent execution.";
     }catch(error){get("research-message").textContent=error.message;get("research-message").className="research-error";}
   }
   function renderDetail() {
@@ -214,12 +221,15 @@
     const section=get("research-request-detail");section.dataset.request=request.request_id;section.replaceChildren();
     const item=data.requests.find(item=>item.request_id===request.request_id);
     section.append(node("h3",scopeLabels[request.scope]),node("p",request.countries.map(countryLabel).join(" · ")),
-      node("p",current.archive ? "Sample history · read only" : stateLabel(item?.state || "prepared"),"request-state"));
+      node("p",current.archive ? "Sample history · read only" : stateLabel(item?.state || "prepared",item?.completion),"request-state"));
+    if(!current.archive && request.synthetic===false)section.append(node('p',current.results.length ? 'Returned findings are saved. Review their evidence and caveats, give feedback, or prepare a follow-up. Receipt is separate from factual acceptance.' : current.acknowledgement?.state==='accepted' ? 'Dave’s response is recorded. Further findings will appear here automatically when delivered.' : current.acknowledgement ? 'Dave’s acknowledgement needs attention. Review his reported status before preparing a follow-up.' : 'This request is saved. Copy the instructions below and invoke Dave manually. His acknowledgement and findings will appear here automatically.'));
+    if(current.acknowledgement)section.append(node('p','Acknowledgement recorded: '+dateLabel(current.acknowledgement.acknowledged_at)));
+    if(current.acknowledgement?.execution_progress)section.append(node('p','Dave reported: '+current.acknowledgement.execution_progress));
     const snapshot=node("details",undefined,"request-technical");snapshot.append(node("summary","Preference snapshot — fixed for this request"));
     for(const key of preferenceFields)snapshot.append(node("p",`${preferenceLabels[key]}: ${request.preferences[key] || "Unknown"}`));
     snapshot.append(node("p",`Request-specific limits: ${request.limits || "Unknown"}`),node("p",`Context: ${request.context || "None supplied"}`));section.append(snapshot);
     const actions=node("div",undefined,"result-actions");
-    actions.append(action("Prepare private handoff",()=>handoff(request.request_id),"prepare-research-handoff"),
+    actions.append(action("Copy instructions for Dave",()=>handoff(request.request_id),"prepare-research-handoff"),
       action("Prepare follow-up",()=>openRequest({countries:request.countries,scope:"refresh",bounds:request.bounds,parent_request_id:request.request_id,parent_request_revision:request.revision,parent_request_digest:request.digest,prior_results:current.results.length ? [{result_id:current.results.at(-1).envelope.result_id,revision:current.results.at(-1).envelope.revision,digest:current.results.at(-1).envelope.digest,finding_id:null,finding_revision:null}]:[]}),"request-follow-up"));
     if(request.parent_request_id)actions.append(action("View parent request",()=>openRequests(request.parent_request_id,null,null,!!current.archive)));
     if(request.legacy) { for(const id of ["prepare-research-handoff","request-follow-up"]) actions.querySelector("#"+id).disabled=true; section.append(node("p","Legacy synthetic history — original digest semantics preserved. Prepare a new request to use the corrected handoff.")); }
@@ -232,11 +242,34 @@
     const button=node("button",`${label} · revision ${origin.revision}`);button.type="button";
     button.addEventListener("click",()=>openRequests(origin.request_id,origin.revision,origin.finding_id));box.append(button);return box;
   }
+  async function refreshReceived(){
+    await reload();
+    if(!researchDialog.open || !current || current.archive)return;
+    const identity=current.request.request_id,sequence=openSequence;
+    renderList(identity);
+    const response=await fetch('/api/research/requests/'+identity,{cache:'no-store'});
+    if(!response.ok)throw new Error('Could not load received findings. Reopen Requests to retry.');
+    const next=await response.json();
+    if(sequence!==openSequence || !researchDialog.open)return;
+    if(JSON.stringify([current.acknowledgement,current.results])===JSON.stringify([next.acknowledgement,next.results]))return;
+    const section=get('research-request-detail');
+    const editing=[...section.querySelectorAll('textarea:not([readonly])')].some(input=>input.value || input===document.activeElement)
+      || section.querySelector('#research-response-review[open]');
+    if(editing){
+      get('show-received-results').hidden=false;
+      get('inbox-status').textContent='New responses received. Your draft is kept; show latest results when ready.';
+      return;
+    }
+    const scroll=researchDialog.scrollTop;
+    current=next;renderDetail();researchDialog.scrollTop=scroll;
+    get('show-received-results').hidden=true;
+  }
+  get('show-received-results').addEventListener('click',()=>{get('show-received-results').hidden=true;openRequests(current?.request.request_id,currentRevision,currentFinding);});
   get("open-research").addEventListener("click",()=>openRequests());
   get("close-research").addEventListener("click",()=>{++openSequence;researchDialog.close();});
   window.addEventListener("grad-compass:prepare-request",event=>openRequest(event.detail));
   window.addEventListener("grad-compass:open-result",event=>openRequests(event.detail.request_id,event.detail.revision,event.detail.finding_id));
   // Changing map filters never changes the pending multi-country selection.
   get("research-selected").addEventListener("click",()=>window.dispatchEvent(new CustomEvent("grad-compass:prepare-request",{detail:{countries:[...selected]}})));
-  window.GradCompassResearch=Object.freeze({hydrate,personal,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests,resultLink,openArchive:()=>openRequests(null,null,null,true)});
+  window.GradCompassResearch=Object.freeze({hydrate,personal,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests,refreshReceived,resultLink,openArchive:()=>openRequests(null,null,null,true)});
 })();

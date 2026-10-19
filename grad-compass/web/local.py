@@ -279,7 +279,7 @@ class LocalResearch(ResearchWorkspace):
         if identity==env.BATCH_ID:raise ValueError('The invented sample batch belongs in the separate sample workspace')
         return {'manifest':manifest,'institutions':institutions,'programs':programs,'digest':actual}
 
-    def receive(self,transport):
+    def receive(self,transport,before_record=None):
         # Keep received public bytes independently of the mutable handoff folder.
         # The existing importer remains the sole exchange 1.0.0 structural validator.
         with self.lock:
@@ -300,7 +300,7 @@ class LocalResearch(ResearchWorkspace):
                     finally:
                         if temporary.exists():shutil.rmtree(temporary)
                 self.public_batch(identity,digest)
-            return super().receive(transport)
+            return super().receive(transport,before_record=before_record)
 
     def _validate_response(self,transport):
         from web.local_contract import validate_response
@@ -364,29 +364,30 @@ class LocalResearch(ResearchWorkspace):
                                        'digest':result['digest'],'finding_id':finding['finding_id'],'finding_revision':finding['finding_revision']})
         return values
 
-    def scan_inbox(self):
+    def scan_inbox(self,paths=None,before_record=None):
         inbox=private_directory(self.directory/'inbox');packets=[];outcomes=[]
-        for path in sorted(inbox.glob('*.json')):
+        for path in sorted(inbox.glob('*.json') if paths is None else paths):
             try:
                 regular(path)
                 if path.stat().st_size>8_000_000:raise ValueError('Producer file is too large')
-                packet=env.loads(path.read_bytes())
-                if not isinstance(packet,dict) or set(packet)!={'body','sha256'}:continue
+                before=path.stat();raw=path.read_bytes();after=path.stat()
+                if (before.st_ino,before.st_size,before.st_mtime_ns,before.st_ctime_ns)!=(after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns):continue
+                packet=env.loads(raw)
+                if not isinstance(packet,dict) or set(packet)!={'body','sha256'}:raise ValueError('Expected a finalized {body, sha256} response transport')
                 value=env.verify(packet,synthetic=False,max_bytes=4_000_000)
                 packets.append((value,packet,path.name))
             except (ValueError,OSError) as error:outcomes.append({'file':path.name,'error':str(error)})
-        packets.sort(key=lambda r:(r[0].get('request_id',''),0 if r[0].get('envelope_kind')=='acknowledgement' else 1,r[0].get('revision',0)))
+        packets.sort(key=lambda r:(0 if r[0].get('envelope_kind')=='acknowledgement' else 1,r[0].get('revision',0),r[0].get('request_id','')))
         for value,packet,name in packets:
             try:
-                result=self.receive(packet);outcomes.append({'file':name,'changed':result['changed'],'kind':value['envelope_kind']})
+                result=self.receive(packet,before_record=before_record);outcomes.append({'file':name,'changed':result['changed'],'kind':value['envelope_kind'],'request_id':value['request_id']})
             except (ValueError,OSError,sqlite3.Error) as error:outcomes.append({'file':name,'error':str(error)})
         return {'outcomes':outcomes,'received':sum(bool(v.get('changed')) for v in outcomes),'errors':sum('error' in v for v in outcomes)}
 
 
-def create_local_server(workspace,port=0,profiles=None):
-    from http.server import ThreadingHTTPServer
+def create_local_server(workspace,port=0,profiles=None,clipboard=None):
+    from web.inbox import InboxServer
     import secrets
     from web.server import handler_for
     workspace.backup()
-    workspace.last_receipt=workspace.research.scan_inbox()
-    return ThreadingHTTPServer(('127.0.0.1',port),handler_for(workspace,session_token=secrets.token_urlsafe(24),profiles=profiles))
+    return InboxServer(('127.0.0.1',port),handler_for(workspace,session_token=secrets.token_urlsafe(24),profiles=profiles,clipboard=clipboard),workspace,profiles)

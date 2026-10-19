@@ -164,7 +164,7 @@ class DemoWorkspace:
             return {"university":dict(university), "professors":professors, "tasks":tasks}
 
 
-def handler_for(workspace, exchange=None, session_token=None, profiles=None):
+def handler_for(workspace, exchange=None, session_token=None, profiles=None, clipboard=None):
     initial_workspace=workspace
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -207,6 +207,9 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None):
                     return self.respond(200,{**overview(workspace, exchange), "country_decisions": workspace.country_decisions(), "research": workspace.research.snapshot(), "session": session_token, "receipt": getattr(workspace,"last_receipt",None), "profiles":profiles.snapshot() if profiles else None})
                 if route == "/api/local/removed" and getattr(workspace,"operational",False):
                     return self.respond(200,{"universities":workspace.removed_universities()})
+                if route == "/api/local/inbox" and getattr(workspace,"operational",False):
+                    from web.inbox import receiver_for
+                    return self.respond(200,{**receiver_for(workspace).status(),'session':session_token})
                 if route == "/api/local/reset-preview" and profiles:
                     return self.respond(200,profiles.reset_preview())
                 if route == "/api/local/history" and getattr(workspace,"operational",False):
@@ -257,7 +260,7 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None):
             research_operation = research_action in research_actions and route == "/api/research/"+research_action
             personal_decision = route == "/api/country-decisions"
             local_action = route.removeprefix("/api/local/")
-            local_operation = getattr(workspace,"operational",False) and local_action in ('refresh','backup','remove-university','restore-university') and route=='/api/local/'+local_action
+            local_operation = getattr(workspace,"operational",False) and local_action in ('refresh','backup','remove-university','restore-university','copy-instructions') and route=='/api/local/'+local_action
             profile_operation=profiles is not None and route in ('/api/local/profiles/create','/api/local/profiles/switch','/api/local/reset')
             preferences = route == "/api/display-preferences"
             if not (preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
@@ -284,15 +287,20 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None):
                     else:result=profiles.reset(**payload)
                     return self.respond(200,result)
                 if local_operation:
+                    if local_action=='copy-instructions':
+                        if not isinstance(payload,dict) or not {'request_id'}<=set(payload)<= {'request_id','feedback_id'}:raise ValueError('Choose the saved request instructions')
+                        if clipboard is None:raise ValueError('Select and copy the displayed instructions in this window')
+                        exported=workspace.research.export(**payload)
+                        clipboard.copy_text(exported['prompt'])
+                        return self.respond(200,{'copied':True})
                     if local_action in ('remove-university','restore-university'):
                         if not isinstance(payload,dict) or set(payload)!={'id'}:raise ValueError('Choose a university in this profile')
                         method=workspace.remove_university if local_action=='remove-university' else workspace.restore_university
                         return self.respond(200,method(payload['id']))
                     if payload != {}:raise ValueError("Use the local workspace action without extra fields")
                     if local_action == "backup":return self.respond(200,workspace.backup())
-                    workspace.backup()
-                    workspace.last_receipt=workspace.research.scan_inbox()
-                    return self.respond(200,workspace.last_receipt)
+                    from web.inbox import receiver_for
+                    return self.respond(200,receiver_for(workspace).check())
                 if research_operation:
                     if not isinstance(payload,dict): raise ValueError("Review the research form fields")
                     if research_action == "country": result = workspace.research.save_country(payload)

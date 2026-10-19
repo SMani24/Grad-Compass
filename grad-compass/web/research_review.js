@@ -1,5 +1,5 @@
 "use strict";
-/* Provisional synthetic response adapter. Real producer integration awaits compatibility review. */
+/* Immutable response review; manual file receipt is an advanced recovery path. */
 (() => {
   const get=id=>document.getElementById(id);
   const countryName=code=>typeof BY_CODE!=="undefined" ? BY_CODE[code]?.name || code.replaceAll("_"," ") : code;
@@ -8,9 +8,9 @@
   function render(ctx) {
     const {section,current,openRequests,openRequest,handoff,post,action,node,technical,notify}=ctx;
     const request=current.request;const real=request.synthetic===false;
-    const responseBox=node("details",undefined,"response-review");responseBox.id="research-response-review";responseBox.open=!current.results.length;
+    const responseBox=node("details",undefined,"response-review");responseBox.id="research-response-review";responseBox.open=!real && !current.results.length;
     responseBox.append(node("summary","Receive a manual response"),node("p","Synthetic adapter only. Load an app-generated response or select its saved JSON file, inspect it, then explicitly receive it. Loading a preview changes no request state."));
-    if(real)responseBox.querySelector("p").textContent="Choose Dave’s returned transport JSON to inspect its exact request binding and actual review status, then receive it. Previewing does not acknowledge anything.";
+    if(real){responseBox.querySelector('summary').textContent='Advanced / recovery: import response JSON';responseBox.querySelector("p").textContent="Responses normally arrive automatically. If delivery needs recovery, choose a returned transport JSON to preview its binding before receiving it. Previewing changes no status.";}
     const chooser=node("select");chooser.id="research-response-kind";chooser.setAttribute("aria-label","Synthetic response type");
     for(const [value,label] of [["accepted","Accepted acknowledgement (demo)"],["needs_clarification","Clarification requested (demo)"],["rejected","Rejected acknowledgement (demo)"],["result-1","First result (demo)"],["result-2","Revised result (demo)"]]){
       const option=node("option",label);option.value=value;chooser.append(option);
@@ -51,7 +51,7 @@
     if(real){chooser.hidden=true;load.hidden=true;saveDemo.textContent="Save response JSON";fileLabel.textContent="Choose a returned producer transport JSON file";}
     responseBox.append(chooser,buttons,preview,responseStatus,fileLabel,file,saveDemo);if(!request.legacy)section.append(responseBox);
 
-    if(!current.results.length){section.append(node("p","No findings received yet. Request state changes only when an explicit response is recorded."));return;}
+    if(!current.results.length){section.append(node("p",real ? 'Waiting for findings. Acknowledgements and results will appear automatically after Dave delivers them.' : "No findings received yet. Request state changes only when an explicit response is recorded."));return;}
     const versions=node("select");versions.id="research-result-revision";versions.setAttribute("aria-label","Result revision to review");
     for(const item of current.results){const option=node("option",`Result revision ${item.envelope.revision} · ${item.envelope.completion}`);option.value=String(item.envelope.revision);versions.append(option);}
     let selected=current.results.find(item=>item.envelope.revision===ctx.revision) || current.results.at(-1);

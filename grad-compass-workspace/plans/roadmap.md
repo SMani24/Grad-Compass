@@ -51,3 +51,7 @@ The user superseded preview-only scope for the persistent personal workflow. Rea
 ## Personal-use cleanup controls — 2026-10-16
 
 Delivered user-requested university removal/restoration, independent local profiles and a confirmed recoverable reset in Settings. This enables a fresh personal workspace while keeping testing separate. See `reviews/2026-10-16-profiles-reset.md`. No new research workflow, canonical profile/CV work, shared contract change or automatic execution is added.
+
+## Automatic local response delivery — 2026-10-19
+
+Implement the newly authorized automatic inbox receipt in the normal operational app: saved request → copy instructions → manual Dave invocation → automatic acknowledgement/partial/final findings → persistent reopen. Keep existing bindings, review states, recovery, profiles and map behavior; manual JSON is an Advanced fallback. APP-012 coordinates exact per-profile finalized delivery with Marry/Dave. This is an operational integration increment, not a new synthetic-only milestone or automatic research executor.

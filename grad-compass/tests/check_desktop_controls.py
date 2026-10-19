@@ -1,7 +1,9 @@
 """Actual Qt input regression checks; run separately with QT_QPA_PLATFORM=offscreen."""
 import importlib.util
 from pathlib import Path
+import sys
 import threading
+import time
 from types import SimpleNamespace
 import unittest
 
@@ -12,6 +14,8 @@ from PyQt6.QtWidgets import QApplication, QDialog, QWidget
 spec = importlib.util.spec_from_file_location("desktop_controls", Path(__file__).resolve().parents[1] / "scripts/desktop_controls.py")
 controls_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(controls_module)
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
+from desktop_clipboard import DesktopClipboard
 
 
 class NativeWindow(QWidget):
@@ -61,6 +65,18 @@ class DesktopControlTests(unittest.TestCase):
         QTest.mouseClick(self.native.child, Qt.MouseButton.BackButton)
         self.assertEqual(self.native.commands, [])
         dialog.hide()
+
+    def test_explicit_clipboard_copy_runs_on_the_gui_thread(self):
+        api=DesktopClipboard();copied=[];clipboard=self.app.clipboard();before=clipboard.text()
+        thread=threading.Thread(target=lambda:copied.append(api.copy_text('Invented handoff test')))
+        thread.start();deadline=time.monotonic()+6
+        try:
+            while thread.is_alive() and time.monotonic()<deadline:QTest.qWait(10)
+            thread.join(timeout=.1)
+            self.assertEqual(copied,[True]);self.assertEqual(clipboard.text(),'Invented handoff test')
+            for value in (None,'x'*32001):
+                with self.assertRaises(ValueError):api.copy_text(value)
+        finally:clipboard.setText(before)
 
 
 if __name__ == "__main__":

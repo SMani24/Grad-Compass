@@ -5,8 +5,40 @@
   const element=(tag,text)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;return value;};
   const readable=value=>value==null ? "Unknown" : typeof value==="object" ? JSON.stringify(value) : String(value);
   let messageTimer,operational=false,profileState=null,pendingReset=null;
+  let inboxVersion=null,inboxTimer=null,inboxBusy=false,inboxStatus=null;
   async function read(path){const response=await fetch(path,{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error || 'Could not load this profile');return data;}
   const post=(path,payload)=>window.GradCompassResearch.post(path,payload);
+  async function updateInbox(value,notify=true){
+    if(value.session && value.session!==window.GradCompassWorkspace?.session)throw new Error('This profile changed. Close this window and reopen Grad Compass.');
+    const changed=inboxVersion===null || inboxVersion!==value.version;
+    inboxVersion=value.version;inboxStatus=value;
+    get('inbox-indicator').hidden=false;get('inbox-receipt').hidden=false;
+    get('results-ready').hidden=!value.ready_count;
+    get('results-ready').textContent=`Results ready (${value.ready_count})`;
+    get('inbox-errors-action').hidden=!value.errors.length;
+    const text=value.errors.length ? `${value.errors.length} incoming response(s) need attention. Open Requests for details.` : !get('show-received-results').hidden ? 'New responses received. Your draft is kept; show latest results when ready.' : value.pending ? 'Waiting for incoming files to finish…' : 'Responses arrive automatically. Dave is invoked manually.';
+    for(const id of ['inbox-workspace-status','inbox-status']){
+      if(get(id).textContent!==text)get(id).textContent=text;
+      get(id).title=value.checked_at ? 'Last inbox check: '+new Date(value.checked_at).toLocaleString() : 'Checking inbox';
+    }
+    const errors=get('inbox-errors');errors.hidden=!value.errors.length;
+    const list=get('inbox-error-list');const signature=JSON.stringify(value.errors);
+    if(list.dataset.errors!==signature){list.replaceChildren(...value.errors.map(item=>element('p',item.file+': '+item.error)));list.dataset.errors=signature;}
+    if(changed){
+      window.dispatchEvent(new CustomEvent('grad-compass:discovery-updated',{detail:{automatic:true}}));
+      if(notify)await window.GradCompassResearch.refreshReceived();
+    }
+    return value;
+  }
+  async function checkInbox(){return updateInbox(await post('/api/local/refresh',{}),false);}
+  async function pollInbox(){
+    if(!operational || inboxBusy)return;inboxBusy=true;
+    try{await updateInbox(await read('/api/local/inbox'));}
+    catch(error){get('inbox-workspace-status').textContent=error.message;get('inbox-status').textContent=error.message;}
+    finally{inboxBusy=false;}
+  }
+  get('results-ready').addEventListener('click',()=>window.GradCompassResearch.openRequests(inboxStatus?.latest_request_id));
+  get('inbox-errors-action').addEventListener('click',()=>{window.GradCompassResearch.openRequests();get('inbox-errors').open=true;});
   function renderProfiles(value){
     if(!value)return;profileState=value;
     get('local-profiles').hidden=false;get('local-reset-settings').hidden=false;
@@ -66,16 +98,14 @@
     document.querySelector(".preview-label").textContent="Private local workspace";
     renderProfiles(workspace.profiles);
     document.querySelector("#request-title").parentElement.querySelector(".eyebrow").textContent="MANUAL RESEARCH HANDOFF";
-    document.querySelector("#research-dialog .request-hint").textContent="Private, persistent research. Prepare a request, manually invoke Dave, then refresh to receive returned results. Receipt is separate from factual acceptance.";
-    if(workspace.receipt?.errors)message(`${workspace.receipt.errors} incoming file(s) need attention. Use Refresh results to inspect the receipt outcome.`,true);
+    document.querySelector("#research-dialog .request-hint").textContent="Saved requests and returned findings. Invoke Dave manually; responses arrive automatically with their actual review status.";
+    pollInbox();if(!inboxTimer)inboxTimer=setInterval(pollInbox,3000);
   }
   get("refresh-local").addEventListener("click",async()=>{
     const button=get("refresh-local");button.disabled=true;
     try{
-      const receipt=await window.GradCompassResearch.post("/api/local/refresh",{});
-      window.dispatchEvent(new Event("grad-compass:discovery-updated"));
-      const errors=receipt.outcomes.filter(item=>item.error);
-      message(errors.length ? errors.map(item=>item.file+": "+item.error).join(" · ") : `${receipt.received} new response(s) received. Saved data remains available; no agent was invoked.`,!!errors.length);
+      const receipt=await updateInbox(await post("/api/local/refresh",{}));
+      message(receipt.errors.length ? receipt.errors.map(item=>item.file+": "+item.error).join(" · ") : `${receipt.received} new response(s) received. Automatic receipt is also running.`,!!receipt.errors.length);
     }catch(error){message(error.message,true);}finally{button.disabled=false;}
   });
   get("backup-local").addEventListener("click",async()=>{
@@ -156,7 +186,10 @@
       card.append(window.GradCompassResearch.resultLink(finding.origin,"Review this finding"));container.append(card);
     }
   }
-  window.GradCompassLocal=Object.freeze({initialize,evidence,location,countryFindings,universityActions});
+  window.GradCompassLocal=Object.freeze({initialize,evidence,location,countryFindings,universityActions,checkInbox});
+  window.addEventListener('focus',pollInbox);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollInbox();});
+  window.addEventListener('pagehide',()=>clearInterval(inboxTimer));
   window.addEventListener("grad-compass:workspace-loaded",event=>initialize(event.detail));
   if(window.GradCompassWorkspace)initialize(window.GradCompassWorkspace);
 })();

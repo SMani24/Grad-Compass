@@ -36,6 +36,7 @@
         </section>
         <div class="filter-controls">
           <p id="active-profile" class="active-profile" hidden></p>
+          <div id="inbox-indicator" hidden><button id="results-ready" type="button" class="quiet-action" hidden>Results ready</button><button id="inbox-errors-action" type="button" class="quiet-action" hidden>Review delivery errors</button><p id="inbox-workspace-status" role="status" aria-live="polite"></p></div>
           <div class="exploration-switch" role="group" aria-label="Explore countries or universities"><button id="countries-mode" type="button" aria-pressed="false">Countries</button><button id="universities-mode" type="button" aria-pressed="true">Universities</button></div>
           <label class="search-label" for="search">Search your universities</label>
           <input id="search" type="search" placeholder="University or city…" autocomplete="off">
@@ -108,6 +109,7 @@
   <dialog id="research-dialog" aria-labelledby="research-title">
     <header class="exchange-header"><div><span class="eyebrow">YOUR MANUAL RESEARCH WORKSPACE</span><h2 id="research-title">Requests &amp; findings</h2><p class="request-hint">Synthetic pilot. Nothing invokes Paperclip. A prepared handoff stays local until an explicit response is received.</p></div><button id="close-research" type="button" class="inspector-close" aria-label="Close requests">×</button></header>
     <p id="research-message" role="status" aria-live="polite"></p>
+    <section id="inbox-receipt" class="inbox-receipt" hidden aria-label="Automatic response receipt"><p id="inbox-status" role="status" aria-live="polite"></p><details id="inbox-errors" hidden><summary>Incoming responses need attention</summary><div id="inbox-error-list"></div></details><button id="show-received-results" type="button" class="quiet-action" hidden>Show latest results</button></section>
     <div class="research-layout"><nav id="research-request-list" aria-label="Saved research requests"></nav><section id="research-request-detail" aria-label="Request and result review"><p>Choose a request, or select countries on the map to prepare one.</p></section></div>
   </dialog>
   <dialog id="settings-dialog" aria-labelledby="settings-title">

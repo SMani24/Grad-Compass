@@ -90,10 +90,12 @@ class ResearchWorkspace:
             for row in db.execute("SELECT * FROM research_requests ORDER BY rowid DESC"):
                 request = self._body(row)
                 ack = self._body(db.execute("SELECT body FROM research_acks WHERE request_id=?",(request["request_id"],)).fetchone())
-                count = db.execute("SELECT count(*) FROM research_results WHERE request_id=?",(request["request_id"],)).fetchone()[0]
+                results = db.execute("SELECT body FROM research_results WHERE request_id=? ORDER BY revision",(request["request_id"],)).fetchall()
+                count = len(results)
                 requests.append({"request_id":request["request_id"],"revision":request["revision"],"digest":request["digest"],
                     "scope":request["scope"],"countries":request["countries"],"created_at":request["created_at"],
                     "state":"results_received" if count else ack["state"] if ack else "prepared", "result_count":count,
+                    "completion":self._body(results[-1]).get("completion") if results else None,
                     "execution_progress":ack.get("execution_progress") if ack else None})
             return {"synthetic":self.synthetic,"countries":{row["code"]:{"watched":bool(row["watched"]),"note":row["note"]}
                     for row in db.execute("SELECT * FROM country_personal ORDER BY code")},"requests":requests,
@@ -254,7 +256,11 @@ class ResearchWorkspace:
                         f"request SHA-256 {current['request']['digest']}. "
                         "Stay within the saved request's countries, scope and limits. Coordinate research and Alex's independent review; "
                         "preserve actual agent-review and human-approval states, evidence, caveats and unknowns. "
-                        f"Return bound acknowledgement/result transport JSON files to {self.directory / 'inbox'}. "
+                        f"Deliver every bound acknowledgement, partial result and final result automatically to {self.directory / 'inbox'}. "
+                        "Use the agreed {body, sha256} transport; write each response to a hidden .tmp file in that inbox, "
+                        "flush/fsync and close it, then atomically rename to a unique non-hidden .json filename. Never edit a finalized file. "
+                        f"Finalize any referenced exchange batches under {self.directory / 'batches'} before publishing their result. "
+                        "The app receives finalized responses automatically; the applicant must not relay response files. "
                         "No automatic invocation, outreach, faculty investigation or profile/CV transfer is authorized. "
                         "Request submission is not factual acceptance. Copying this handoff is not delivery or acknowledgement.")
             return {"prompt":prompt,"path":str(path),"digest":value["digest"],"kind":kind}
@@ -282,7 +288,7 @@ class ResearchWorkspace:
         else: envelopes.utc(value["acknowledged_at"])
         return value
 
-    def receive(self, transport):
+    def receive(self, transport, before_record=None):
         value = self._validate_response(transport)
         request_id = value["request_id"]; kind = value["envelope_kind"]
         with self.lock, closing(self.connect()) as db,db:
@@ -292,6 +298,7 @@ class ResearchWorkspace:
                 if previous:
                     if previous["_transport"]!=transport: raise ValueError("A different acknowledgement is already recorded; prepare a follow-up")
                     return {"changed":False,**self.request(request_id)}
+                if before_record:before_record()
                 db.execute("INSERT INTO research_acks VALUES(?,?,?)",(value["ack_id"],request_id,envelopes.storage(value)))
             else:
                 previous=self._body(db.execute("SELECT body FROM research_results WHERE id=? AND revision=?",(value["result_id"],value["revision"])).fetchone())
@@ -305,6 +312,7 @@ class ResearchWorkspace:
                     if not prior or prior["digest"]!=value["previous_result_digest"]:
                         raise ValueError("Receive the exact earlier result revision/digest first")
                     if prior["completion"]=="complete": raise ValueError("A complete result requires a new refresh request")
+                if before_record:before_record()
                 db.execute("INSERT INTO research_results VALUES(?,?,?,?,?)",(value["result_id"],value["revision"],request_id,envelopes.storage(value),self.clock()))
         return {"changed":True,**self.request(request_id)}
 
