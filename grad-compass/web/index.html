@@ -35,6 +35,7 @@
           <span id="atlas-label" class="eyebrow">YOUR UNIVERSITY ATLAS</span><h1 id="exploration-title">Explore universities</h1><p id="exploration-description">A world of possibilities, in one place.</p>
         </section>
         <div class="filter-controls">
+          <p id="active-profile" class="active-profile" hidden></p>
           <div class="exploration-switch" role="group" aria-label="Explore countries or universities"><button id="countries-mode" type="button" aria-pressed="false">Countries</button><button id="universities-mode" type="button" aria-pressed="true">Universities</button></div>
           <label class="search-label" for="search">Search your universities</label>
           <input id="search" type="search" placeholder="University or city…" autocomplete="off">
@@ -113,10 +114,24 @@
     <header class="exchange-header"><h2 id="settings-title">Settings</h2><button id="close-settings" class="inspector-close" type="button" aria-label="Close settings">×</button></header>
     <label for="text-size">Text size</label>
     <select id="text-size" disabled><option value="standard">Standard · 100%</option><option value="comfortable">Comfortable · 115%</option><option value="large">Large · 130%</option><option value="extra-large">Extra large · 150%</option></select>
-    <div id="local-settings" hidden><button id="backup-local" type="button" class="quiet-action">Create backup</button> <button id="sample-history" type="button" class="quiet-action">View sample history</button><p id="backup-status" role="status"></p><details><summary>Recovery</summary><p>Backups stay in your private workspace. Restore into a new empty workspace using the documented restore command; the current workspace is preserved.</p></details></div>
+    <div id="local-settings" hidden>
+      <section id="local-profiles" class="local-settings-section" hidden>
+        <h3>Local profiles</h3><p>Each profile has separate saved countries, preferences, research and settings. Use a separate profile for testing.</p>
+        <label for="local-profile">Profile</label><div class="local-profile-row"><select id="local-profile"></select><button id="switch-profile" type="button" class="quiet-action">Switch profile</button></div>
+        <form id="create-profile-form"><label for="new-profile-name">New profile name</label><div class="local-profile-row"><input id="new-profile-name" maxlength="60" required placeholder="For example, Testing"><button type="submit" class="quiet-action">Create profile</button></div></form>
+        <p id="profile-status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="local-settings-section"><h3>Recovery</h3><button id="backup-local" type="button" class="quiet-action">Create backup</button> <button id="sample-history" type="button" class="quiet-action">View sample history</button><p id="backup-status" role="status"></p>
+        <details><summary>Backups and reset recovery</summary><p>Reset backups are retained. Restore a backup into a new workspace using the restore command in the app guide; the current workspace is preserved.</p><p id="profile-backup-directory"></p><div id="reset-recovery-list"></div></details>
+      </section>
+      <details class="local-settings-section"><summary>Removed universities <span id="removed-count"></span></summary><p>Removed universities and their programs stay out of discovery, including after replay. Their original research remains in Requests.</p><div id="removed-universities"></div><p id="removed-status" role="status"></p></details>
+      <section id="local-reset-settings" class="local-settings-section" hidden><h3>Reset app data</h3><p>Start this profile from empty. Other profiles and recovery backups are kept.</p><button id="open-reset" type="button" class="danger-action">Reset this profile…</button></section>
+    </div>
     <p class="settings-sample">Explore universities with text that feels comfortable to read.</p>
     <p id="settings-status" role="status" aria-live="polite">Loading your preference…</p>
   </dialog>
+  <dialog id="local-confirm" aria-labelledby="local-confirm-title" aria-describedby="local-confirm-description"><form method="dialog"><h2 id="local-confirm-title">Remove university?</h2><p id="local-confirm-description"></p><div class="request-actions"><button id="local-confirm-accept" value="confirm" class="danger-action">Remove university</button><button value="cancel" class="quiet-action" autofocus>Cancel</button></div></form></dialog>
+  <dialog id="reset-dialog" aria-labelledby="reset-title" aria-describedby="reset-summary reset-description"><h2 id="reset-title">Reset this profile?</h2><p id="reset-summary"></p><p id="reset-description">This clears this profile’s saved countries, notes, decisions, preferences, universities, programs, requests, results, feedback, sample history and text settings. Other profiles stay unchanged. A recovery backup is saved first.</p><form id="reset-form"><label for="reset-confirmation">Type RESET to confirm</label><input id="reset-confirmation" autocomplete="off" spellcheck="false" required><p id="reset-status" role="alert"></p><div class="request-actions"><button id="confirm-reset" type="submit" class="danger-action" disabled>Reset profile</button><button id="cancel-reset" type="button" class="quiet-action">Cancel</button></div></form></dialog>
   <dialog id="exchange-dialog" aria-labelledby="exchange-title">
     <header class="exchange-header"><div><span class="eyebrow">SYNTHETIC RESEARCH HANDOFF</span><h2 id="exchange-title">Review an exchange batch</h2><p>Invented records in a separate disposable workspace. Producer review and your import decision stay distinct.</p></div><button id="close-exchange" type="button" class="inspector-close" aria-label="Close research imports">×</button></header>
     <div id="exchange-message" role="status" aria-live="polite"></div>

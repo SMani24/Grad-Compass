@@ -67,6 +67,8 @@ class LocalWorkspace(DemoWorkspace):
                         PRIMARY KEY(institution_id,revision));''')
                 db.execute('INSERT INTO app_local_guard VALUES(?)',(LOCAL_MARKER,))
         with closing(self.connect()):pass
+        with closing(self.writer()) as db,db:
+            db.execute('CREATE TABLE IF NOT EXISTS removed_institutions(institution_id TEXT PRIMARY KEY,name TEXT NOT NULL,removed_at TEXT NOT NULL)')
         private_directory(self.directory/'inbox');private_directory(self.directory/'batches')
         if previous: self._preserve_previous(Path(previous))
 
@@ -183,7 +185,9 @@ class LocalWorkspace(DemoWorkspace):
 
     def overview(self):
         institutions,_=self.records();values=[]
+        removed={row['id'] for row in self.removed_universities()}
         for identity,item in institutions.items():
+            if identity in removed:continue
             r=item['record'];location=self.location(identity);private=self.private_record(item['result'],'institution',identity)
             values.append({'id':'local-'+identity,'name':r['name'],'country_code':r['country_code'],'city':r.get('city'),
                 'latitude':location.get('latitude'),'longitude':location.get('longitude'),'location':location,'deadline':None,'status':'Researching',
@@ -191,6 +195,27 @@ class LocalWorkspace(DemoWorkspace):
                 'research':{'external_id':identity,'revision':r['record_revision'],'review':r['review']['state'],'storage':'received',
                             'facts':r['facts'],'private':private,'human_approval':private.get('human_approval','unknown')}})
         return {'synthetic':False,'operational':True,'universities':sorted(values,key=lambda r:r['name'])}
+
+    def removed_universities(self):
+        with closing(self.connect()) as db:
+            return [dict(row) for row in db.execute('SELECT institution_id AS id,name,removed_at FROM removed_institutions ORDER BY name')]
+
+    def remove_university(self,identity):
+        env.identifier(identity)
+        with self.state_lock,self.research.lock:
+            if any(row['id']==identity for row in self.removed_universities()):return {'changed':False}
+            item=next((u for u in self.overview()['universities'] if u['research']['external_id']==identity),None)
+            if item is None:raise ValueError('Choose a university in this profile')
+            backup=self.backup()
+            with closing(self.writer()) as db,db:
+                db.execute('INSERT INTO removed_institutions VALUES(?,?,?)',(identity,item['name'],env.now()))
+            return {'changed':True,'backup':backup['name']}
+
+    def restore_university(self,identity):
+        env.identifier(identity)
+        with self.state_lock,closing(self.writer()) as db,db:
+            changed=db.execute('DELETE FROM removed_institutions WHERE institution_id=?',(identity,)).rowcount>0
+        return {'changed':changed}
 
     def university(self,identity):
         institution=next((u for u in self.overview()['universities'] if u['id']==identity),None)
@@ -358,10 +383,10 @@ class LocalResearch(ResearchWorkspace):
         return {'outcomes':outcomes,'received':sum(bool(v.get('changed')) for v in outcomes),'errors':sum('error' in v for v in outcomes)}
 
 
-def create_local_server(workspace,port=0):
+def create_local_server(workspace,port=0,profiles=None):
     from http.server import ThreadingHTTPServer
     import secrets
     from web.server import handler_for
     workspace.backup()
     workspace.last_receipt=workspace.research.scan_inbox()
-    return ThreadingHTTPServer(('127.0.0.1',port),handler_for(workspace,session_token=secrets.token_urlsafe(24)))
+    return ThreadingHTTPServer(('127.0.0.1',port),handler_for(workspace,session_token=secrets.token_urlsafe(24),profiles=profiles))

@@ -47,3 +47,7 @@ APP-008 incorporates Marry/Dave's reviewed synthetic handoff proposal and suppli
 ## Operational local milestone — 2026-10-16
 
 The user superseded preview-only scope for the persistent personal workflow. Real request/ack/result receipt, field-specific country evidence, institution/program discovery, source-backed app-owned campus points, feedback/refresh bindings and restore-to-new-workspace are delivered using the existing reviewed first dataset. Normal launch uses private persistent local storage, preserves previous personal state and separates samples. No automatic expiry/renewal or agent execution exists. See `reviews/2026-10-16-local-workflow.md` for the actual manually invoked round trip and checks. New research still requires a bounded submitted request and manual Dave invocation; the other roadmap increments remain deferred until authorized.
+
+## Personal-use cleanup controls — 2026-10-16
+
+Delivered user-requested university removal/restoration, independent local profiles and a confirmed recoverable reset in Settings. This enables a fresh personal workspace while keeping testing separate. See `reviews/2026-10-16-profiles-reset.md`. No new research workflow, canonical profile/CV work, shared contract change or automatic execution is added.

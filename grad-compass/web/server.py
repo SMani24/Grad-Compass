@@ -1,6 +1,6 @@
 """Loopback-only synthetic map preview and opt-in disposable exchange workflow."""
 import argparse
-from contextlib import closing
+from contextlib import closing, nullcontext
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -164,7 +164,8 @@ class DemoWorkspace:
             return {"university":dict(university), "professors":professors, "tasks":tasks}
 
 
-def handler_for(workspace, exchange=None, session_token=None):
+def handler_for(workspace, exchange=None, session_token=None, profiles=None):
+    initial_workspace=workspace
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):
             pass  # Do not log query strings, private request contents, or local paths.
@@ -185,6 +186,13 @@ def handler_for(workspace, exchange=None, session_token=None):
                 pass  # Closing the desktop window can cancel an in-flight map response.
 
         def do_GET(self):
+            try:
+                with profiles.request_context() if profiles else nullcontext():return self._get()
+            except ValueError as error:return self.respond(409,{'error':str(error)})
+
+        def _get(self):
+            workspace=profiles.workspace if profiles else initial_workspace
+            session_token=profiles.session_token if profiles else initial_token
             route = urlsplit(self.path).path
             if hasattr(self, "server") and self.headers.get("Host") != f"127.0.0.1:{self.server.server_port}":
                 return self.respond(403,{"error":"Open the local app address to read this workspace"})
@@ -196,7 +204,11 @@ def handler_for(workspace, exchange=None, session_token=None):
                     return self.respond(200,(APP_ROOT/"ui/data/countries.geo.json").read_bytes())
                 if route == "/api/workspace":
                     from web.discovery import overview
-                    return self.respond(200,{**overview(workspace, exchange), "country_decisions": workspace.country_decisions(), "research": workspace.research.snapshot(), "session": session_token, "receipt": getattr(workspace,"last_receipt",None)})
+                    return self.respond(200,{**overview(workspace, exchange), "country_decisions": workspace.country_decisions(), "research": workspace.research.snapshot(), "session": session_token, "receipt": getattr(workspace,"last_receipt",None), "profiles":profiles.snapshot() if profiles else None})
+                if route == "/api/local/removed" and getattr(workspace,"operational",False):
+                    return self.respond(200,{"universities":workspace.removed_universities()})
+                if route == "/api/local/reset-preview" and profiles:
+                    return self.respond(200,profiles.reset_preview())
                 if route == "/api/local/history" and getattr(workspace,"operational",False):
                     return self.respond(200,workspace.archived_requests())
                 archive_match = re.fullmatch(r"/api/local/history/([a-f0-9-]{36})",route)
@@ -230,6 +242,13 @@ def handler_for(workspace, exchange=None, session_token=None):
                 self.respond(500,{"error":"Could not load the workspace"})
 
         def do_POST(self):
+            try:
+                with profiles.request_context() if profiles else nullcontext():return self._post()
+            except ValueError as error:return self.respond(409,{'error':str(error)})
+
+        def _post(self):
+            workspace=profiles.workspace if profiles else initial_workspace
+            session_token=profiles.session_token if profiles else initial_token
             route = urlsplit(self.path).path
             actions = {"stage", "map", "preview", "promote", "replay"}
             action = route.removeprefix("/api/exchange/")
@@ -238,13 +257,15 @@ def handler_for(workspace, exchange=None, session_token=None):
             research_operation = research_action in research_actions and route == "/api/research/"+research_action
             personal_decision = route == "/api/country-decisions"
             local_action = route.removeprefix("/api/local/")
-            local_operation = getattr(workspace,"operational",False) and route in ("/api/local/refresh","/api/local/backup")
+            local_operation = getattr(workspace,"operational",False) and local_action in ('refresh','backup','remove-university','restore-university') and route=='/api/local/'+local_action
+            profile_operation=profiles is not None and route in ('/api/local/profiles/create','/api/local/profiles/switch','/api/local/reset')
             preferences = route == "/api/display-preferences"
-            if not (preferences or personal_decision or research_operation or local_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
+            if not (preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
                 return self.respond(405,{"error":"This endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"
             if (self.headers.get("Host") != origin.removeprefix("http://")
                 or self.headers.get("Origin", origin) != origin
+                or (profiles is not None and self.headers.get('X-Grad-Compass-Workspace')!=session_token)
                 or not session_token
                 or not secrets.compare_digest(self.headers.get("X-Grad-Compass-Session", ""), session_token or "")):
                 return self.respond(403, {"error": "Use this app session to save workspace changes"})
@@ -254,7 +275,19 @@ def handler_for(workspace, exchange=None, session_token=None):
                     raise ValueError("A small JSON request is required")
                 from web.research_envelopes import loads
                 payload = loads(self.rfile.read(length))
+                if profile_operation:
+                    if not isinstance(payload,dict):raise ValueError('Review the local profile action')
+                    fields={'/api/local/profiles/create':{'name'},'/api/local/profiles/switch':{'profile_id'},'/api/local/reset':{'profile_id','token','confirmation'}}[route]
+                    if set(payload)!=fields:raise ValueError('Review the local profile action')
+                    if route.endswith('/create'):result=profiles.create(payload['name'])
+                    elif route.endswith('/switch'):result=profiles.switch(payload['profile_id'])
+                    else:result=profiles.reset(**payload)
+                    return self.respond(200,result)
                 if local_operation:
+                    if local_action in ('remove-university','restore-university'):
+                        if not isinstance(payload,dict) or set(payload)!={'id'}:raise ValueError('Choose a university in this profile')
+                        method=workspace.remove_university if local_action=='remove-university' else workspace.restore_university
+                        return self.respond(200,method(payload['id']))
                     if payload != {}:raise ValueError("Use the local workspace action without extra fields")
                     if local_action == "backup":return self.respond(200,workspace.backup())
                     workspace.backup()
@@ -298,13 +331,14 @@ def handler_for(workspace, exchange=None, session_token=None):
             except ValueError as error:
                 return self.respond(409, {"error": str(error)})
             except (OSError, sqlite3.Error):
-                return self.respond(500, {"error": "Could not complete the disposable workspace operation"})
+                return self.respond(500, {"error": "Could not complete the workspace operation"})
 
         def do_PUT(self):
             self.respond(405, {"error": "Use the explicit exchange workflow actions"})
 
         do_PATCH = do_DELETE = do_PUT
 
+    initial_token=session_token
     return Handler
 
 

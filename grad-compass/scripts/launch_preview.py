@@ -58,8 +58,9 @@ def main():
         args.smoke_test = True
     local_mode=not args.smoke_test and not args.preview
     if local_mode:
-        from web.local import LocalWorkspace
-        workspace=LocalWorkspace(args.local_dir,PREVIEW_DIR)
+        from web.profiles import LocalProfiles
+        profiles=LocalProfiles(args.local_dir,PREVIEW_DIR if args.local_dir.resolve()==LOCAL_DIR else None)
+        workspace=profiles.workspace
         directory=workspace.directory
     else:
         directory = prepare_workspace(Path(temporary_preview.name) / "preview" if temporary_preview else PREVIEW_DIR)
@@ -70,7 +71,7 @@ def main():
 
     if local_mode:
         from web.local import create_local_server
-        server=create_local_server(workspace,port=0)
+        server=create_local_server(workspace,port=0,profiles=profiles)
     else:
         server = create_server(directory, port=0, exchange_directory=Path(temporary_exchange.name) if temporary_exchange else args.exchange_dir)
     worker = threading.Thread(target=server.serve_forever, daemon=True)
@@ -204,7 +205,7 @@ def main():
         server.shutdown()
         server.server_close()
         worker.join(timeout=5)
-        if local_mode:workspace.backup()
+        if local_mode:profiles.workspace.backup()
         if temporary_exchange:
             temporary_exchange.cleanup()
         if temporary_preview:

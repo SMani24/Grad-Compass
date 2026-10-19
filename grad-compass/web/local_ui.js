@@ -4,16 +4,67 @@
   const get=id=>document.getElementById(id);
   const element=(tag,text)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;return value;};
   const readable=value=>value==null ? "Unknown" : typeof value==="object" ? JSON.stringify(value) : String(value);
-  let messageTimer;
+  let messageTimer,operational=false,profileState=null,pendingReset=null;
+  async function read(path){const response=await fetch(path,{cache:'no-store'});const data=await response.json();if(!response.ok)throw new Error(data.error || 'Could not load this profile');return data;}
+  const post=(path,payload)=>window.GradCompassResearch.post(path,payload);
+  function renderProfiles(value){
+    if(!value)return;profileState=value;
+    get('local-profiles').hidden=false;get('local-reset-settings').hidden=false;
+    const select=get('local-profile');select.replaceChildren();
+    for(const profile of value.profiles){const option=element('option',profile.name);option.value=profile.id;select.append(option);}
+    select.value=value.active_id;
+    const active=value.profiles.find(profile=>profile.id===value.active_id);
+    document.querySelector('.preview-label').textContent='Local profile · '+active.name;
+    document.querySelector('.preview-label').title='Local profile: '+active.name;
+    get('active-profile').hidden=false;get('active-profile').textContent='Profile: '+active.name;get('active-profile').title='Local profile: '+active.name;
+    get('switch-profile').disabled=true;
+    get('profile-backup-directory').textContent='Current profile backups: '+value.backup_directory;
+    get('reset-recovery-list').replaceChildren(...value.recovery_backups.map(backup=>element('p',`${backup.name} · reset ${new Date(backup.reset_at).toLocaleString()} · recovery backup: ${backup.path}`)));
+  }
+  async function loadRemoved(){
+    if(!operational)return;
+    try{
+      const data=await read('/api/local/removed');get('removed-count').textContent=`(${data.universities.length})`;
+      get('removed-universities').replaceChildren();
+      if(!data.universities.length)get('removed-universities').append(element('p','No removed universities.'));
+      for(const university of data.universities){
+        const row=element('div');row.className='removed-university';row.append(element('span',university.name));
+        const restore=element('button','Restore');restore.type='button';restore.className='quiet-action';restore.dataset.restoreUniversity=university.id;
+        restore.setAttribute('aria-label','Restore '+university.name);
+        restore.addEventListener('click',async()=>{restore.disabled=true;try{await post('/api/local/restore-university',{id:university.id});await loadRemoved();window.dispatchEvent(new Event('grad-compass:discovery-updated'));get('removed-status').textContent=university.name+' restored.';}catch(error){get('removed-status').textContent=error.message;restore.disabled=false;}});
+        row.append(restore);get('removed-universities').append(row);
+      }
+    }catch(error){get('removed-status').textContent=error.message;}
+  }
+  function confirmRemoval(university){
+    const dialog=get('local-confirm');dialog.returnValue='cancel';
+    get('local-confirm-title').textContent='Remove '+university.name+'?';
+    get('local-confirm-description').textContent='Remove this university and its programs from your map and list. Original research stays in Requests. A backup is saved first; you can restore the university in Settings.';
+    return new Promise(resolve=>{dialog.addEventListener('close',()=>resolve(dialog.returnValue==='confirm'),{once:true});dialog.showModal();});
+  }
+  function universityActions(container,university){
+    const button=element('button','Remove university');button.type='button';button.className='danger-action';button.id='remove-university';
+    button.addEventListener('click',async()=>{
+      button.disabled=true;
+      try{
+        if(!await confirmRemoval(university))return;
+        await post('/api/local/remove-university',{id:university.research.external_id});
+        window.dispatchEvent(new CustomEvent('grad-compass:discovery-updated',{detail:{removedUniversity:university.id}}));
+        message(university.name+' removed. Restore it in Settings → Removed universities.');
+      }catch(error){message(error.message,true);}finally{button.disabled=false;}
+    });container.append(button);
+  }
   function message(text,error=false){
     clearTimeout(messageTimer);get("local-message").textContent=text;get("local-message").hidden=false;
     if(!error)messageTimer=setTimeout(()=>{get("local-message").hidden=true;},10000);
   }
   function initialize(workspace){
     if(!workspace.operational)return;
+    operational=true;
     document.body.dataset.workspace="local";
     get("refresh-local").hidden=false;get("open-exchange").hidden=true;get("local-settings").hidden=false;
     document.querySelector(".preview-label").textContent="Private local workspace";
+    renderProfiles(workspace.profiles);
     document.querySelector("#request-title").parentElement.querySelector(".eyebrow").textContent="MANUAL RESEARCH HANDOFF";
     document.querySelector("#research-dialog .request-hint").textContent="Private, persistent research. Prepare a request, manually invoke Dave, then refresh to receive returned results. Receipt is separate from factual acceptance.";
     if(workspace.receipt?.errors)message(`${workspace.receipt.errors} incoming file(s) need attention. Use Refresh results to inspect the receipt outcome.`,true);
@@ -33,6 +84,46 @@
     catch(error){get("backup-status").textContent=error.message;}finally{button.disabled=false;}
   });
   get("sample-history").addEventListener("click",()=>{get("settings-dialog").close();window.GradCompassResearch.openArchive();});
+  get('open-settings').addEventListener('click',loadRemoved);
+  get('local-profile').addEventListener('change',()=>{get('switch-profile').disabled=get('local-profile').value===profileState?.active_id;});
+  get('create-profile-form').addEventListener('submit',async event=>{
+    event.preventDefault();const button=event.submitter || get('create-profile-form').querySelector('button');button.disabled=true;
+    try{
+      const result=await post('/api/local/profiles/create',{name:get('new-profile-name').value});renderProfiles(result);
+      get('local-profile').value=result.profile.id;get('switch-profile').disabled=false;get('new-profile-name').value='';
+      get('profile-status').textContent=`${result.profile.name} created empty. Choose Switch profile to open it. Your current profile is unchanged.`;
+    }catch(error){get('profile-status').textContent=error.message;}finally{button.disabled=false;}
+  });
+  get('switch-profile').addEventListener('click',async()=>{
+    const button=get('switch-profile');button.disabled=true;
+    try{await post('/api/local/profiles/switch',{profile_id:get('local-profile').value});window.location.replace('/');}
+    catch(error){get('profile-status').textContent=error.message;button.disabled=false;}
+  });
+  get('open-reset').addEventListener('click',async()=>{
+    const button=get('open-reset');button.disabled=true;
+    try{
+      pendingReset=await read('/api/local/reset-preview');get('reset-title').textContent='Reset “'+pendingReset.name+'”?';
+      const c=pendingReset.counts;
+      get('reset-summary').textContent=`${c.saved_countries} saved countries, ${c.universities} universities, ${c.programs} programs, ${c.requests} requests, ${c.results} result revisions and ${c.feedback} feedback entries will leave this profile.`;
+      get('reset-confirmation').value='';get('confirm-reset').disabled=true;get('reset-status').textContent='';
+      get('settings-dialog').close();get('reset-dialog').showModal();get('reset-confirmation').focus();
+    }catch(error){get('backup-status').textContent=error.message;}finally{button.disabled=false;}
+  });
+  get('reset-confirmation').addEventListener('input',()=>{get('confirm-reset').disabled=get('reset-confirmation').value!=='RESET';});
+  get('cancel-reset').addEventListener('click',()=>{if(get('reset-dialog').dataset.busy!=='true')get('reset-dialog').close();});
+  get('reset-dialog').addEventListener('close',()=>{
+    if(get('reset-dialog').dataset.busy!=='true'){
+      get('settings-dialog').showModal();get('open-reset').focus({preventScroll:true});
+    }
+  });
+  get('reset-form').addEventListener('submit',async event=>{
+    event.preventDefault();if(!pendingReset || get('reset-dialog').dataset.busy==='true')return;
+    get('reset-dialog').dataset.busy='true';get('confirm-reset').disabled=true;get('cancel-reset').disabled=true;get('reset-confirmation').disabled=true;
+    try{
+      await post('/api/local/reset',{profile_id:pendingReset.profile_id,token:pendingReset.token,confirmation:get('reset-confirmation').value});
+      window.location.replace('/');
+    }catch(error){get('reset-status').textContent=error.message;get('reset-dialog').dataset.busy='false';get('confirm-reset').disabled=get('reset-confirmation').value!=='RESET';get('cancel-reset').disabled=false;get('reset-confirmation').disabled=false;}
+  });
   function evidence(container,record,title){
     if(!record)return;
     const details=element("details");details.className="source-details";details.append(element("summary",title));
@@ -65,7 +156,7 @@
       card.append(window.GradCompassResearch.resultLink(finding.origin,"Review this finding"));container.append(card);
     }
   }
-  window.GradCompassLocal=Object.freeze({initialize,evidence,location,countryFindings});
+  window.GradCompassLocal=Object.freeze({initialize,evidence,location,countryFindings,universityActions});
   window.addEventListener("grad-compass:workspace-loaded",event=>initialize(event.detail));
   if(window.GradCompassWorkspace)initialize(window.GradCompassWorkspace);
 })();

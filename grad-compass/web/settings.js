@@ -58,7 +58,7 @@
     status.textContent = "Saving…";
     try {
       const response = await fetch("/api/display-preferences", {
-        method: "POST", headers: {"Content-Type": "application/json", "X-Grad-Compass-Session": session},
+        method: "POST", headers: {"Content-Type": "application/json", "X-Grad-Compass-Session": session,"X-Grad-Compass-Workspace":window.GradCompassWorkspace?.session || session},
         body: JSON.stringify({text_size: chosen})
       });
       if (!response.ok) throw new Error("Could not save. Your previous text size has been restored.");

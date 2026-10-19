@@ -31,7 +31,7 @@
     toolbar();
   }
   async function post(path, payload) {
-    const response = await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-Grad-Compass-Session":session},body:JSON.stringify(payload)});
+    const response = await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-Grad-Compass-Session":session,"X-Grad-Compass-Workspace":window.GradCompassWorkspace?.session || session},body:JSON.stringify(payload)});
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Could not save. Please retry.");
     return result;

@@ -398,6 +398,7 @@ if (typeof document !== "undefined") {
         if(university.synthetic===false)window.GradCompassLocal?.evidence(elements.inspector,university.research.private,"Institution evidence & caveats");
       }
       if(university.synthetic===false)window.GradCompassLocal?.location(elements.inspector,university.location);
+      if(university.synthetic===false)window.GradCompassLocal?.universityActions(elements.inspector,university);
       for(const origin of (detail.research_results || []).slice(0,1)) elements.inspector.append(window.GradCompassResearch.resultLink(origin));
       elements.inspector.append(node("h3", "", "Programs"));
       if (!detail.programs?.length) elements.inspector.append(node("p", "", state.operational ? "No programs received yet." : "No promoted programs saved yet."));
@@ -650,8 +651,9 @@ if (typeof document !== "undefined") {
     updateNavigationButtons();
   });
   get("retry").addEventListener("click", loadWorkspace);
-  window.addEventListener("grad-compass:discovery-updated", async () => {
+  window.addEventListener("grad-compass:discovery-updated", async event => {
     try {
+      if(event.detail?.removedUniversity===state.selected){closeInspector(false);updateUrl(true);}
       const result = await api("/api/workspace");
       state.universities = result.universities;
       state.decisions = result.country_decisions || {}; state.session = result.session;
@@ -669,7 +671,9 @@ if (typeof document !== "undefined") {
       if (event.key === "ArrowLeft") goBack(); else goForward();
     } else if (event.key === "Escape") {
       event.preventDefault();
-      if (get("request-dialog")?.open) {
+      if(get('local-confirm')?.open)get('local-confirm').close('cancel');
+      else if(get('reset-dialog')?.open){if(get('reset-dialog').dataset.busy!=='true')get('reset-dialog').close();}
+      else if (get("request-dialog")?.open) {
         if (get("request-form").dataset.submitting !== "true") get("request-dialog").close();
       } else if (get("research-dialog")?.open) get("research-dialog").close();
       else if (get("settings-dialog")?.open) get("settings-dialog").close();

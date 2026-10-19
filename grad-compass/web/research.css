@@ -125,3 +125,16 @@ textarea:focus-visible { outline: 3px solid #56b9d5; outline-offset: 3px; }
 }
 .local-message { position: fixed; z-index: 9; bottom: 24px; right: 68px; max-width: min(600px,calc(100vw - 92px)); padding: 12px 16px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 24px #15304420; font-size: .75rem; overflow-wrap: anywhere; }
 #local-settings { margin: 18px 0; font-size: .75rem; line-height: 1.6; }
+.local-settings-section { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
+.active-profile { margin: 0 0 8px; font-size: .6875rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview-label { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.local-profile-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 14px; }
+.local-profile-row input,.local-profile-row select { min-width: 0; flex: 1 1 160px; width: auto; }
+#settings-dialog input,#reset-dialog input { box-sizing: border-box; max-width: 100%; padding: 10px; font: inherit; border: 1px solid var(--line); border-radius: 6px; }
+.danger-action { background: #fff3f1; color: #a52620; border: 1px solid #e0b4af; border-radius: 7px; padding: 9px 12px; font: inherit; cursor: pointer; }
+.danger-action:disabled { opacity: .5; cursor: default; }
+#local-confirm,#reset-dialog { box-sizing: border-box; width: min(540px,calc(100% - 24px)); max-height: calc(100% - 24px); padding: 24px; overflow: auto; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); font-size: .875rem; }
+#local-confirm p,#reset-dialog p,#reset-recovery-list p,#profile-backup-directory { line-height: 1.6; overflow-wrap: anywhere; }
+#removed-universities .removed-university { margin: 12px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#removed-universities .removed-university span { flex: 1 1 140px; overflow-wrap: anywhere; }
+#local-confirm::backdrop,#reset-dialog::backdrop { background: #15304466; }

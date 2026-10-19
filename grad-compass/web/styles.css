@@ -887,6 +887,7 @@ html {
 }
 
 #settings-dialog {
+  box-sizing: border-box;
   width: min(440px,calc(100vw - 24px));
   max-height: calc(100dvh - 24px);
   overflow: auto;

@@ -14,7 +14,7 @@ grad-compass/envGradCompass/bin/python -B grad-compass/scripts/launch_preview.py
 
 Despite its retained filename, this command opens the normal local app. `--preview` explicitly opens the separate invented sample workspace. Smoke-test flags always use disposable sample storage.
 
-The normal app uses Git-excluded `grad-compass-workspace/runtime/local/`, with an owner-only directory and marked local databases. The legacy tracked database, configuration and image cache are not opened for application data. The loopback server uses a random port, session-protected mutations and validated Host/Origin headers; it stops when the window closes. Browser state and logs stay inside the private runtime. No public hosting or automatic agent execution is included.
+The existing Personal profile uses Git-excluded `grad-compass-workspace/runtime/local/`. Additional profiles and the active-profile registry use the sibling `runtime/local-profiles/` directory. All data directories are owner-only, with marked local databases. The launcher reopens the last selected local profile. The legacy tracked database, configuration and image cache are not opened for application data. The loopback server uses a random port, session-protected mutations and validated Host/Origin headers; it stops when the window closes. Browser state and logs stay inside the private runtime. No public hosting or automatic agent execution is included.
 
 The existing Python environment and Qt libraries have been verified. For a fresh checkout, create `grad-compass/envGradCompass/` and install `grad-compass/requirements.txt`. Desktop rendering needs a graphical session and the Linux Qt platform libraries. The HTTP layer uses Python's standard library; exchange validation uses jsonschema.
 
@@ -29,6 +29,17 @@ Countries is the initial exploration mode in the normal app. A country polygon/c
 Map markers require verified app-owned coordinates. Each location retains campus identity, source, locator, observation time, method and uncertainty. An unresolved university remains visible in cards/List without a fabricated pin. Country centroids and map camera centers are not campus locations. The first real run has five source-backed campus points; location observations do not approve university/program suitability.
 
 Back/Forward, Alt+Left/Right and mouse side buttons restore workspace context. Escape closes details before clearing country context, and returns List to Map. Ctrl+W asks before closing the desktop window. **Settings → Text size** offers Standard, Comfortable, Large and Extra large; the choice persists locally. Panels scroll and controls wrap at narrow widths and larger sizes.
+
+## Local profiles, university removal and reset
+
+Close older app windows and reopen **Grad Compass** to load these controls.
+
+- Open a university and choose **Remove university**. Confirmation explains that it and its programs will leave Map/List while original research stays in Requests. A backup is created first. The removal survives replay and relaunch; **Settings → Removed universities → Restore** brings the same stable identity and programs back.
+- **Settings → Local profiles** creates an empty named profile and lets you switch explicitly. Current data is retained as **Personal**. Each profile has its own countries, notes, decisions, preferences, requests, results, feedback, removed universities, campus locations and text settings. The current profile is labelled in the exploration panel, including narrow windows. These are local workspaces; canonical Applicant Profiles are unchanged.
+- **Settings → Reset app data → Reset this profile…** shows a current-data summary and requires typing **RESET**. Reset clears all active data in that profile, including saved selections, research/history and preferences. It preserves other profiles and saves a recovery backup first. Cancelling leaves data untouched. If data or incoming responses changed after the summary, review it again before confirming.
+- Reset opens new empty storage atomically. Earlier files/backups remain recoverable; old inbox files and preview data are not silently imported again. This is a recoverable fresh start rather than secure erasure of disk/backups. **Settings → Recovery → Backups and reset recovery** shows the recovery locations. Restore into a new workspace with the command below.
+
+Use a separate profile for exploratory manual testing. Automated checks use invented temporary workspaces and remove them afterward. No reset or university removal is executed against your own data during development. Prepared handoffs always name the active profile's request/inbox; return results to that exact profile. Switching/reset rotates the app session so a stale tab cannot submit into the new profile. If another app window changes the profile registry, close the older window and reopen.
 
 ## Manual research workflow
 
@@ -45,7 +56,7 @@ There is no automatic 30-day stop, renewal requirement or cleanup of operational
 
 ## Backup and recovery
 
-Backups are made on launch, before inbox refresh and on normal close. **Settings → Save local backup** creates another snapshot. SQLite's backup API captures databases; hash inventories cover immutable handoffs, incoming packets, retained public batches, personal decisions, display preferences and the separate sample archive. Backups stay under `runtime/local/backups/` and do not expire automatically. Copy that private directory to owner-controlled backup media for protection against device loss; copies on the same disk cannot protect against disk failure.
+Backups are made on launch, before inbox refresh and on normal close. **Settings → Save local backup** creates another snapshot. SQLite's backup API captures databases; hash inventories cover immutable handoffs, incoming packets, retained public batches, personal decisions, display preferences and the separate sample archive. Each profile has its own `backups/` directory and backups do not expire automatically. Settings shows its current backup directory; reset recovery points retain the earlier directory. Copy that private directory to owner-controlled backup media for protection against device loss; copies on the same disk cannot protect against disk failure.
 
 Restore into a **new** directory; the restore tool checks member hashes, database integrity/scope, safe paths and handoff references, and refuses an existing destination:
 
@@ -58,7 +69,7 @@ grad-compass/envGradCompass/bin/python -B grad-compass/scripts/launch_preview.py
   --local-dir grad-compass-workspace/runtime/local-restored
 ```
 
-The original workspace remains in place. Do not copy research or applicant payloads into tracked source files. This workflow does not transfer profile/CV artifacts, send outreach, investigate faculty or automatically call agents.
+The original workspace remains in place. An explicit `--local-dir` uses a separate profile registry next to that directory and never copies the normal preview into it. Do not copy research or applicant payloads into tracked source files. This workflow does not transfer profile/CV artifacts, send outreach, investigate faculty or automatically call agents.
 
 ## Sample workspace and regression review
 
@@ -94,3 +105,11 @@ grad-compass/envGradCompass/bin/python -B grad-compass/scripts/check_local_ui.py
 Its screenshots stay in the private runtime. Additional sample demonstrations use `--research-smoke-test`, `--country-smoke-test`, `--exchange-smoke-test`, or `--readability-smoke-test`; optional `--review-screenshots grad-compass-workspace/reviews` saves Git-excluded sample images.
 
 The legacy `app.py` shell remains available only for explicit isolated development with `GRAD_COMPASS_DATA_DIR` and `GRAD_COMPASS_OFFLINE=1`. The normal launcher above is the supported local workflow and never falls back to legacy data.
+
+To review removal, restore, profile isolation, typed reset, cancellation, recovery and all 12 supported settings/map-selection layouts without touching personal data:
+
+```bash
+grad-compass/envGradCompass/bin/python -B grad-compass/scripts/check_profile_ui.py
+```
+
+This uses only invented temporary records and cleans up its storage. Optional screenshots may be saved with `--screenshots grad-compass-workspace/runtime/profile-ui-review`.
