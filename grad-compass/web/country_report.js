@@ -80,7 +80,9 @@ if(typeof document!=='undefined')(() => {
     }
     const sources=node('section',undefined,'report-section');sources.id='report-sources';sources.append(node('h2','Sources'),node('p','Sources below were supplied with the finding. Observation dates do not establish applicability to a later academic year.'));
     for(const source of report.sources){const row=node('div',undefined,'report-source');const link=node('a',source.locator || source.source_url);if(/^https?:\/\//i.test(source.source_url)){link.href=source.source_url;link.rel='noopener noreferrer';link.target='_blank';}row.append(link,node('p',source.source_url),node('p','Observed '+date(source.observed_at)));sources.append(row);}body.append(sources);
-    layout.append(body,rail);article.append(layout);section.append(article);return true;
+    layout.append(body,rail);article.append(layout);section.append(article);
+    if(requestAnimationFrame && current.request.synthetic===false)window.GradCompassReportReader?.upgrade(article,ctx,code);
+    return true;
   }
   window.GradCompassCountryReport=Object.freeze({render,project:projectCountryReport});
 })();

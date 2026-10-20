@@ -11,7 +11,7 @@ import re
 import secrets
 import sqlite3
 import sys
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit,parse_qs
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(APP_ROOT))
@@ -31,8 +31,12 @@ STATIC_FILES = {
     "/panels.css": (APP_ROOT / "web" / "panels.css", "text/css; charset=utf-8"),
     "/country_report.js": (APP_ROOT / "web" / "country_report.js", "text/javascript; charset=utf-8"),
     "/country_report.css": (APP_ROOT / "web" / "country_report.css", "text/css; charset=utf-8"),
+    "/report_reader.js": (APP_ROOT / "web" / "report_reader.js", "text/javascript; charset=utf-8"),
+    "/report_reader.css": (APP_ROOT / "web" / "report_reader.css", "text/css; charset=utf-8"),
     "/report-assets.json": (APP_ROOT / "web" / "assets" / "countries.json", "application/json"),
     "/assets/belgium-grand-place.jpg": (APP_ROOT / "web" / "assets" / "belgium-grand-place.jpg", "image/jpeg"),
+    "/assets/belgium-flag-small.svg": (APP_ROOT / "web" / "assets" / "belgium-flag-small.svg", "image/svg+xml"),
+    "/assets/belgium-locator.png": (APP_ROOT / "web" / "assets" / "belgium-locator.png", "image/png"),
     "/exchange.js": (APP_ROOT / "web" / "exchange.js", "text/javascript; charset=utf-8"),
     "/exchange.css": (APP_ROOT / "web" / "exchange.css", "text/css; charset=utf-8"),
     "/vendor/leaflet.js": (APP_ROOT / "ui" / "vendor" / "leaflet.js", "text/javascript; charset=utf-8"),
@@ -176,7 +180,7 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
         def log_message(self, format, *args):
             pass  # Do not log query strings, private request contents, or local paths.
 
-        def respond(self, status, payload, content_type="application/json; charset=utf-8"):
+        def respond(self, status, payload, content_type="application/json; charset=utf-8",filename=None):
             body = payload if isinstance(payload, bytes) else json.dumps(payload).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type",content_type)
@@ -184,6 +188,7 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
             self.send_header("Cache-Control","no-store")
             self.send_header("X-Content-Type-Options","nosniff")
             self.send_header("Referrer-Policy","no-referrer")
+            if filename:self.send_header('Content-Disposition','attachment; filename="'+filename+'"')
             self.send_header("Content-Security-Policy","default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
             try:
                 self.end_headers()
@@ -229,6 +234,23 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                     return self.respond(200,workspace.research.request(request_match[1]))
                 if route == "/api/research":
                     return self.respond(200,{**workspace.research.snapshot(), "session": session_token})
+                if route.startswith('/api/reports') and getattr(workspace,'operational',False):
+                    from web import report_packages as packages
+                    query=parse_qs(urlsplit(self.path).query)
+                    if route=='/api/reports':
+                        catalog=packages.catalog(workspace,query.get('request_id',[None])[0])
+                        return self.respond(200,{'reports':[packages.public(r) for r in catalog['reports']],'errors':catalog['errors']})
+                    match=re.fullmatch(r'/api/reports/([a-f0-9]{64})/(annotations|pdf|page|image)',route)
+                    if match:
+                        key,operation=match.groups()
+                        if operation=='annotations':return self.respond(200,packages.annotations(workspace,key))
+                        from web.report_pdf import ensure_pdf,page_data
+                        report=packages.get(workspace,key,query.get('edition',[None])[0])
+                        if operation=='pdf':
+                            pdf=ensure_pdf(workspace,report,query.get('pdf_sha256',[None])[0])
+                            return self.respond(200,pdf['path'].read_bytes(),'application/pdf',pdf['filename'])
+                        page=int(query.get('page',['0'])[0])
+                        return self.respond(200,page_data(workspace,report,page,operation=='image',query.get('pdf_sha256',[None])[0]),'image/png' if operation=='image' else 'application/json; charset=utf-8')
                 if route == '/api/panel-widths':
                     from web.panels import preferences as panel_widths
                     return self.respond(200,{**panel_widths(workspace),'session':session_token})
@@ -273,7 +295,8 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
             profile_operation=profiles is not None and route in ('/api/local/profiles/create','/api/local/profiles/switch','/api/local/reset')
             preferences = route == "/api/display-preferences"
             layout = route == '/api/panel-widths'
-            if not (layout or preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
+            report_operation = getattr(workspace,'operational',False) and route in ('/api/reports/annotate','/api/reports/draft')
+            if not (report_operation or layout or preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
                 return self.respond(405,{"error":"This endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"
             if (self.headers.get("Host") != origin.removeprefix("http://")
@@ -288,6 +311,9 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                     raise ValueError("A small JSON request is required")
                 from web.research_envelopes import loads
                 payload = loads(self.rfile.read(length))
+                if report_operation:
+                    from web import report_packages as packages
+                    return self.respond(200,packages.save_annotation(workspace,payload) if route.endswith('/annotate') else packages.prepare_draft(workspace,payload))
                 if layout:
                     from web.panels import preferences as panel_widths
                     return self.respond(200,panel_widths(workspace,payload))

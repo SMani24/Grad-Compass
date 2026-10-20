@@ -42,6 +42,29 @@ class InboxReceiver:
                 def backup_once():
                     nonlocal backed_up
                     if not backed_up:self.workspace.backup();backed_up=True
+                # Optional canonical-report notices share this finalized inbox, not
+                # the research wire schema. Existing result bytes remain unchanged.
+                ordinary=[]
+                from web import report_packages as packages
+                for path in candidates:
+                    value=None
+                    try:
+                        if path.stat().st_size>8_000_000:ordinary.append(path);continue
+                        value=env.loads(path.read_bytes())
+                        outer=value
+                        if isinstance(outer,dict) and isinstance(outer.get('body'),str):value=env.loads(outer['body'])
+                        if isinstance(value,dict) and value.get('schema_version')==packages.NOTICE:
+                            if not isinstance(outer,dict) or set(outer)!={'body','sha256'} or hashlib.sha256(outer['body'].encode('utf-8')).hexdigest()!=outer['sha256']:raise ValueError('Report notices require the existing exact-byte transport')
+                            if self.signature(path)!=signatures[path.name]:pending+=1;continue
+                            packages.receive_notice(self.workspace,value)
+                            self.processed[path.name]=signatures[path.name];self.errors.pop(path.name,None);continue
+                    except (ValueError,OSError,KeyError,TypeError):
+                        # The normal scanner supplies its exact error for malformed
+                        # response transports; report notices get a scoped error.
+                        if isinstance(value,dict) and value.get('schema_version')==packages.NOTICE:
+                            self.errors[path.name]='Invalid report delivery: package bytes, review or request binding failed';continue
+                    ordinary.append(path)
+                candidates=ordinary
                 receipt=self.workspace.research.scan_inbox(candidates,before_record=backup_once)
                 received=receipt['received']
                 for outcome in receipt['outcomes']:
@@ -50,6 +73,7 @@ class InboxReceiver:
                     else:
                         self.errors.pop(name,None);self.processed[name]=signatures[name]
                 self.workspace.last_receipt=receipt;self.problem=None;self.pending=pending
+                self.report_catalog=packages.catalog(self.workspace)
             except (ValueError,OSError,sqlite3.Error) as error:
                 self.problem='Could not check incoming responses: '+str(error)
             self.checked_at=env.now()
@@ -60,10 +84,13 @@ class InboxReceiver:
             # Receipt identity drives UI updates without exposing payloads on every tick.
             rows=[tuple(row) for row in db.execute('SELECT id,request_id FROM research_acks ORDER BY id')]
             rows.extend(tuple(row) for row in db.execute('SELECT id,revision,request_id FROM research_results ORDER BY request_id,revision'))
+            report_catalog=getattr(self,'report_catalog',{'reports':[],'errors':[]})
+            rows.extend((r['key'],r['edition']) for r in report_catalog['reports'])
             version=hashlib.sha256(env.compact(rows).encode()).hexdigest()
             latest=db.execute('SELECT request_id FROM research_results ORDER BY rowid DESC LIMIT 1').fetchone()
             count=db.execute('SELECT count(DISTINCT request_id) FROM research_results').fetchone()[0]
             errors=[{'file':name,'error':value} for name,value in sorted(self.errors.items())]
+            errors.extend(report_catalog['errors'])
             if self.problem:errors.append({'file':'Inbox','error':self.problem})
             return {'version':version,'checked_at':self.checked_at,'pending':self.pending,'errors':errors,
                     'ready_count':count,'latest_request_id':latest[0] if latest else None}

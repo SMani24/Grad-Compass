@@ -91,6 +91,8 @@ def main():
         )
         from desktop_controls import DesktopControls
         controls = DesktopControls(window)
+        from desktop_downloads import DesktopDownloads
+        downloads=DesktopDownloads(window)
         capture = None
         if args.review_screenshots:
             from core.paths import validate_data_directory
@@ -99,6 +101,7 @@ def main():
 
         def started():
             controls.install_requested.emit()
+            downloads.install_requested.emit()
             if not controls.installed.wait(10):
                 logging.error("Desktop shortcut setup did not complete")
             if args.smoke_test:

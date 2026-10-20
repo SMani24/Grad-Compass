@@ -2,11 +2,38 @@
   "BEL": {
     "path": "/assets/belgium-grand-place.jpg",
     "alt": "Grand Place in Brussels at night, an illustrative country photograph",
-    "credit": "Grand Place, Brussels · Romaine",
+    "credit": "Grand Place, Brussels \u00b7 Romaine",
     "license": "CC0 1.0",
     "source_url": "https://commons.wikimedia.org/wiki/File:Brussels-Grand_Place.jpg",
     "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
     "photographed_at": "2017-11-21",
-    "sha256": "b55deff6ad348f08eca8259828326b9b9eda05962d6cd37f1f7edd348c2249e1"
+    "sha256": "b55deff6ad348f08eca8259828326b9b9eda05962d6cd37f1f7edd348c2249e1",
+    "flag": {
+      "path": "/assets/belgium-flag-small.svg",
+      "alt": "Belgium tricolour flag",
+      "credit": "Original vector by Grad Compass / Marry",
+      "license": "National symbol; original geometric rendering",
+      "sha256": "f048d5a7860ab37c9e491b1bb6a38d29a1c7cfddef4d689a9e8477fd27c76e53"
+    },
+    "locator": {
+      "path": "/assets/belgium-locator.png",
+      "alt": "Belgium highlighted in teal in Western Europe, with neighbouring countries for geographic context",
+      "caption": "Belgium in Western Europe. Geographic context only; no university or campus locations.",
+      "credit": "Grad Compass rendering \u00b7 Natural Earth boundaries",
+      "source_url": "https://www.naturalearthdata.com/",
+      "license": "Public domain",
+      "license_url": "https://www.naturalearthdata.com/about/terms-of-use/",
+      "extent": [
+        -6,
+        45,
+        12,
+        56
+      ],
+      "projection": "Mercator, cropped to extent",
+      "transformation": "Country polygons projected, clipped and labelled; Belgium highlighted",
+      "source_file": "ui/data/countries.geo.json",
+      "source_sha256": "45f41865adec4f86602c2cd05c0e29cd8b437614bf2f5b5a863d12463202cae4",
+      "sha256": "1eb6300fb3cab75651afb26f603dd056a88fa1e827d1842a83b898f935b200fb"
+    }
   }
 }

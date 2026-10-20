@@ -140,6 +140,7 @@
       get("request-preference-summary").textContent=summary(data.preferences);
       get("request-preferences").open=!data.has_preferences;
       get("request-context").value=context.context || "";
+      get('request-only').checked=!!context.request_only;
       get("request-form-status").textContent="This will be saved locally for manual handoff, not sent to an agent.";
       requestDialog.showModal();
     } catch(error) {status(error.message);}
@@ -265,6 +266,7 @@
   async function refreshReceived(){
     await reload();
     if(!researchDialog.open || !current || current.archive)return;
+    await window.GradCompassReportReader?.refresh();
     const identity=current.request.request_id,sequence=openSequence;
     renderList(identity);
     const response=await fetch('/api/research/requests/'+identity,{cache:'no-store'});
@@ -273,7 +275,7 @@
     if(sequence!==openSequence || !researchDialog.open)return;
     if(JSON.stringify([current.acknowledgement,current.results])===JSON.stringify([next.acknowledgement,next.results]))return;
     const section=get('research-request-detail');
-    const editing=[...section.querySelectorAll('textarea:not([readonly])')].some(input=>(input.id==='report-personal-note' ? input.value!==input.defaultValue : input.value) || input===document.activeElement)
+    const editing=section.querySelector('.annotation-draft') || [...section.querySelectorAll('textarea:not([readonly])')].some(input=>((input.id==='report-personal-note' || input.closest('.canonical-report')) ? input.value!==input.defaultValue : input.value) || input===document.activeElement)
       || section.querySelector('#research-response-review[open]');
     if(editing){
       get('show-received-results').hidden=false;
