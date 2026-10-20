@@ -99,3 +99,29 @@
 }
 .report-version-context{margin-top:12px;font-size:.75rem;color:#496372}.report-version-context>summary{cursor:pointer}
 @media(max-width:700px){#research-dialog .canonical-report .report-heading h1{font-size:1.5rem}#research-request-detail .canonical-report .report-heading .eyebrow{font-size:.75rem}}
+/* Editorial editions share a canonical origin, but keep their own passages. */
+.reader-view-switch{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.reader-view-switch button{font-weight:650}
+.reader-view-switch button[aria-pressed=true]{background:#17566b;color:white;border-color:#17566b}
+.canonical-reading .inline-evidence{display:inline;border:0;background:none;padding:0;color:#066785;font:inherit;line-height:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;white-space:normal}
+.inline-evidence:hover{color:#003d50}.inline-evidence:focus-visible{outline:2px solid #197a91;outline-offset:2px;border-radius:2px}
+.report-source-dialog{width:min(92vw,680px);max-height:82dvh;padding:24px;border:1px solid #adcbd5;border-radius:14px;overflow:auto;background:#fff;color:#193c4e;box-shadow:0 14px 60px #102c3d66}
+.report-source-dialog::backdrop{background:#16334270}
+.report-source-dialog a{display:block;overflow-wrap:anywhere;margin-block:12px;color:#075f7a}
+.report-source-dialog p{font-size:.9rem!important;line-height:1.7!important}
+.report-source-dialog h2{font-size:1.4rem}.report-source-dialog h3{font-size:1rem;margin-top:24px}
+#close-report-sources{float:right}
+.report-source{padding:12px 0;border-bottom:1px solid #dce7eb}.report-source>summary{cursor:pointer;color:#075f7a;font-size:.9rem;font-weight:650;line-height:1.6}
+#research-request-detail .report-export-origin{font-size:.8rem;line-height:1.6;margin-bottom:8px}
+.annotation-document{font-size:.7rem!important;color:#506c7a}
+@media(max-width:700px){.report-source-dialog{padding:16px}.reader-view-switch{width:100%}.reader-toolbar>select{flex:1 1 120px}#reader-sections{flex-basis:100%}}
+.canonical-report .report-photo{height:120px}
+.canonical-report .report-heading{padding:14px 22px}
+#research-dialog .canonical-report .report-heading h1{font-size:1.8rem;margin:8px 0 12px}
+#research-request-detail .canonical-report .report-heading .eyebrow{font-size:.7rem;line-height:1.4;margin:4px 0}
+#research-request-detail .canonical-report .report-heading .report-export-origin,#research-request-detail .canonical-report .report-heading .report-scope-line{font-size:.8rem;line-height:1.55;margin:8px 0 0}
+.canonical-report .report-facts{padding:12px 22px}
+.canonical-report .report-term-labels{padding:8px 22px}
+.canonical-reading .report-section{scroll-margin-top:calc(var(--reader-toolbar-height,110px) + 20px)}
+.annotation-panel{top:calc(var(--reader-toolbar-height,110px) + 20px);max-height:calc(100dvh - var(--reader-toolbar-height,110px) - 40px)}
+@media(max-width:700px){#research-dialog .canonical-report .report-heading h1{font-size:1.5rem}.canonical-report .report-photo{height:110px}.canonical-reading .report-section{scroll-margin-top:20px}}

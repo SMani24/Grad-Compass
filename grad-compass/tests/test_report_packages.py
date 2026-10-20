@@ -208,7 +208,7 @@ class ReportPackageTests(unittest.TestCase):
         self.meta['canonical_document']={**self.meta['canonical_document'],'revision_id':str(uuid4()),'revision_number':2,'sha256':reports.digest(self.markdown.encode())}
         self.root=self.root.parent/'revision-0002';self.root.mkdir();(self.root/'report.md').write_text(self.markdown);(self.root/'map.md').write_text(self.evidence);self.write()
         report=reports.catalog(self.workspace)['reports'][0];pdf=ensure_pdf(self.workspace,report);q=QPdfDocument(None);q.load(str(pdf['path']));text=''.join(q.getAllText(p).text() for p in range(q.pageCount()))
-        self.assertIn('complete invented summary',text);self.assertNotIn('Private synthetic detail',text);self.assertIn('Report v2',text)
+        self.assertIn('complete invented summary',text);self.assertNotIn('Private synthetic detail',text);self.assertIn('canonical report v2',text)
         self.assertIn('-v2-reader.pdf',pdf['filename']);self.assertEqual(original['path'].read_bytes(),original_bytes)
         self.assertIn('-v1-reader.pdf',ensure_pdf(self.workspace,old)['filename'])
 

@@ -85,7 +85,7 @@ class InboxReceiver:
             rows=[tuple(row) for row in db.execute('SELECT id,request_id FROM research_acks ORDER BY id')]
             rows.extend(tuple(row) for row in db.execute('SELECT id,revision,request_id FROM research_results ORDER BY request_id,revision'))
             report_catalog=getattr(self,'report_catalog',{'reports':[],'errors':[]})
-            rows.extend((r['key'],r['edition']) for r in report_catalog['reports'])
+            rows.extend((r['key'],r['edition'],*[e['id'] for e in r.get('editorial_editions',[])]) for r in report_catalog['reports'])
             version=hashlib.sha256(env.compact(rows).encode()).hexdigest()
             latest=db.execute('SELECT request_id FROM research_results ORDER BY rowid DESC LIMIT 1').fetchone()
             count=db.execute('SELECT count(DISTINCT request_id) FROM research_results').fetchone()[0]

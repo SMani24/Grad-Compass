@@ -121,6 +121,7 @@ def catalog(workspace,request_id=None):
         if root.exists():
             for path in sorted(root.rglob('metadata.local.json')):
                 if any(p.startswith('.') for p in path.relative_to(root).parts):continue
+                if 'editions' in path.relative_to(root).parts:continue
                 try:
                     report=validate(workspace,path);doc=report['metadata']['canonical_document'];identity=(doc['id'],doc['revision_id'])
                     if identity in bindings and bindings[identity]!=doc['sha256']:raise ValueError('Canonical revision has conflicting bytes')
@@ -133,10 +134,15 @@ def catalog(workspace,request_id=None):
         versions={}
         for report in reports:
             if request_id is None or report['metadata']['request']['id']==request_id:versions.setdefault(report['key'],report)
+        from web.report_editions import attach
+        parents={r['metadata']['canonical_document']['revision_id'] for r in reports}
+        for report in versions.values():attach(workspace,report,errors,parents)
         return {'reports':list(versions.values()),'errors':errors}
 
 
-def public(report):return {k:v for k,v in report.items() if not k.endswith('_bytes')}
+def public(report):
+    from web.report_editions import public as public_edition
+    return {k:public_edition(v) if k in ('reader','detailed') and v else v for k,v in report.items() if not k.endswith('_bytes')}
 
 
 def get(workspace,key,edition=None):
@@ -145,7 +151,8 @@ def get(workspace,key,edition=None):
         if not re.fullmatch('[a-f0-9]{64}',edition):raise ValueError('Choose a saved PDF edition')
         path=workspace.directory/'report-cache'/key/edition/'metadata.local.json'
         if not path.is_file():raise ValueError('Saved report edition not found')
-        return _cached(workspace,path)
+        from web.report_editions import attach
+        return attach(workspace,_cached(workspace,path),[])
     report=next((r for r in catalog(workspace)['reports'] if r['key']==key),None)
     if report is None:raise ValueError('Saved report version not found in this profile')
     return report
@@ -186,9 +193,14 @@ def save_annotation(workspace,payload):
             if not isinstance(selector,dict):raise ValueError('Select a passage before annotating')
             start=selector.get('start');end=selector.get('end')
             if type(start) is not int or type(end) is not int or start<0 or not start<end:raise ValueError('Invalid passage range')
-            if selector.get('view')=='report':
-                if set(selector)!={'view','block_id','start','end','quote'}:raise ValueError('Invalid report passage fields')
-                block=report['content']['blocks'].get(selector.get('block_id'))
+            if selector.get('view') in ('report','editorial'):
+                editorial=selector['view']=='editorial'
+                if set(selector)!=({'view','block_id','start','end','quote','document'} if editorial else {'view','block_id','start','end','quote'}):raise ValueError('Invalid report passage fields')
+                if editorial:
+                    from web.report_editions import get as get_edition
+                    tree=get_edition(workspace,report,selector['document'])['content']
+                else:tree=report['content']
+                block=tree['blocks'].get(selector.get('block_id'))
                 if block is None:raise ValueError('Passage is not in this canonical report')
                 text=block['text']
             elif selector.get('view')=='pdf':
@@ -221,7 +233,7 @@ def prepare_draft(workspace,payload):
         finding=next(f for f in result['findings'] if f['kind']=='country' and f['country_code']==meta['country_code'] and f['finding_revision']==producer['finding_revision'])
         lines=[report['content']['title'],f"Canonical report v{doc['revision_number']} · {doc['revision_id']} · SHA-256 {doc['sha256']}"]
         for a in selected:
-            s=a['selector'];location=('PDF page '+str(s['page']+1)+' · PDF SHA-256 '+s['pdf_sha256']) if s['view']=='pdf' else s['block_id']
+            s=a['selector'];location=('PDF page '+str(s['page']+1)+' · PDF SHA-256 '+s['pdf_sha256']) if s['view']=='pdf' else s['block_id']+(' · editorial edition '+s['document'] if s['view']=='editorial' else '')
             lines.extend(['',location,'“'+s['quote']+'”',a['comment'] or '(Highlight; no comment)'])
         comment='\n'.join(lines)
         if len(comment)>4000:raise ValueError('Selected passages exceed the 4000-character feedback limit. Select fewer annotations; none were sent.')

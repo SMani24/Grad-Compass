@@ -21,11 +21,15 @@ def preferences(workspace,payload=None):
                 value['sidebar_open']=payload['sidebar_open']
             if 'position' in payload:
                 p=payload['position']
-                if not isinstance(p,dict) or set(p)!={'key','anchor','offset'} or not isinstance(p['key'],str) or not re.fullmatch('[a-f0-9]{64}',p['key']):raise ValueError('Choose the exact report version')
+                if not isinstance(p,dict) or not {'key','anchor','offset'}<=set(p)<={'key','anchor','offset','document'} or not isinstance(p['key'],str) or not re.fullmatch('[a-f0-9]{64}',p['key']):raise ValueError('Choose the exact report version')
                 from web.report_packages import get
                 report=get(workspace,p['key'])
-                anchors={'top',*[b['id'] for b in report['content']['blocks'].values()]}
+                tree=report['content'];identity=p['key']
+                if 'document' in p:
+                    from web.report_editions import get as get_edition
+                    tree=get_edition(workspace,report,p['document'])['content'];identity+=':'+p['document']
+                anchors={'top',*[b['id'] for b in tree['blocks'].values()]}
                 if p['anchor'] not in anchors or type(p['offset']) is not int or not -10000<=p['offset']<=10000:raise ValueError('Choose a passage in this report version')
-                value['positions'][p['key']]={'anchor':p['anchor'],'offset':p['offset']}
+                value['positions'][identity]={'anchor':p['anchor'],'offset':p['offset']}
             atomic_json(path,value)
         return value

@@ -38,7 +38,7 @@ def refs(text):
 
 
 def parse_report(markdown,evidence):
-    sections=[];blocks={};counts={};title='Country report';section=None
+    sections=[];blocks={};counts={};title='Country report';title_seen=False;section=None
     def block(tokens):
         text=plain(tokens)
         digest=hashlib.sha256(text.encode()).hexdigest()[:12]
@@ -54,7 +54,7 @@ def parse_report(markdown,evidence):
         kind=token['type']
         if kind=='heading':
             text=plain(token['children'])
-            if token['attrs']['level']==1:title=text;continue
+            if token['attrs']['level']==1 and not title_seen:title=text;title_seen=True;continue
             identity=re.sub('[^a-z0-9]+','-',text.lower()).strip('-')
             section={'id':identity,'title':text,'items':[]};sections.append(section)
         elif kind in ('paragraph','block_text'):
@@ -71,6 +71,7 @@ def parse_report(markdown,evidence):
                 rows.extend([[block(c['children']) for c in row] for row in source])
             section['items'].append({'type':'table','rows':rows})
         elif kind in ('block_html','block_code'):
+            if kind=='block_html' and re.fullmatch(r'\s*<!--[\s\S]*?-->\s*',token.get('raw','')):continue
             ensure();section['items'].append({'type':'paragraph','block':block([{'type':'text','raw':token.get('raw','')}])})
     sources={}
     for token in PARSER(evidence):

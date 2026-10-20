@@ -243,12 +243,16 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                     if route=='/api/reports/reading':
                         from web.report_reading import preferences as reading_preferences
                         return self.respond(200,reading_preferences(workspace))
-                    match=re.fullmatch(r'/api/reports/([a-f0-9]{64})/(annotations|pdf|page|image|markdown)',route)
+                    match=re.fullmatch(r'/api/reports/([a-f0-9]{64})/(annotations|pdf|page|image|markdown|editorial)',route)
                     if match:
                         key,operation=match.groups()
                         if operation=='annotations':return self.respond(200,packages.annotations(workspace,key))
                         from web.report_pdf import ensure_pdf,page_data
                         report=packages.get(workspace,key,query.get('edition',[None])[0])
+                        from web import report_editions as editions
+                        if operation=='editorial':return self.respond(200,editions.public(editions.get(workspace,report,query.get('document',[None])[0])))
+                        if 'reader' in query or 'detailed' in query:
+                            report=editions.select(workspace,report,*(None if query.get(kind,['none'])[0]=='none' else query[kind][0] for kind in ('reader','detailed')))
                         if operation=='markdown':
                             from web.report_export import markdown,filename
                             choice=query.get('annotations',['0'])[0]

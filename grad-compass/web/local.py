@@ -242,7 +242,7 @@ class LocalWorkspace(DemoWorkspace):
             for name in ('country-decisions.json','display-preferences.json','panel-widths.json','report-annotations.json','report-reading.json'):
                 source=regular(self.directory/name)
                 if source.is_file():atomic_json(target/name,env.loads(source.read_bytes()))
-            for name in ('research-handoff','inbox','batches','received-batches','sample-history','reports','report-cache'):
+            for name in ('research-handoff','inbox','batches','received-batches','sample-history','reports','report-cache','editorial-cache'):
                 source=self.directory/name
                 if source.exists():
                     for path in source.rglob('*'):

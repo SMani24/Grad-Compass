@@ -27,7 +27,8 @@ def main():
     screenshots=private_directory(args.screenshots);window=webview.create_window('Grad Compass — canonical report check (isolated copy)',f'http://127.0.0.1:{server.server_port}/',width=1440,height=1000,min_size=(390,640));capture=PreviewCapture(window,screenshots,prefix='2026-10-20-canonical-'+('restart-' if args.restart else ''))
     from web.report_packages import catalog
     active_report=next(r for r in catalog(profiles.workspace)['reports'] if r['metadata']['country_code']=='BEL')
-    expected_pdf='belgium-country-report-2026-10-20-v'+str(active_report['metadata']['canonical_document']['revision_number'])+'-reader.pdf'
+    from web.report_pdf import ensure_pdf
+    expected_pdf=ensure_pdf(profiles.workspace,active_report)['filename']
     download_names=[];downloads_root=private_directory(screenshots/'isolated-downloads'/str(uuid4()))
     def download_path(name):download_names.append(name);return str(downloads_root/name)
     downloads=DesktopDownloads(window,choose_path=download_path)
@@ -52,7 +53,7 @@ def main():
             click('read-country-report');wait("!!document.querySelector('.canonical-report .canonical-table')")
             assert js("document.querySelector('.canonical-report').dataset.canonical")
             assert js("!!document.querySelector('.canonical-report .report-locator img')")
-            assert js("document.querySelectorAll('.canonical-citations a').length>0")
+            assert js("document.querySelectorAll('.inline-evidence').length>0")
             if args.restart:
                 click('reader-download-pdf')
                 end=time.monotonic()+30
@@ -62,8 +63,7 @@ def main():
                 click('reader-annotations');wait("document.querySelectorAll('.saved-annotation').length>=2")
                 assert 'Edited isolated report comment' in js("document.querySelector('.annotation-panel').textContent+Array.from(document.querySelectorAll('.annotation-panel textarea')).map(n=>n.value).join(' ')")
                 assert js("!!document.getElementById('annotation-feedback-draft')")
-                click('reader-show-pdf');wait("!!document.querySelector('.pdf-page')")
-                js("document.getElementById('pdf-page').value='1';document.getElementById('pdf-page').dispatchEvent(new Event('change'))")
+                js("[...document.querySelectorAll('.annotation-location')].find(n=>n.textContent.includes('PDF page')).click()")
                 wait("document.querySelector('.pdf-page')?.dataset.page==='1' && document.querySelectorAll('.pdf-mark').length>0")
                 js("const zoom=document.querySelector('select[aria-label=\"PDF zoom\"]');zoom.value='3';zoom.dispatchEvent(new Event('change'))")
                 assert js("document.querySelector('.pdf-page').clientWidth>document.querySelector('.pdf-viewport').clientWidth && document.getElementById('research-dialog').scrollWidth<=document.getElementById('research-dialog').clientWidth")
