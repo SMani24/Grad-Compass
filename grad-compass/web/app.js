@@ -85,6 +85,7 @@ if (typeof document !== "undefined") {
   const get = id => document.getElementById(id);
   const state = { operational: false, universities: [], filtered: [], selected: null, view: "map", mode: "universities", selectedCountry: null, decisions: {}, session: null, countries: [], geometry: null, map: null, polygons: null, markers: null, mapError: false, detailSequence: 0 };
   const elements = { search: get("search"), country: get("country"), status: get("status"), results: get("results"), inspector: get("inspector") };
+  window.addEventListener('grad-compass:panels-resized',()=>state.map?.invalidateSize({pan:false}));
   let navigationIndex = 0;
   let navigationEnd = 0;
   let editingSearch = false;

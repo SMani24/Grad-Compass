@@ -27,6 +27,8 @@ STATIC_FILES = {
     "/research.js": (APP_ROOT / "web" / "research.js", "text/javascript; charset=utf-8"),
     "/research.css": (APP_ROOT / "web" / "research.css", "text/css; charset=utf-8"),
     "/settings.js": (APP_ROOT / "web" / "settings.js", "text/javascript; charset=utf-8"),
+    "/panels.js": (APP_ROOT / "web" / "panels.js", "text/javascript; charset=utf-8"),
+    "/panels.css": (APP_ROOT / "web" / "panels.css", "text/css; charset=utf-8"),
     "/exchange.js": (APP_ROOT / "web" / "exchange.js", "text/javascript; charset=utf-8"),
     "/exchange.css": (APP_ROOT / "web" / "exchange.css", "text/css; charset=utf-8"),
     "/vendor/leaflet.js": (APP_ROOT / "ui" / "vendor" / "leaflet.js", "text/javascript; charset=utf-8"),
@@ -223,6 +225,9 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                     return self.respond(200,workspace.research.request(request_match[1]))
                 if route == "/api/research":
                     return self.respond(200,{**workspace.research.snapshot(), "session": session_token})
+                if route == '/api/panel-widths':
+                    from web.panels import preferences as panel_widths
+                    return self.respond(200,{**panel_widths(workspace),'session':session_token})
                 if route == "/api/display-preferences":
                     return self.respond(200, {**workspace.display_preferences(), "session": session_token})
                 if route == "/api/exchange":
@@ -263,7 +268,8 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
             local_operation = getattr(workspace,"operational",False) and local_action in ('refresh','backup','remove-university','restore-university','copy-instructions') and route=='/api/local/'+local_action
             profile_operation=profiles is not None and route in ('/api/local/profiles/create','/api/local/profiles/switch','/api/local/reset')
             preferences = route == "/api/display-preferences"
-            if not (preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
+            layout = route == '/api/panel-widths'
+            if not (layout or preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
                 return self.respond(405,{"error":"This endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"
             if (self.headers.get("Host") != origin.removeprefix("http://")
@@ -278,6 +284,9 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                     raise ValueError("A small JSON request is required")
                 from web.research_envelopes import loads
                 payload = loads(self.rfile.read(length))
+                if layout:
+                    from web.panels import preferences as panel_widths
+                    return self.respond(200,panel_widths(workspace,payload))
                 if profile_operation:
                     if not isinstance(payload,dict):raise ValueError('Review the local profile action')
                     fields={'/api/local/profiles/create':{'name'},'/api/local/profiles/switch':{'profile_id'},'/api/local/reset':{'profile_id','token','confirmation'}}[route]
