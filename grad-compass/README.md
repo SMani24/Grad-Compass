@@ -147,3 +147,7 @@ To verify automatic receipt, copy instructions, partial/final updates, draft pro
 grad-compass/envGradCompass/bin/python -B grad-compass/scripts/check_inbox_ui.py \
   --screenshots grad-compass-workspace/runtime/inbox-ui-review
 ```
+
+Country reports support Comfortable/Wide reading widths, Hide/Show requests, compact section navigation and a private per-version reading position. Tables use the available window independently of paragraph width. Open Annotations when needed; closing it restores the reading area.
+
+Download PDF saves a concise reader edition of the selected report. Export options → Download detailed Markdown saves the complete report, editorial evidence map, dated public sources and stable passage references for use outside the app. Personal annotations are excluded unless you explicitly select their Markdown checkbox. Report versions and research-result revisions are distinct; About versions and exports explains their relationship. Older reports and their exact PDF annotations remain available through the report-version selector.

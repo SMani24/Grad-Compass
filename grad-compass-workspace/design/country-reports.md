@@ -82,3 +82,47 @@ Each content block has a stable section/paragraph-or-cell reference derived from
 Feedback preparation stores a private draft containing selected quotations and exact report/page references. Explicit saving uses the existing request/result/finding-bound feedback envelope. Follow-up preparation uses the existing bounded refresh form and request-only preference exceptions. No automatic sending, factual approval, preference edit or agent execution is introduced. Personal country notes remain separate and available on the map.
 
 Codex owns the content parser, reader, app PDF exports, annotations, native download control and static app assets. Marry owns producer metadata/package publication and compatibility; Dave/Alex own canonical content and factual review. The original prepared producer delivery document and flag source remain their files; the app uses a copied flag asset. Locator provenance, extent, transformation, public-domain source and exact hashes are in `web/assets/countries.json`. It depicts country geography, never campuses. Conditional numbers come from canonical content; no applicant affordability or guaranteed-support graphic is inferred.
+
+## Reader editions and portable exports — APP-015, 2026-10-20
+
+The reading workspace now uses the available window for tables and figures while constraining prose independently: Comfortable is approximately 70 characters, Wide approximately 92, constrained by the actual viewport. The saved-request sidebar collapses; section navigation is a compact toolbar selector. Closing annotations releases its width. Map resize handles are quiet edge dividers with a 20-pixel pointer target, a stronger hover/focus/drag indicator, and the existing keyboard/reset behavior.
+
+`report-reading.json` is an app-owned private profile preference, included in ordinary backups. It stores width, sidebar visibility and reading positions keyed by exact canonical content key. Positions use a stable passage ID plus pixel offset, rather than a window-size-dependent document offset; a top-of-document position is also supported. Writes are debounced, flushed on navigation and restored after images/layout. These preferences neither modify research history nor travel to agents. Existing annotations, PDF inventories and canonical keys are unchanged.
+
+### Implemented exports
+
+The selected canonical report and metadata edition determine both exports. The research result revision is a separate identifier. In the Belgium handoff, result r2 initially supplied report v1; a genuine replacement report v2 arrived subsequently. The reader labels report versions explicitly and explains the relationship in a secondary “About versions and exports” disclosure. A renderer name is an app layout/cache identifier, never a factual report version.
+
+* **Reader PDF:** `web/report_pdf.py`, renderer `country-reader-2`. Until producer concise copy is agreed and delivered, the fallback selects complete current canonical at-a-glance passages, the qualified regional cost table and its explanation, and the first three timing/next questions. It does not paraphrase new factual assertions. It includes dates, scope, actual review, historical/unknown/conditional distinctions and linked editorial source references. Other reports without that editorial structure retain their complete content as a fallback. The full source-map text and all omitted detail remain in the Markdown companion. Old detailed PDFs and old reader renderers stay immutable and retrievable by digest, including through their original page annotations.
+* **Detailed Markdown:** `web/report_export.py`. The entire canonical Markdown and editorial evidence map are included verbatim, followed by bound public finding-level source records, observation dates, complete passage text with stable locators and exact report/review/result provenance. This retains calculations, applicable years, regional differences, unresolved conflicts and source qualifications. All public source URLs are present; the original map's obsolete sibling filename and internal coordination links remain historical context, not dependencies. Its content and public evidence are embedded in the file. It does not manufacture a precise claim-to-source mapping where the producer supplied only topic or finding-level associations. Local operational metadata paths are omitted. Personal annotations are excluded by default; a labelled checkbox explicitly includes only the selected report version's saved annotations in a separately named Markdown export. PDF exports keep annotations separate.
+
+Example names: `belgium-country-report-2026-10-20-v2-reader.pdf`, `belgium-country-report-2026-10-20-v2-detailed.md`, and `…-v2-detailed-with-annotations.md`. Choosing report v1 exports v1, without overwriting its internal immutable cache or reanchoring annotations. The same-origin native download handler permits only these report PDF/Markdown routes and preserves the server's descriptive filename.
+
+### Small optional producer addition — proposed, not activated
+
+Keep private report-package 0.1, private responses 0.1.0 and public exchange 1.0.0 compatible. The smallest proposed addition is an optional `reader_document` metadata reference alongside `canonical_document` and `evidence_map`:
+
+```json
+{
+  "reader_document": {
+    "relative_path": "country-reader-r0001.md",
+    "sha256": "exact UTF-8 reader document hash",
+    "revision_id": "editorial revision UUID",
+    "revision_number": 1,
+    "canonical_revision_id": "exact detailed canonical revision UUID",
+    "canonical_sha256": "exact detailed canonical bytes hash",
+    "evidence_map_sha256": "exact accompanying evidence map hash",
+    "passage_map": {
+      "opportunities-1": ["existing-canonical-section/text-hash/occurrence"]
+    },
+    "factual_review": {
+      "state": "pending"
+    },
+    "human_approval": {"state": "unknown"}
+  }
+}
+```
+
+The concise Markdown uses stable explicit editorial paragraph IDs, for example an `<!-- passage: opportunities-1 -->` marker preceding a paragraph. Dave/Discovery provide engaging concise wording, essential conditions, opportunities, obstacles, unknowns and next steps. The mapping binds editorial passages to detailed canonical block IDs (available in the portable export); it records editorial lineage rather than inventing factual support. A non-pending editorial review must name its own exact editorial revision/hash, record, time and scope, separately from canonical review and human approval. The draft shape above requires Marry's compatibility confirmation before producer adoption or consumer activation. No undelivered summary is treated as approved or silently substituted into the app.
+
+Marry owns metadata/package/notice delivery and compatibility, Dave/Discovery own both research and editorial wording, Alex owns factual review, and Codex owns consumer validation/rendering/export/cache. A new concise revision, changed parent binding or review record is a new immutable package edition. Retain earlier report/PDF versions and private annotations. No rewrite of shared importer files or exchange schemas is needed. The current exact canonical package remains usable while this optional concise addition is discussed; the tested extract fallback is already implemented.
