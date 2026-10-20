@@ -302,14 +302,12 @@ if (typeof document !== "undefined") {
       personal.append(label, chooser, saved); elements.inspector.append(personal);
       chooser.addEventListener("change", async () => {
         const previous = state.decisions[code] || "";
-        const choice = chooser.value; chooser.disabled = true; saved.textContent = "Saving…";
+        const choice = chooser.value; chooser.disabled = true; saved.textContent = "Saving decision…";saved.dataset.state='saving';
         try {
-          const response = await fetch("/api/country-decisions", {method:"POST",headers:{"Content-Type":"application/json","X-Grad-Compass-Session":state.session},body:JSON.stringify({country_code:code,decision:choice})});
-          const result = await response.json();
-          if (!response.ok) throw new Error("Could not save your decision. Please retry.");
+          const result = await window.GradCompassResearch.post('/api/country-decisions',{country_code:code,decision:choice});
           state.decisions = result.country_decisions; renderResults();
-          if (sequence === state.detailSequence) saved.textContent = "Saved in this workspace. Research review is unchanged.";
-        } catch(error) { chooser.value = previous; if (sequence === state.detailSequence) saved.textContent = error.message; }
+          if (sequence === state.detailSequence){saved.textContent = "Saved in this workspace. Research review is unchanged.";saved.dataset.state='saved';}
+        } catch(error) { chooser.value = previous; if (sequence === state.detailSequence){saved.textContent = 'Decision not saved. '+error.message+' Previous choice kept.';saved.dataset.state='error';} }
         finally { chooser.disabled = false; }
       });
       const explore = node("button", "portal-link explore-country", "Explore universities here");
