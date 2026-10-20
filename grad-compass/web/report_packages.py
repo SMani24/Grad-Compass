@@ -218,7 +218,7 @@ def prepare_draft(workspace,payload):
         meta=report['metadata'];doc=meta['canonical_document'];producer=meta.get('producer_result')
         if not producer:raise ValueError('This report has no received finding binding for feedback yet; Marry owns that handoff')
         request=workspace.research.request(meta['request']['id']);result=next(r['envelope'] for r in request['results'] if r['envelope']['digest']==producer['body_sha256'])
-        finding=next(f for f in result['findings'] if f['finding_revision']==producer['finding_revision'])
+        finding=next(f for f in result['findings'] if f['kind']=='country' and f['country_code']==meta['country_code'] and f['finding_revision']==producer['finding_revision'])
         lines=[report['content']['title'],f"Canonical report v{doc['revision_number']} · {doc['revision_id']} · SHA-256 {doc['sha256']}"]
         for a in selected:
             s=a['selector'];location=('PDF page '+str(s['page']+1)+' · PDF SHA-256 '+s['pdf_sha256']) if s['view']=='pdf' else s['block_id']

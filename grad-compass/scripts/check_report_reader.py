@@ -7,6 +7,7 @@ import sys
 import threading
 import time
 import traceback
+from uuid import uuid4
 
 APP=Path(__file__).resolve().parents[1];sys.path[:0]=[str(APP),str(APP/'scripts')]
 from web.profiles import LocalProfiles
@@ -24,7 +25,7 @@ def main():
     from preview_capture import PreviewCapture
     from desktop_downloads import DesktopDownloads
     screenshots=private_directory(args.screenshots);window=webview.create_window('Grad Compass — canonical report check (isolated copy)',f'http://127.0.0.1:{server.server_port}/',width=1440,height=1000,min_size=(390,640));capture=PreviewCapture(window,screenshots,prefix='2026-10-20-canonical-'+('restart-' if args.restart else ''))
-    download_names=[];downloads_root=private_directory(screenshots/'isolated-downloads')
+    download_names=[];downloads_root=private_directory(screenshots/'isolated-downloads'/str(uuid4()))
     def download_path(name):download_names.append(name);return str(downloads_root/name)
     downloads=DesktopDownloads(window,choose_path=download_path)
     passed=[]
@@ -52,7 +53,7 @@ def main():
             if args.restart:
                 click('reader-download-pdf')
                 end=time.monotonic()+30
-                while time.monotonic()<end and not (downloads_root/'belgium-country-report-2026-10-20-v1.pdf').is_file():time.sleep(.1)
+                while time.monotonic()<end and (not download_names or not (downloads_root/'belgium-country-report-2026-10-20-v1.pdf').is_file()):time.sleep(.1)
                 assert download_names==['belgium-country-report-2026-10-20-v1.pdf']
                 assert (downloads_root/download_names[0]).read_bytes().startswith(b'%PDF-')
                 click('reader-annotations');wait("document.querySelectorAll('.saved-annotation').length>=2")
@@ -61,12 +62,19 @@ def main():
                 click('reader-show-pdf');wait("!!document.querySelector('.pdf-page')")
                 js("document.getElementById('pdf-page').value='2';document.getElementById('pdf-page').dispatchEvent(new Event('change'))")
                 wait("document.querySelector('.pdf-page')?.dataset.page==='2' && document.querySelectorAll('.pdf-mark').length>0")
+                js("const zoom=document.querySelector('select[aria-label=\"PDF zoom\"]');zoom.value='3';zoom.dispatchEvent(new Event('change'))")
+                assert js("document.querySelector('.pdf-page').clientWidth>document.querySelector('.pdf-viewport').clientWidth && document.getElementById('research-dialog').scrollWidth<=document.getElementById('research-dialog').clientWidth")
+                js("document.querySelector('select[aria-label=\"PDF zoom\"]').value='1';document.querySelector('select[aria-label=\"PDF zoom\"]').dispatchEvent(new Event('change'))")
                 shot('annotations-and-pdf');passed.append(True);print('Native restart passed: report/PDF highlights, edited comment, private draft and exact PDF location preserved.',flush=True);return
             wait("document.querySelector('.report-photo img')?.naturalWidth>0");shot('report-header')
             js("document.querySelector('[id*=canonical-funding]').scrollIntoView({block:'start'})");assert js("document.querySelector('.reader-toolbar').getBoundingClientRect().top>=0 && document.querySelector('.reader-toolbar').getBoundingClientRect().top<80");shot('funding-table')
             # Select across actual rich-text nodes; the same browser Range is used by mouse/keyboard selection.
             js("""(()=>{const b=document.querySelector('.canonical-table tbody tr:first-child td:nth-child(2) [data-report-block]');const w=document.createTreeWalker(b,NodeFilter.SHOW_TEXT),nodes=[];while(w.nextNode())nodes.push(w.currentNode);const r=document.createRange();r.setStart(nodes[0],0);r.setEnd(nodes[Math.min(1,nodes.length-1)],nodes[Math.min(1,nodes.length-1)].length);const s=getSelection();s.removeAllRanges();s.addRange(r);document.querySelector('.canonical-reading').dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));})()""")
-            wait("!document.getElementById('reader-comment').disabled");click('reader-comment');wait("!!document.getElementById('new-annotation-comment-text')");js("document.getElementById('new-annotation-comment-text').value='Isolated report comment'")
+            wait("!document.getElementById('reader-comment').disabled")
+            js("window.__validPassage=getSelection().getRangeAt(0).cloneRange();const invalid=document.createRange();invalid.selectNodeContents(document.querySelector('.canonical-reading'));getSelection().removeAllRanges();getSelection().addRange(invalid);document.querySelector('.canonical-reading').dispatchEvent(new MouseEvent('mouseup',{bubbles:true}))")
+            assert js("document.getElementById('reader-highlight').disabled"),'Unsupported selection must not reuse an earlier passage'
+            js("getSelection().removeAllRanges();getSelection().addRange(window.__validPassage);document.querySelector('.canonical-reading').dispatchEvent(new MouseEvent('mouseup',{bubbles:true}))")
+            click('reader-comment');wait("!!document.getElementById('new-annotation-comment-text')");js("document.getElementById('new-annotation-comment-text').value='Isolated report comment'")
             click('reader-annotations');click('reader-annotations');assert js("document.getElementById('new-annotation-comment-text').value")=='Isolated report comment'
             js("document.getElementById('canonical-version').dispatchEvent(new Event('change'))");assert js("document.getElementById('new-annotation-comment-text').value")=='Isolated report comment';assert js("document.getElementById('reader-status').textContent.includes('Save or cancel')")
             click('save-new-annotation');wait("document.getElementById('reader-status').textContent.includes('saved privately')")
