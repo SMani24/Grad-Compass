@@ -239,7 +239,7 @@ class LocalWorkspace(DemoWorkspace):
                 dest=target/source.name
                 fd=os.open(dest,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600);os.close(fd)
                 with closing(sqlite3.connect(source.as_uri()+'?mode=ro',uri=True)) as src,closing(sqlite3.connect(dest)) as dst:src.backup(dst)
-            for name in ('country-decisions.json','display-preferences.json','panel-widths.json','report-annotations.json'):
+            for name in ('country-decisions.json','display-preferences.json','panel-widths.json','report-annotations.json','report-reading.json'):
                 source=regular(self.directory/name)
                 if source.is_file():atomic_json(target/name,env.loads(source.read_bytes()))
             for name in ('research-handoff','inbox','batches','received-batches','sample-history','reports','report-cache'):

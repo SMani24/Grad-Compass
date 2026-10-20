@@ -240,12 +240,20 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                     if route=='/api/reports':
                         catalog=packages.catalog(workspace,query.get('request_id',[None])[0])
                         return self.respond(200,{'reports':[packages.public(r) for r in catalog['reports']],'errors':catalog['errors']})
-                    match=re.fullmatch(r'/api/reports/([a-f0-9]{64})/(annotations|pdf|page|image)',route)
+                    if route=='/api/reports/reading':
+                        from web.report_reading import preferences as reading_preferences
+                        return self.respond(200,reading_preferences(workspace))
+                    match=re.fullmatch(r'/api/reports/([a-f0-9]{64})/(annotations|pdf|page|image|markdown)',route)
                     if match:
                         key,operation=match.groups()
                         if operation=='annotations':return self.respond(200,packages.annotations(workspace,key))
                         from web.report_pdf import ensure_pdf,page_data
                         report=packages.get(workspace,key,query.get('edition',[None])[0])
+                        if operation=='markdown':
+                            from web.report_export import markdown,filename
+                            choice=query.get('annotations',['0'])[0]
+                            if choice not in ('0','1'):raise ValueError('Choose whether to include personal annotations')
+                            return self.respond(200,markdown(workspace,report,choice=='1'),'text/markdown; charset=utf-8',filename(report,'-detailed'+('-with-annotations' if choice=='1' else '')+'.md'))
                         if operation=='pdf':
                             pdf=ensure_pdf(workspace,report,query.get('pdf_sha256',[None])[0])
                             return self.respond(200,pdf['path'].read_bytes(),'application/pdf',pdf['filename'])
@@ -295,7 +303,7 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
             profile_operation=profiles is not None and route in ('/api/local/profiles/create','/api/local/profiles/switch','/api/local/reset')
             preferences = route == "/api/display-preferences"
             layout = route == '/api/panel-widths'
-            report_operation = getattr(workspace,'operational',False) and route in ('/api/reports/annotate','/api/reports/draft')
+            report_operation = getattr(workspace,'operational',False) and route in ('/api/reports/annotate','/api/reports/draft','/api/reports/reading')
             if not (report_operation or layout or preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
                 return self.respond(405,{"error":"This endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"
@@ -312,6 +320,9 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                 from web.research_envelopes import loads
                 payload = loads(self.rfile.read(length))
                 if report_operation:
+                    if route.endswith('/reading'):
+                        from web.report_reading import preferences as reading_preferences
+                        return self.respond(200,reading_preferences(workspace,payload))
                     from web import report_packages as packages
                     return self.respond(200,packages.save_annotation(workspace,payload) if route.endswith('/annotate') else packages.prepare_draft(workspace,payload))
                 if layout:

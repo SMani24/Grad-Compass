@@ -5,12 +5,15 @@
   const chars=value=>Array.from(value),slice=(value,start,end)=>chars(value).slice(start,end).join('');
   const date=value=>value ? value.slice(0,10) : 'Not supplied';
   async function load(url){const response=await fetch(url,{cache:'no-store'});const value=await response.json();if(!response.ok)throw Error(value.error || 'Could not load the saved report.');return value;}
+  let dispose=()=>{};
   async function upgrade(old,ctx,code){
     let target=old;
     try{
       const catalog=await load('/api/reports?request_id='+ctx.current.request.request_id);
       const reports=catalog.reports.filter(r=>r.metadata.country_code===code);
       if(!old.isConnected || !reports.length){if(catalog.errors.length){const warning=el('p','Report package needs attention. The original received findings remain available.','report-package-error');old.prepend(warning);}return;}
+      dispose();
+      const preferences=await load('/api/reports/reading');if(!old.isConnected)return;
       let selected=reports[0],annotations={annotations:[],unreconciled:[]},view='report',page=0,pdf=null,pdfEdition=null,pdfSha=null,pending=null,railOpen=false,checked=new Set(),draft=null,requestSequence=0;
       const article=el('article',undefined,'country-report canonical-report');article.id='country-report';article.dataset.country=code;article.dataset.canonical=selected.key;article.dataset.edition=selected.edition;article.dataset.request=ctx.current.request.request_id;old.replaceWith(article);target=article;
       const status=el('p','','reader-status');status.id='reader-status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
@@ -20,6 +23,36 @@
       const button=(text,fn,id)=>{const b=el('button',text,'quiet-action');b.type='button';if(id)b.id=id;b.addEventListener('click',async()=>{b.disabled=true;try{await fn();}catch(error){message(error.message);}finally{b.disabled=['reader-highlight','reader-comment'].includes(b.id)?!pending?.quote:false;}});return b;};
       const content=el('div',undefined,'canonical-layout'),reading=el('div',undefined,'canonical-reading'),rail=el('aside',undefined,'annotation-panel');rail.setAttribute('aria-label','Highlights, comments and feedback');rail.hidden=true;
       const assets=await load('/report-assets.json');if(!article.isConnected)return;
+      const dialog=document.getElementById('research-dialog');let saveTimer,restoring=false,saveQueue=Promise.resolve();
+      function persist(value){saveQueue=saveQueue.catch(()=>{}).then(()=>ctx.post('/api/reports/reading',value));return saveQueue.catch(error=>message('Reading preference not saved. '+error.message));}
+      function capturePosition(){
+        if(view!=='report' || !article.isConnected || !dialog.open || restoring)return null;
+        const edge=dialog.getBoundingClientRect().top+toolbar.getBoundingClientRect().height+20;
+        const blocks=[...reading.querySelectorAll('[data-report-block]')],block=blocks.find(n=>n.getBoundingClientRect().bottom>=edge);
+        const before=block && block.getBoundingClientRect().top>edge && block===blocks[0];
+        const position={key:selected.key,anchor:block && !before?block.dataset.reportBlock:'top',offset:block && !before?Math.round(edge-block.getBoundingClientRect().top):Math.round(dialog.scrollTop)};
+        position.offset=Math.max(-10000,Math.min(10000,position.offset));preferences.positions[selected.key]={anchor:position.anchor,offset:position.offset};return position;
+      }
+      function savePosition(){clearTimeout(saveTimer);const captured=capturePosition(),saved=preferences.positions[selected.key];const position=captured || (saved?{key:selected.key,...saved}:null);if(position)return persist({position});return saveQueue;}
+      function restorePosition(){
+        const position=preferences.positions[selected.key];restoring=true;
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{
+          if(!article.isConnected || view!=='report'){restoring=false;return;}
+          const block=position && [...reading.querySelectorAll('[data-report-block]')].find(n=>n.dataset.reportBlock===position.anchor);
+          if(block)dialog.scrollTop+=block.getBoundingClientRect().top-dialog.getBoundingClientRect().top-toolbar.getBoundingClientRect().height-20+position.offset;
+          else dialog.scrollTop=position?.offset || 0;
+          setTimeout(()=>{restoring=false;},100);
+        }));
+      }
+      const scrolled=()=>{if(!restoring && view==='report'){capturePosition();clearTimeout(saveTimer);saveTimer=setTimeout(savePosition,500);}};
+      dialog.addEventListener('scroll',scrolled,{passive:true});dialog.addEventListener('close',savePosition);window.addEventListener('pagehide',savePosition);
+      const sidebar=document.getElementById('report-sidebar-toggle') || button('Hide requests',()=>{},'report-sidebar-toggle');
+      if(!sidebar.isConnected)document.querySelector('.report-topbar').insertBefore(sidebar,document.getElementById('close-research'));
+      sidebar.setAttribute('aria-controls','report-request-navigation');
+      function applyLayout(){dialog.dataset.readingWidth=preferences.width;dialog.classList.toggle('requests-collapsed',!preferences.sidebar_open);sidebar.textContent=preferences.sidebar_open?'Hide requests':'Show requests';sidebar.setAttribute('aria-expanded',String(preferences.sidebar_open));}
+      sidebar.onclick=async()=>{capturePosition();preferences.sidebar_open=!preferences.sidebar_open;applyLayout();await persist({sidebar_open:preferences.sidebar_open});restorePosition();};
+      dispose=()=>{savePosition();dialog.removeEventListener('scroll',scrolled);dialog.removeEventListener('close',savePosition);window.removeEventListener('pagehide',savePosition);};applyLayout();
+
       function sourceControls(block,box){
         if(!block.refs.length)return;
         const details=el('details',undefined,'canonical-citations');details.append(el('summary','Evidence '+block.refs.join(', ')));
@@ -58,6 +91,7 @@
         const heading=el('div',undefined,'report-heading');heading.append(el('p','COUNTRY REPORT · VERSION '+doc.revision_number,'eyebrow'));
         const title=el('h1');if(asset?.flag){const flag=el('img');flag.src=asset.flag.path;flag.alt=asset.flag.alt;flag.className='report-flag';title.append(flag);}title.append(document.createTextNode(selected.content.title));heading.append(title);
         const review=meta.canonical_factual_review || {state:'pending'},badges=el('div',undefined,'report-badges');for(const text of ['Factual review: '+review.state,'Human approval: '+(meta.human_approval?.state || 'unknown')])badges.append(el('span',text));heading.append(badges);
+        const versionContext=el('details',undefined,'report-version-context');versionContext.append(el('summary','About versions and exports'),el('p','Research result r'+(meta.producer_result?.revision || 'unknown')+' supplied this canonical report v'+doc.revision_number+'. Exports use the selected canonical version; reader layout numbers are independent.'));heading.append(versionContext);
         heading.append(el('p','This bounded country report does not establish exhaustive coverage, programme eligibility or completed university discovery.'));
         const facts=el('dl',undefined,'report-facts');for(const [label,value] of [['Report date',selected.content.report_date || meta.report_date || 'Unknown'],['Evidence observed',meta.source_artifact?.observed_on || 'See dated evidence'],['Review date',date(review.reviewed_at || review.time)],['Requested intake',ctx.current.request.preferences.intake || 'Not specified']]){const cell=el('div');cell.append(el('dt',label),el('dd',value));facts.append(cell);}header.append(heading,facts);
         const terms=el('div',undefined,'report-term-labels');for(const label of selected.content.labels || [])terms.append(el('span',label.text,'term-'+label.kind));header.append(terms);
@@ -66,7 +100,7 @@
       function renderReport(){
         reading.replaceChildren();const asset=assets[code];
         if(asset?.locator){const figure=el('figure',undefined,'report-locator'),img=el('img');img.src=asset.locator.path;img.alt=asset.locator.alt;img.addEventListener('error',()=>{figure.replaceChildren(el('p','Locator image unavailable. The report remains readable.'));});const credit=el('a',asset.locator.caption+' '+asset.locator.credit+' · '+asset.locator.license);credit.href=asset.locator.source_url;credit.target='_blank';credit.rel='noopener noreferrer';const caption=el('figcaption');caption.append(credit);figure.append(img,caption);reading.append(figure);}
-        const outline=el('nav',undefined,'report-outline');outline.setAttribute('aria-label','Canonical report sections');for(const section of selected.content.sections){const a=el('a',section.title);a.href='#canonical-'+section.id;a.addEventListener('click',e=>{e.preventDefault();document.getElementById('canonical-'+section.id)?.scrollIntoView({block:'start'});});outline.append(a);}reading.append(outline);
+        sections.replaceChildren(new Option('Jump to section…',''));for(const section of selected.content.sections)sections.append(new Option(section.title,'canonical-'+section.id));sections.append(new Option('Sources and evidence map','report-sources'));
         for(const section of selected.content.sections){const group=el('section',undefined,'report-section');group.id='canonical-'+section.id;group.append(el('h2',section.title));
           if(/funding|costs/.test(section.id)){const terms=el('p','Figures retain their published year, region and unit. Target-year terms remain unconfirmed; competitive awards are conditional.','report-terms');group.append(terms);}
           for(const item of section.items){
@@ -140,15 +174,24 @@
         rail.append(button('Prepare selected feedback',async()=>{draft=await ctx.post('/api/reports/draft',{key:selected.key,annotation_ids:[...checked]});renderRail();},'prepare-annotation-feedback'));
         if(draft)renderDraft(draft);if(commentDraft)rail.prepend(commentDraft);for(const input of rail.querySelectorAll('textarea'))if(dirty.has(input.id) && dirty.get(input.id)!==input.defaultValue)input.value=dirty.get(input.id);
       }
-      const reportButton=button('Report',()=>{showReport();message('Canonical report view.');},'reader-show-report'),pdfButton=button('View PDF',async()=>{view='pdf';page=0;pdfEdition=null;pdfSha=null;await renderPdf();},'reader-show-pdf');
+      const reportButton=button('Report',()=>{showReport();restorePosition();message('Canonical report view.');},'reader-show-report'),pdfButton=button('View PDF',async()=>{await savePosition();view='pdf';page=0;pdfEdition=null;pdfSha=null;await renderPdf();},'reader-show-pdf');
       const highlight=button('Highlight',()=>saveSelection(),'reader-highlight');highlight.disabled=true;
       const comment=button('Comment',()=>{if(!pending?.quote)throw Error('Select a passage first.');if(document.getElementById('new-annotation-comment-text')){message('Save or cancel your current comment before starting another.');document.getElementById('new-annotation-comment-text').focus();return;}const selectedPassage={...pending};railOpen=true;renderRail();const box=el('section',undefined,'annotation-draft');box.id='new-annotation-comment';box.append(el('h3','Comment on selected passage'),el('blockquote',selectedPassage.quote));const label=el('label','Your comment'),input=el('textarea');input.id='new-annotation-comment-text';input.rows=4;input.maxLength=2000;label.htmlFor=input.id;box.append(label,input,button('Save highlight and comment',()=>saveSelection(input.value,selectedPassage,true),'save-new-annotation'),button('Cancel',()=>{document.getElementById('new-annotation-comment')?.remove();clearSelection();renderRail();}));rail.prepend(box);input.focus();},'reader-comment');comment.disabled=true;
       const notesButton=button('Annotations (0)',()=>{railOpen=!railOpen;if(railOpen && !rail.children.length)renderRail();else{rail.hidden=!railOpen;notesButton.setAttribute('aria-expanded',String(railOpen));}},'reader-annotations');notesButton.setAttribute('aria-expanded','false');
       const download=el('a','Download PDF','quiet-action');download.id='reader-download-pdf';download.download='';
+      const exports=el('details',undefined,'reader-exports');exports.id='reader-export-options';exports.append(el('summary','Export options'));
+      exports.append(el('p','PDF: concise reader edition, using selected canonical passages. Detailed Markdown: complete report, qualifications, evidence map, public URLs and stable passage references.'));
+      const markdown=el('a','Download detailed Markdown','quiet-action');markdown.id='reader-download-markdown';markdown.download='';
+      const privateLabel=el('label'),includePrivate=el('input');includePrivate.type='checkbox';includePrivate.id='export-personal-annotations';privateLabel.append(includePrivate,document.createTextNode(' Include personal annotations in Markdown (private)'));
+      function exportLinks(){markdown.href='/api/reports/'+selected.key+'/markdown?edition='+selected.edition+'&annotations='+(includePrivate.checked?'1':'0');}
+      includePrivate.addEventListener('change',exportLinks);exports.append(markdown,privateLabel);
+      const width=el('select');width.id='reader-width';width.setAttribute('aria-label','Reading width');width.append(new Option('Comfortable','comfortable'),new Option('Wide','wide'));width.value=preferences.width;
+      width.addEventListener('change',async()=>{capturePosition();preferences.width=width.value;applyLayout();await persist({width:preferences.width});restorePosition();});
+      const sections=el('select');sections.id='reader-sections';sections.setAttribute('aria-label','Jump to report section');sections.addEventListener('change',()=>{const target=sections.value;showReport();sections.value=target;document.getElementById(target)?.scrollIntoView({block:'start'});});
       const versions=el('select');versions.id='canonical-version';versions.setAttribute('aria-label','Canonical report version');for(const report of reports)versions.append(new Option('Report v'+report.metadata.canonical_document.revision_number+' · '+(report.content.report_date || 'undated'),report.key));
-      versions.addEventListener('change',async()=>{try{if(document.getElementById('new-annotation-comment-text') || [...rail.querySelectorAll('textarea')].some(n=>n.value!==n.defaultValue)){versions.value=selected.key;message('Save or cancel your current comment or edited draft before switching versions.');return;}++requestSequence;clearSelection();reading.replaceChildren(el('p','Opening saved report version…'));selected=reports.find(r=>r.key===versions.value);article.dataset.canonical=selected.key;article.dataset.edition=selected.edition;annotations=await load('/api/reports/'+selected.key+'/annotations');pending=null;checked.clear();draft=annotations.draft || null;page=0;pdfEdition=null;pdfSha=null;view='report';download.href=pdfUrl('pdf');renderHeader();renderReport();renderRail();message('Viewing saved report v'+selected.metadata.canonical_document.revision_number+'. Earlier annotations remain bound to their original version.');}catch(e){message(e.message);}});
-      toolbar.append(reportButton,pdfButton,highlight,comment,notesButton,download,versions);article.append(header,toolbar,status,content);content.append(reading,rail);
-      annotations=await load('/api/reports/'+selected.key+'/annotations');draft=annotations.draft || null;download.href=pdfUrl('pdf');renderHeader();renderReport();renderRail();message('Canonical report loaded. Select a passage to highlight or comment.');
+      versions.addEventListener('change',async()=>{try{if(document.getElementById('new-annotation-comment-text') || [...rail.querySelectorAll('textarea')].some(n=>n.value!==n.defaultValue)){versions.value=selected.key;message('Save or cancel your current comment or edited draft before switching versions.');return;}await savePosition();++requestSequence;clearSelection();reading.replaceChildren(el('p','Opening saved report version…'));selected=reports.find(r=>r.key===versions.value);article.dataset.canonical=selected.key;article.dataset.edition=selected.edition;annotations=await load('/api/reports/'+selected.key+'/annotations');pending=null;checked.clear();draft=annotations.draft || null;page=0;pdfEdition=null;pdfSha=null;view='report';download.href=pdfUrl('pdf');exportLinks();renderHeader();renderReport();renderRail();restorePosition();message('Viewing saved report v'+selected.metadata.canonical_document.revision_number+'. Earlier annotations remain bound to their original version.');}catch(e){message(e.message);}});
+      toolbar.append(reportButton,pdfButton,highlight,comment,notesButton,download,exports,sections,width,versions);article.append(header,toolbar,status,content);content.append(reading,rail);
+      annotations=await load('/api/reports/'+selected.key+'/annotations');draft=annotations.draft || null;download.href=pdfUrl('pdf');exportLinks();renderHeader();renderReport();renderRail();await Promise.all([...header.querySelectorAll('img'),...reading.querySelectorAll('img')].map(img=>img.decode?.().catch(()=>{})));restorePosition();message('Canonical report loaded. Select a passage to highlight or comment.');
       if(catalog.errors.length)message('A report package needs attention; see Advanced / recovery. The validated report remains available.');
       if(catalog.errors.length){const diagnostics=ctx.technical('Report delivery errors',Object.fromEntries(catalog.errors.map(e=>[e.file,e.error])));ctx.section.querySelector('#report-history')?.append(diagnostics);}
     }catch(error){if(target.isConnected)target.prepend(el('p','Canonical report unavailable: '+error.message+' Original received findings are preserved.','report-package-error'));}

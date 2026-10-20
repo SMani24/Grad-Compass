@@ -45,7 +45,7 @@ if(typeof document!=='undefined')(() => {
     const heading=node('div',undefined,'report-heading');heading.append(node('p','COUNTRY REPORT','eyebrow'),node('h1',flag(code)+' '+name(code)));
     const progress=window.GradCompassResearch.countryStatus(code,(window.GradCompassWorkspace?.universities || []).filter(u=>u.country_code===code).length);
     const badges=node('div',undefined,'report-badges');
-    for(const text of ['Report available · revision '+result.revision+' · '+result.completion,'Factual review: '+[...new Set(report.findings.map(f=>f.review_status))].join(', '),'Human approval: '+[...new Set(report.findings.map(f=>f.human_approval?.state || 'unknown'))].join(', ')])badges.append(node('span',text));
+    for(const text of ['Received findings · result r'+result.revision+' · '+result.completion,'Factual review: '+[...new Set(report.findings.map(f=>f.review_status))].join(', '),'Human approval: '+[...new Set(report.findings.map(f=>f.human_approval?.state || 'unknown'))].join(', ')])badges.append(node('span',text));
     heading.append(badges,node('p',progress.discovery+'. This report covers a bounded request; it is not exhaustive country coverage.'));
     hero.append(photo,heading);article.append(hero);
     const facts=node('dl',undefined,'report-facts');

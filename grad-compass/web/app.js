@@ -290,7 +290,26 @@ if (typeof document !== "undefined") {
       top.append(node("span", "eyebrow", "COUNTRY DETAILS"), close);
       elements.inspector.replaceChildren(top, node("div", "institution-symbol", country?.flag || "🌐"), node("h2", "", country?.name || code));
       const progress=window.GradCompassResearch.countryStatus(code,detail.university_count);
-      elements.inspector.append(node('p','research-state',progress.report),metadata('Factual review',detail.review_status),metadata('University discovery',progress.discovery),node('p','coverage-hint','Reports cover the saved request’s scope, not an exhaustive assessment of this country.'));
+      const availability=node('p','country-report-availability',progress.report);
+      elements.inspector.append(availability);
+      const actions=node('div','country-primary-actions');
+      if(detail.origin){
+        const read=node('button','portal-link read-report-primary','Read country report');read.id='read-country-report';read.type='button';
+        read.addEventListener('click',()=>window.GradCompassResearch.openRequests(detail.origin.request_id,null,detail.origin.finding_id));actions.append(read);
+        const reportResponse=await api('/api/reports?request_id='+detail.origin.request_id).catch(()=>null);
+        if(sequence!==state.detailSequence)return;
+        const report=reportResponse?.reports?.find(r=>r.metadata.country_code===code);
+        if(report)availability.textContent='Country report available · '+(report.content.report_date || report.metadata.report_date || 'date unknown')+' · v'+report.metadata.canonical_document.revision_number;
+        availability.append(document.createTextNode(' · Factual review: '+(report?.metadata.canonical_factual_review?.state || detail.review_status)));
+      }
+      const explore = node("button", "portal-link explore-country", "Explore universities");
+      explore.id = "explore-country"; explore.type = "button";
+      explore.addEventListener("click", () => {
+        elements.status.value = "";
+        setMode("universities");
+        get("universities-mode").focus({preventScroll:true});
+      });
+      actions.append(explore);elements.inspector.append(actions,metadata('University discovery',progress.discovery));
       elements.inspector.append(window.GradCompassResearch.detailControls(code));
       const personal = node("section", "country-personal");
       const label = node("label", "", "Your personal decision"); label.htmlFor = "country-decision";
@@ -312,19 +331,8 @@ if (typeof document !== "undefined") {
         } catch(error) { chooser.value = previous; if (sequence === state.detailSequence){saved.textContent = 'Decision not saved. '+error.message+' Previous choice kept.';saved.dataset.state='error';} }
         finally { chooser.disabled = false; }
       });
-      const explore = node("button", "portal-link explore-country", "Explore universities here");
-      explore.id = "explore-country"; explore.type = "button";
-      explore.addEventListener("click", () => {
-        elements.status.value = "";
-        setMode("universities");
-        get("universities-mode").focus({preventScroll:true});
-      });
-      elements.inspector.append(explore);
-      if(detail.origin){
-        const read=node('button','portal-link','Read country report');read.id='read-country-report';read.type='button';
-        read.addEventListener('click',()=>window.GradCompassResearch.openRequests(detail.origin.request_id,null,detail.origin.finding_id));elements.inspector.append(read);
-      }
       const evidenceStart=elements.inspector.children.length;
+      elements.inspector.append(node('p','coverage-hint','Reports cover the saved request’s scope, not an exhaustive assessment of this country.'));
       elements.inspector.append(node("h3", "", "Research summary"), node("p", "country-summary", detail.summary));
       if(detail.synthetic===false && detail.findings)window.GradCompassLocal?.countryFindings(elements.inspector,detail.findings);
       for(const [field,title] of (detail.synthetic===false && detail.findings ? [] : [["funding_routes","Funding routes"],["costs","Costs"],["work_rules","Work rules"]])) {

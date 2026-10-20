@@ -40,7 +40,7 @@
     toolbar();
   }
   async function post(path, payload) {
-    const response = await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-Grad-Compass-Session":session,"X-Grad-Compass-Workspace":window.GradCompassWorkspace?.session || session},body:JSON.stringify(payload)});
+    const response = await fetch(path,{method:"POST",keepalive:path==="/api/reports/reading",headers:{"Content-Type":"application/json","X-Grad-Compass-Session":session,"X-Grad-Compass-Workspace":window.GradCompassWorkspace?.session || session},body:JSON.stringify(payload)});
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Could not save. Please retry.");
     return result;
@@ -87,7 +87,10 @@
     return box;
   }
   function detailControls(code) {
-    const box=node("section",undefined,"country-watch-detail");box.append(watchButton(code,"detail"));
+    const box=node("section",undefined,"country-watch-detail");
+    if(personal(code).watched){
+      const overflow=node('details',undefined,'country-overflow');overflow.append(node('summary','Country actions'),watchButton(code,'detail'));box.append(overflow);
+    }else box.append(watchButton(code,'detail'));
     const editor=node("details");editor.id="country-note-editor";editor.append(node("summary",personal(code).note ? "Private note · edit" : "Add a private note"));
     const label=node("label","Private note");label.htmlFor="country-note";
     const note=node("textarea");note.id="country-note";note.value=personal(code).note;note.maxLength=4000;note.rows=3;

@@ -1,9 +1,11 @@
-.panel-resizer { position:absolute; z-index:6; top:calc(var(--content-top,100px) + 16px); bottom:40px; width:14px; cursor:ew-resize; touch-action:none; display:flex; align-items:center; justify-content:center; border-radius:8px; }
-.left-resizer { left:calc(24px + var(--results-width) - 7px); }
-.right-resizer { right:calc(24px + var(--inspector-width) - 7px); display:none; }
+.panel-resizer { position:absolute; z-index:6; top:calc(var(--content-top,100px) + 16px); bottom:40px; width:20px; cursor:ew-resize; touch-action:none; display:flex; align-items:center; justify-content:center; border-radius:3px; }
+.left-resizer { left:calc(24px + var(--results-width) - 10px); }
+.right-resizer { right:calc(24px + var(--inspector-width) - 10px); display:none; }
 .workspace.has-inspector .right-resizer { display:flex; }
-.panel-resizer span { color:#fff; background:#21617a; border:2px solid white; border-radius:7px; padding:12px 1px; box-shadow:0 1px 7px #15304440; }
-.panel-resizer:hover,.panel-resizer:focus-visible { background:#087ba433; outline:3px solid #42a9c0; }
+.panel-resizer span { font-size:0; width:2px; height:64px; background:#7797a680; border-radius:2px; transition:background .15s,height .15s; }
+.panel-resizer:hover span,.panel-resizer:focus-visible span,.panel-resizer.is-dragging span { background:#167b91; height:100px; width:3px; }
+.panel-resizer:hover,.panel-resizer.is-dragging { background:#187e9212; }
+.panel-resizer:focus-visible { outline:2px solid #167b91; outline-offset:0; }
 .resizing-panel { cursor:ew-resize; user-select:none; }
 .country-evidence-secondary { margin-top:24px; border-top:1px solid var(--line); padding-top:18px; }
 .country-evidence-secondary > summary { font-weight:650; cursor:pointer; }

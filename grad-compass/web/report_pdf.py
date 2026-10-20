@@ -13,7 +13,7 @@ from web.report_packages import immutable
 
 PDF_LOCK=threading.RLock()
 ASSETS=Path(__file__).parent/'assets'
-RENDERER='country-print-5'
+RENDERER='country-reader-2'
 
 
 def styles():
@@ -30,7 +30,8 @@ def styles():
             'heading':ParagraphStyle('heading',parent=base,fontName='Compass-Bold',fontSize=16,leading=21,spaceBefore=20,spaceAfter=12,keepWithNext=True),
             'small':ParagraphStyle('small',parent=base,fontSize=8,leading=12,spaceAfter=7),
             'cell':ParagraphStyle('cell',parent=base,fontSize=8,leading=12,spaceAfter=3),
-            'header':ParagraphStyle('header',parent=base,fontName='Compass-Bold',fontSize=8,leading=12,textColor='#ffffff')}
+            'header':ParagraphStyle('header',parent=base,fontName='Compass-Bold',fontSize=8,leading=12,textColor='#ffffff'),
+            'source_title':ParagraphStyle('source_title',parent=base,fontName='Compass-Bold',fontSize=9,leading=13,spaceBefore=10,spaceAfter=4,keepWithNext=True)}
 
 
 def _asset():
@@ -51,36 +52,47 @@ def build(report):
     from PIL import Image as Raster
     s=styles();meta=report['metadata'];doc=meta['canonical_document'];tree=report['content'];review=meta.get('canonical_factual_review',{'state':'pending'})
     body=[];width=A4[0]-96
+    # Until a producer editorial edition is agreed/delivered, select complete
+    # canonical passages. Never synthesize a shorter factual assertion.
+    concise=any(section['id']=='at-a-glance' for section in tree['sections'])
+    sections=[section for section in tree['sections'] if section['id']=='at-a-glance' or section['id'].startswith('costs') or section['id'].startswith('timing')] if concise else tree['sections']
     def p(text,style='body'):return Paragraph(text,s[style])
-    body.append(p('GRAD COMPASS · COUNTRY REPORT','small'))
+    body.append(p('GRAD COMPASS · COUNTRY REPORT · READER EDITION','small'))
     if meta['country_code']=='BEL':
         class Flag(Flowable):
             width=30;height=20
             def draw(self):
                 for i,color in enumerate(('#171717','#f6ca35','#eb3c45')):self.canv.setFillColor(HexColor(color));self.canv.rect(i*10,0,10,20,fill=1,stroke=0)
-        body.extend([Flag(),Spacer(1,10)])
+        body.extend([Flag(),Spacer(1,3 if concise else 10)])
     body.append(p(escape(tree['title']),'title'))
     asset=_asset() if meta['country_code']=='BEL' else {}
     if asset:
         with Raster.open(_path(asset)) as image:
             # Screen and print share the same photograph; crop locally, never rewrite it.
-            target_ratio=width/125;crop_height=int(image.width/target_ratio);top=max(0,int(image.height*.52-crop_height/2));image=image.crop((0,top,image.width,min(image.height,top+crop_height)));image.load();raster=io.BytesIO();image.save(raster,format='JPEG');raster.seek(0)
-        body.append(Image(raster,width=width,height=125))
+            target_ratio=width/90;crop_height=int(image.width/target_ratio);top=max(0,int(image.height*.52-crop_height/2));image=image.crop((0,top,image.width,min(image.height,top+crop_height)));image.load();raster=io.BytesIO();image.save(raster,format='JPEG');raster.seek(0)
+        body.append(Image(raster,width=width,height=90))
         body.append(p(escape(asset['credit'])+' · '+escape(asset['license'])+' · <a href="'+escape(asset['source_url'])+'">Image source</a>','small'))
     body.extend([p('Report v'+str(doc['revision_number'])+' · '+escape(meta.get('report_date') or tree['report_date'] or 'Date not separately supplied'),'small'),
                  p('Factual review: <b>'+escape(review.get('state','pending'))+'</b> · Review date: '+escape(review.get('reviewed_at',review.get('time','Not supplied')))+' · Human approval: '+escape(meta.get('human_approval',{}).get('state','unknown')),'small'),
                  p('Evidence observed: '+escape(meta.get('source_artifact',{}).get('observed_on','Not separately supplied'))+' · Target-year terms are not inferred from historical figures. Bounded country report; university discovery is separate.','small')])
-    for label in tree.get('labels',[]):body.append(p('<b>'+escape(label['text'])+'</b>','small'))
-    if asset.get('locator'):
+    if concise:body.append(p('<b>'+' · '.join(escape(label['text']) for label in tree.get('labels',[]))+'</b>','small'))
+    else:
+        for label in tree.get('labels',[]):body.append(p('<b>'+escape(label['text'])+'</b>','small'))
+    if asset.get('locator') and not concise:
         locator=asset['locator'];body.append(Image(str(_path(locator)),width=230,height=138));body.append(p(escape(locator['caption'])+' · '+escape(locator['credit'])+' · '+escape(locator['license']),'small'))
-    body.append(PageBreak())
+    body.append(p('Reader edition: selected complete passages from canonical report v'+str(doc['revision_number'])+'. The companion detailed Markdown includes all study routes, funding conditions, residence rules, calculations, source observations and the complete evidence map. This extract is not a replacement factual review.','small'))
+    if not concise:body.append(PageBreak())
     def sources(block):
         refs=[r for r in block['refs'] if r in tree['sources']]
         return p('Evidence: '+', '.join('<link href="#'+r+'" color="#08647c">'+r+'</link>' for r in refs),'small') if refs else None
-    for section in tree['sections']:
+    used_refs=set()
+    for section in sections:
         body.append(p(escape(section['title']),'heading'))
         if 'funding' in section['id'] or 'costs' in section['id']:body.append(p('<b>Figures retain their stated year, region and unit. Target-year terms remain unconfirmed; competitive awards are conditional.</b>','small'))
         for item in section['items']:
+            if concise and section['id'].startswith('timing') and item.get('number',0)>3:continue
+            blocks=[b for row in item['rows'] for b in row] if item['type']=='table' else [item['block']]
+            used_refs.update(ref for block in blocks for ref in block['refs'])
             if item['type']=='table':
                 rows=[]
                 for i,row in enumerate(item['rows']):
@@ -94,20 +106,24 @@ def build(report):
                 citation=sources(block)
                 paragraph=p(prefix+block['pdf']);paragraph.keepWithNext=bool(citation);body.append(paragraph)
                 if citation:body.append(citation)
-    body.append(p('Sources and evidence map','heading'))
-    body.append(p('Editorial topic mapping supplied with the canonical report. Original inbox sources remain finding-level. Review disposition above applies only to the exact report revision it names.','small'))
+    body.append(p('Sources and detailed companion','heading'))
+    body.append(p('Editorial topic mappings, not newly verified claim-level citations. Full evidence-map text and dated finding-level records are included in Download detailed Markdown in the app. This reader edition preserves the selected canonical wording; omitted detail remains in that companion.','small'))
     for ref,source in tree['sources'].items():
-        body.append(p('<a name="'+ref+'"/>'+ref+' · '+escape(source['topic']),'heading'))
-        body.append(p(escape(source['text']),'small'))
-        for link in source['links']:body.append(p('<a href="'+escape(link['url'],{'"':'&quot;'})+'" color="#08647c">'+escape(link['label'])+'</a>','small'))
+        if concise and ref not in used_refs:continue
+        topic=source['topic'].split(' — ')[0] if concise else source['topic']
+        body.append(p('<a name="'+ref+'"/>'+ref+' · '+escape(topic),'source_title' if concise else 'heading'))
+        if not concise:body.append(p(escape(source['text']),'small'))
+        links=['<a href="'+escape(link['url'],{'"':'&quot;'})+'" color="#08647c">'+escape(link['label'])+'</a>' for link in source['links']]
+        if links:body.append(p(' · '.join(links),'small'))
+        elif concise:body.append(p('Editorial synthesis; full mapping is included in detailed Markdown.','small'))
     body.append(p('Exact canonical revision and provenance','heading'))
-    body.append(p(escape(doc['revision_id'])+'<br/>SHA-256 '+doc['sha256']+'<br/>PDF uses the same canonical content as the app; personal annotations are kept separately.','small'))
+    body.append(p(escape(doc['revision_id'])+'<br/>SHA-256 '+doc['sha256']+'<br/>Reader layout: '+RENDERER+'. Canonical report version is independent of the research result revision. Personal annotations are kept separately.','small'))
     def document(output):return SimpleDocTemplate(output,pagesize=A4,leftMargin=48,rightMargin=48,topMargin=44,bottomMargin=48,title=tree['title'],author='Grad Compass',pageCompression=1)
     # Two ordinary layout passes keep PDF bookmark destinations intact. Saving and
     # replaying canvas states for page totals breaks internal source destinations.
     first=document(io.BytesIO());first.build(deepcopy(body));total=first.page
     def footer(canvas,doc):
-        canvas.saveState();canvas.setFont('Compass',7);canvas.setFillColor(HexColor('#466473'));canvas.drawString(48,28,'Grad Compass · '+meta['country_code']+' · report v'+str(report['metadata']['canonical_document']['revision_number']));canvas.drawRightString(A4[0]-48,28,str(doc.page)+' / '+str(total));canvas.restoreState()
+        canvas.saveState();canvas.setFont('Compass',7);canvas.setFillColor(HexColor('#466473'));canvas.drawString(48,28,'Grad Compass · '+meta['country_code']+' · canonical report v'+str(report['metadata']['canonical_document']['revision_number'])+' · reader edition');canvas.drawRightString(A4[0]-48,28,str(doc.page)+' / '+str(total));canvas.restoreState()
     output=io.BytesIO();pdf=document(output);pdf.build(body,onFirstPage=footer,onLaterPages=footer);return output.getvalue()
 
 
@@ -133,7 +149,7 @@ def ensure_pdf(workspace,report,pdf_sha256=None):
             if match:
                 from datetime import datetime
                 date=datetime.strptime(' '.join(match.groups()),'%d %B %Y').date().isoformat()
-        filename=('belgium' if meta['country_code']=='BEL' else meta['country_code'].lower())+'-country-report-'+(date or 'undated')+'-v'+str(doc['revision_number'])+'.pdf'
+        filename=('belgium' if meta['country_code']=='BEL' else meta['country_code'].lower())+'-country-report-'+(date or 'undated')+'-v'+str(doc['revision_number'])+('-reader' if path.stem.startswith('country-reader-') else '')+'.pdf'
         return {'path':path,'sha256':hashlib.sha256(raw).hexdigest(),'filename':filename,'edition':report['edition']}
 
 

@@ -25,11 +25,13 @@ class DesktopDownloads(QObject):
 
     def download(self,request):
         source=urlsplit(request.url().toString());origin=urlsplit(self.window.original_url)
-        if (source.scheme,source.netloc)!=(origin.scheme,origin.netloc) or not re.fullmatch(r'/api/reports/[a-f0-9]{64}/pdf',source.path):request.cancel();return
+        if (source.scheme,source.netloc)!=(origin.scheme,origin.netloc) or not re.fullmatch(r'/api/reports/[a-f0-9]{64}/(pdf|markdown)',source.path):request.cancel();return
+        extension='md' if source.path.endswith('/markdown') else 'pdf'
         suggested=request.suggestedFileName()
-        if not re.fullmatch(r'[a-z0-9-]+\.pdf',suggested):suggested='country-report.pdf'
-        path=self.choose_path(suggested) if self.choose_path else QFileDialog.getSaveFileName(self.native,'Save country report',suggested,'PDF documents (*.pdf)')[0]
+        if not re.fullmatch(r'[a-z0-9-]+\.'+extension,suggested):suggested='country-report.'+extension
+        file_filter='Markdown reports (*.md)' if extension=='md' else 'PDF documents (*.pdf)'
+        path=self.choose_path(suggested) if self.choose_path else QFileDialog.getSaveFileName(self.native,'Save country report',suggested,file_filter)[0]
         if not path:request.cancel();return
         target=Path(path)
-        if target.suffix.lower()!='.pdf':target=target.with_suffix('.pdf')
+        if target.suffix.lower()!='.'+extension:target=target.with_suffix('.'+extension)
         request.setDownloadDirectory(str(target.parent));request.setDownloadFileName(target.name);request.accept()

@@ -29,5 +29,10 @@ class DesktopDownloadTests(unittest.TestCase):
         for url in ('https://example.org/test.pdf','http://127.0.0.1:1235/api/reports/'+'a'*64+'/pdf','http://127.0.0.1:1234/assets/test.pdf','http://127.0.0.1:1234/api/reports/'+'a'*64+'/pdf'):
             request=Request(url);handler.download(request);self.assertTrue(request.cancelled);self.assertFalse(request.accepted)
 
+    def test_markdown_download_uses_its_own_extension(self):
+        chosen=[];handler=DesktopDownloads(SimpleNamespace(original_url='http://127.0.0.1:1234/'),lambda name:chosen.append(name) or '/tmp/review/detailed')
+        request=Request('http://127.0.0.1:1234/api/reports/'+'a'*64+'/markdown','belgium-country-report-2026-10-20-v2-detailed.md');handler.download(request)
+        self.assertEqual(chosen,[request.name]);self.assertEqual(request.filename,'detailed.md');self.assertTrue(request.accepted)
+
 
 if __name__=='__main__':unittest.main()

@@ -25,6 +25,9 @@ def main():
     from preview_capture import PreviewCapture
     from desktop_downloads import DesktopDownloads
     screenshots=private_directory(args.screenshots);window=webview.create_window('Grad Compass — canonical report check (isolated copy)',f'http://127.0.0.1:{server.server_port}/',width=1440,height=1000,min_size=(390,640));capture=PreviewCapture(window,screenshots,prefix='2026-10-20-canonical-'+('restart-' if args.restart else ''))
+    from web.report_packages import catalog
+    active_report=next(r for r in catalog(profiles.workspace)['reports'] if r['metadata']['country_code']=='BEL')
+    expected_pdf='belgium-country-report-2026-10-20-v'+str(active_report['metadata']['canonical_document']['revision_number'])+'-reader.pdf'
     download_names=[];downloads_root=private_directory(screenshots/'isolated-downloads'/str(uuid4()))
     def download_path(name):download_names.append(name);return str(downloads_root/name)
     downloads=DesktopDownloads(window,choose_path=download_path)
@@ -53,15 +56,15 @@ def main():
             if args.restart:
                 click('reader-download-pdf')
                 end=time.monotonic()+30
-                while time.monotonic()<end and (not download_names or not (downloads_root/'belgium-country-report-2026-10-20-v1.pdf').is_file()):time.sleep(.1)
-                assert download_names==['belgium-country-report-2026-10-20-v1.pdf']
+                while time.monotonic()<end and (not download_names or not (downloads_root/expected_pdf).is_file()):time.sleep(.1)
+                assert download_names==[expected_pdf]
                 assert (downloads_root/download_names[0]).read_bytes().startswith(b'%PDF-')
                 click('reader-annotations');wait("document.querySelectorAll('.saved-annotation').length>=2")
                 assert 'Edited isolated report comment' in js("document.querySelector('.annotation-panel').textContent+Array.from(document.querySelectorAll('.annotation-panel textarea')).map(n=>n.value).join(' ')")
                 assert js("!!document.getElementById('annotation-feedback-draft')")
                 click('reader-show-pdf');wait("!!document.querySelector('.pdf-page')")
-                js("document.getElementById('pdf-page').value='2';document.getElementById('pdf-page').dispatchEvent(new Event('change'))")
-                wait("document.querySelector('.pdf-page')?.dataset.page==='2' && document.querySelectorAll('.pdf-mark').length>0")
+                js("document.getElementById('pdf-page').value='1';document.getElementById('pdf-page').dispatchEvent(new Event('change'))")
+                wait("document.querySelector('.pdf-page')?.dataset.page==='1' && document.querySelectorAll('.pdf-mark').length>0")
                 js("const zoom=document.querySelector('select[aria-label=\"PDF zoom\"]');zoom.value='3';zoom.dispatchEvent(new Event('change'))")
                 assert js("document.querySelector('.pdf-page').clientWidth>document.querySelector('.pdf-viewport').clientWidth && document.getElementById('research-dialog').scrollWidth<=document.getElementById('research-dialog').clientWidth")
                 js("document.querySelector('select[aria-label=\"PDF zoom\"]').value='1';document.querySelector('select[aria-label=\"PDF zoom\"]').dispatchEvent(new Event('change'))")
@@ -81,13 +84,13 @@ def main():
             wait("document.querySelectorAll('.saved-annotation').length===1");js("document.querySelector('.saved-annotation textarea').value='Edited isolated report comment';document.querySelector('.saved-annotation .quiet-action').click()");wait("document.getElementById('reader-status').textContent==='Comment saved.'")
             js("document.querySelector('.annotation-location').click()");shot('report-highlight-and-comment')
             click('reader-show-pdf');wait("!!document.querySelector('.pdf-page') && document.querySelector('.pdf-page>img').naturalWidth>0");shot('pdf-cover')
-            js("document.getElementById('pdf-page').value='2';document.getElementById('pdf-page').dispatchEvent(new Event('change'))");wait("document.querySelector('.pdf-page')?.dataset.page==='2' && document.querySelector('.pdf-page>img').naturalWidth>0")
-            js("document.querySelector('.pdf-links a[href^=\"#pdf-page-\"]').click()");wait("Number(document.querySelector('.pdf-page')?.dataset.page)>=5")
-            js("document.getElementById('pdf-page').value='2';document.getElementById('pdf-page').dispatchEvent(new Event('change'))");wait("document.querySelector('.pdf-page')?.dataset.page==='2'")
+            js("document.getElementById('pdf-page').value='1';document.getElementById('pdf-page').dispatchEvent(new Event('change'))");wait("document.querySelector('.pdf-page')?.dataset.page==='1' && document.querySelector('.pdf-page>img').naturalWidth>0")
+            js("document.querySelector('.pdf-links a[href^=\"#pdf-page-\"]').click()");wait("Number(document.querySelector('.pdf-page')?.dataset.page)>1")
+            js("document.getElementById('pdf-page').value='1';document.getElementById('pdf-page').dispatchEvent(new Event('change'))");wait("document.querySelector('.pdf-page')?.dataset.page==='1'")
             js("""(()=>{const words=[...document.querySelectorAll('.pdf-text-layer span')],a=words[3],b=words[6],r=document.createRange();r.setStart(a.firstChild,0);r.setEnd(b.firstChild,b.textContent.length);const s=getSelection();s.removeAllRanges();s.addRange(r);document.querySelector('.canonical-reading').dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));})()""")
             click('reader-highlight');wait("document.querySelectorAll('.saved-annotation').length===2");assert js("document.querySelectorAll('.pdf-mark').length>0");shot('pdf-highlight')
             js("document.querySelectorAll('.saved-annotation input[type=checkbox]').forEach(n=>{n.checked=true;n.dispatchEvent(new Event('change'))})");click('prepare-annotation-feedback');wait("!!document.getElementById('annotation-feedback-text')")
-            assert 'SHA-256' in js("document.getElementById('annotation-feedback-text').value");assert 'PDF page 3' in js("document.getElementById('annotation-feedback-text').value");shot('feedback-preview')
+            assert 'SHA-256' in js("document.getElementById('annotation-feedback-text').value");assert 'PDF page 2' in js("document.getElementById('annotation-feedback-text').value");shot('feedback-preview')
             before=len(profiles.workspace.research.request('41b6af76-f27e-4c58-a3a8-b835101658f0')['feedback'])
             click('annotation-follow-up');wait("document.getElementById('request-dialog').open");assert js("document.getElementById('request-only').checked");assert 'SHA-256' in js("document.getElementById('request-context').value");click('cancel-request')
             assert len(profiles.workspace.research.request('41b6af76-f27e-4c58-a3a8-b835101658f0')['feedback'])==before

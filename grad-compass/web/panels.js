@@ -25,9 +25,9 @@
     handle.addEventListener('pointerdown',event=>{
       if(!ready || event.button!==0)return;event.preventDefault();handle.setPointerCapture(event.pointerId);
       const start=event.clientX,width=parseInt(handle.getAttribute('aria-valuenow'),10);
-      root.classList.add('resizing-panel');
+      root.classList.add('resizing-panel');handle.classList.add('is-dragging');
       const move=e=>{preferred[side]=Math.round(Math.max(260,Math.min(maximum(),width+(e.clientX-start)*(side==='left'?1:-1))));apply();};
-      const finish=()=>{root.classList.remove('resizing-panel');handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',finish);handle.removeEventListener('pointercancel',finish);scheduleSave();};
+      const finish=()=>{root.classList.remove('resizing-panel');handle.classList.remove('is-dragging');handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',finish);handle.removeEventListener('pointercancel',finish);scheduleSave();};
       handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',finish);handle.addEventListener('pointercancel',finish);
     });
     handle.addEventListener('keydown',event=>{

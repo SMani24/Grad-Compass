@@ -95,7 +95,7 @@ class ReportPackageTests(unittest.TestCase):
 
     def test_pdf_shared_text_links_geometry_and_digest(self):
         pdf=ensure_pdf(self.workspace,self.report);page=page_data(self.workspace,self.report,0)
-        self.assertEqual(pdf['filename'],'can-country-report-2026-10-20-v1.pdf');self.assertEqual(pdf['sha256'],reports.digest(pdf['path'].read_bytes()))
+        self.assertEqual(pdf['filename'],'can-country-report-2026-10-20-v1-reader.pdf');self.assertEqual(pdf['sha256'],reports.digest(pdf['path'].read_bytes()))
         texts='';links=[]
         for n in range(page['pages']):
             data=page_data(self.workspace,self.report,n);texts+=data['text'];links+=data['links']
@@ -158,6 +158,8 @@ class ReportPackageTests(unittest.TestCase):
         value={'key':self.report['key'],'id':str(uuid4()),'selector':self.selector(),'comment':'Managed HTTP check'}
         self.assertEqual(helper.http('/api/reports/annotate',value,**{'X-Grad-Compass-Workspace':''})['status'],403)
         self.assertEqual(helper.http('/api/reports/annotate',value)['status'],200)
+        self.assertEqual(helper.http('/api/reports/reading',{'width':'wide'},**{'X-Grad-Compass-Workspace':''})['status'],403)
+        self.assertEqual(helper.http('/api/reports/reading',{'width':'wide'})['payload']['width'],'wide')
 
     def test_exact_bound_review_updates_disposition_without_reapproving_the_finding(self):
         annotation=self.annotate();original=self.report;old_pdf=ensure_pdf(self.workspace,original)
@@ -173,6 +175,42 @@ class ReportPackageTests(unittest.TestCase):
         current=self.workspace.research.request(self.fixture.request['request_id'])
         self.assertEqual(current['results'][0]['envelope']['findings'][0]['review_status'],'pending')
         self.assertTrue(old_pdf['path'].is_file())
+
+    def test_detailed_markdown_is_portable_exact_and_private_by_default(self):
+        from web.report_export import markdown
+        annotation=self.annotate();before=self.workspace.research.snapshot()
+        text=markdown(self.workspace,self.report).decode()
+        self.assertIn(self.markdown,text);self.assertIn(self.evidence,text)
+        self.assertIn('https://example.org/evidence',text);self.assertIn(self.report['metadata']['canonical_document']['sha256'],text)
+        self.assertIn(self.selector()['block_id'],text);self.assertIn('finding-level',text)
+        self.assertNotIn(annotation['comment'],text);self.assertNotIn(str(self.workspace.directory),text)
+        private=markdown(self.workspace,self.report,True).decode();self.assertIn(annotation['comment'],private);self.assertIn(annotation['selector']['quote'],private)
+        self.assertEqual(self.workspace.research.snapshot(),before)
+
+    def test_reader_preferences_positions_restart_backup_and_profile_isolation(self):
+        from web.report_reading import preferences
+        position={'key':self.report['key'],'anchor':self.selector()['block_id'],'offset':81}
+        preferences(self.workspace,{'width':'wide','sidebar_open':False,'position':position})
+        expected=preferences(self.workspace);self.assertEqual(expected['positions'][self.report['key']]['offset'],81)
+        self.assertEqual(preferences(LocalWorkspace(self.workspace.directory)),expected)
+        backup=self.workspace.backup();restored=restore_backup(self.workspace.directory/'backups'/backup['name'],self.fixture.root/'restored-reading')
+        self.assertEqual(preferences(restored),expected)
+        profiles=LocalProfiles(self.workspace.directory);other=profiles.create('Reading test')['profile']['id'];profiles.switch(other)
+        self.assertEqual(preferences(profiles.workspace),{'width':'comfortable','sidebar_open':True,'positions':{}})
+        with self.assertRaises(ValueError):preferences(self.workspace,{'width':'huge'})
+        with self.assertRaises(ValueError):preferences(self.workspace,{'position':{**position,'anchor':'nonexistent'}})
+        with self.assertRaises(ValueError):preferences(self.workspace,{'position':{**position,'key':'0'*64}})
+
+    def test_short_reader_and_selected_version_export_do_not_rewrite_old_pdf(self):
+        from PyQt6.QtPdf import QPdfDocument
+        original=ensure_pdf(self.workspace,self.report);original_bytes=original['path'].read_bytes()
+        old=self.report;self.markdown+='\n## At a glance\n\nA complete invented summary. [E01]\n\n## Detailed additional findings\n\nPrivate synthetic detail with qualifications.\n'
+        self.meta['canonical_document']={**self.meta['canonical_document'],'revision_id':str(uuid4()),'revision_number':2,'sha256':reports.digest(self.markdown.encode())}
+        self.root=self.root.parent/'revision-0002';self.root.mkdir();(self.root/'report.md').write_text(self.markdown);(self.root/'map.md').write_text(self.evidence);self.write()
+        report=reports.catalog(self.workspace)['reports'][0];pdf=ensure_pdf(self.workspace,report);q=QPdfDocument(None);q.load(str(pdf['path']));text=''.join(q.getAllText(p).text() for p in range(q.pageCount()))
+        self.assertIn('complete invented summary',text);self.assertNotIn('Private synthetic detail',text);self.assertIn('Report v2',text)
+        self.assertIn('-v2-reader.pdf',pdf['filename']);self.assertEqual(original['path'].read_bytes(),original_bytes)
+        self.assertIn('-v1-reader.pdf',ensure_pdf(self.workspace,old)['filename'])
 
 
 if __name__=='__main__':unittest.main()
