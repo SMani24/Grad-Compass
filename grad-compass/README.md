@@ -57,6 +57,16 @@ The first manually invoked real request returned 28 country field findings, five
 
 There is no automatic 30-day stop, renewal requirement or cleanup of operational records. Saved countries, notes, preferences, requests, results and feedback persist. Existing personal state was copied non-destructively from the marked preview; previous invented requests remain available separately through **Settings → Sample history**. Samples never supply real-mode institution or country evidence. Canonical applicant profiles/CVs remain outside this integration.
 
+## Country reports and map panels
+
+Country cards and details show country-report availability, factual review and university discovery separately from your personal decision. A completed bounded country request does not mean university discovery has started or that country coverage is exhaustive. Decisions use the existing profile-protected endpoint, show saving/saved/error feedback, and stay independent across local profiles.
+
+On wide windows, drag the teal handles on the panels' inner edges. Tab to a handle and use Left/Right (10 pixels), Shift+Left/Right (40 pixels), or Home/End. Double-click resets that side; **Settings → Reset panel widths** resets both. Each profile remembers its preferred widths. Narrow windows use the existing responsive layout without overwriting those preferences. The map redraws during resizing.
+
+Choose **Read country report** in country details, or open **Requests & findings**, for the full-window reading workspace. The latest returned revision opens first, with country/request navigation, section links, dates, factual-review status and caveats. **Personal notes** opens the same private country note used on the map. **Back to map** or Escape returns to the mounted map with its camera, selection and panel widths intact. Revision comparisons, request bindings and manual recovery remain in the expandable area below the report.
+
+The existing Belgium report retains its exact supplied wording and all sources. Missing structured sections remain unknown; report date, observation dates, requested intake and separately unspecified academic year are distinguished. Existing sources are finding-level, so the UI explicitly avoids inventing precise claim-to-source associations. The offline photographic header has documented provenance and a flag fallback. The app-owned projection and future compatible format suggestions are in [country-reports.md](../grad-compass-workspace/design/country-reports.md); no producer/response schema change is required.
+
 ## Backup and recovery
 
 Backups are made on launch, before recording new incoming responses and on normal close. Unchanged polling/replay does not create more backups. **Settings → Save local backup** creates another snapshot. SQLite's backup API captures databases; hash inventories cover immutable handoffs, incoming packets, retained public batches, personal decisions, display preferences and the separate sample archive. Each profile has its own `backups/` directory and backups do not expire automatically. Settings shows its current backup directory; reset recovery points retain the earlier directory. Copy that private directory to owner-controlled backup media for protection against device loss; copies on the same disk cannot protect against disk failure.
@@ -93,7 +103,7 @@ From the monorepo root:
 ```bash
 grad-compass/envGradCompass/bin/python -B -m unittest discover -s grad-compass/tests -v
 grad-compass/envGradCompass/bin/python -B -m unittest discover -s grad-compass-exchange/tests -v
-node --test grad-compass/tests/web_discovery.test.cjs grad-compass/tests/country_drawer.test.cjs
+node --test grad-compass/tests/web_discovery.test.cjs grad-compass/tests/country_drawer.test.cjs grad-compass/tests/country_report.test.cjs
 QT_QPA_PLATFORM=offscreen grad-compass/envGradCompass/bin/python -B grad-compass/tests/check_desktop_controls.py -v
 grad-compass/envGradCompass/bin/python -B grad-compass/scripts/launch_preview.py --selection-smoke-test
 git diff --check
@@ -116,6 +126,8 @@ grad-compass/envGradCompass/bin/python -B grad-compass/scripts/check_profile_ui.
 ```
 
 This uses only invented temporary records and cleans up its storage. Optional screenshots may be saved with `--screenshots grad-compass-workspace/runtime/profile-ui-review`.
+
+The [country workspace review](../grad-compass-workspace/reviews/2026-10-20-country-reports.md) records native desktop decision, resize, restart, map-return and 12-layout checks using an explicitly marked disposable copy of existing research. `scripts/check_country_workspace.py` requires that isolated copy; do not point it at a personal workspace, because it deliberately changes test decisions, notes and widths. It performs no research or response submission. Normal-app screenshots are separately read-only and Git-excluded.
 
 To verify automatic receipt, copy instructions, partial/final updates, draft protection, visible invalid-file errors and reopen persistence using invented temporary records:
 

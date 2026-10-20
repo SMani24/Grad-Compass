@@ -289,7 +289,8 @@ if (typeof document !== "undefined") {
       close.addEventListener("click", closeInspector);
       top.append(node("span", "eyebrow", "COUNTRY DETAILS"), close);
       elements.inspector.replaceChildren(top, node("div", "institution-symbol", country?.flag || "🌐"), node("h2", "", country?.name || code));
-      elements.inspector.append(node("p", "research-state", detail.synthetic===false ? (detail.review_status==="not_researched" ? "Country research not received yet" : `Agent factual review · ${detail.review_status}`) : detail.review_status === "unreviewed_demo" ? "Invented evidence · unreviewed demo" : ["pending","accepted","rejected"].includes(detail.review_status) ? `Invented evidence · review ${detail.review_status}` : "Country evidence not researched"));
+      const progress=window.GradCompassResearch.countryStatus(code,detail.university_count);
+      elements.inspector.append(node('p','research-state',progress.report),metadata('Factual review',detail.review_status),metadata('University discovery',progress.discovery),node('p','coverage-hint','Reports cover the saved request’s scope, not an exhaustive assessment of this country.'));
       elements.inspector.append(window.GradCompassResearch.detailControls(code));
       const personal = node("section", "country-personal");
       const label = node("label", "", "Your personal decision"); label.htmlFor = "country-decision";
@@ -319,6 +320,11 @@ if (typeof document !== "undefined") {
         get("universities-mode").focus({preventScroll:true});
       });
       elements.inspector.append(explore);
+      if(detail.origin){
+        const read=node('button','portal-link','Read country report');read.id='read-country-report';read.type='button';
+        read.addEventListener('click',()=>window.GradCompassResearch.openRequests(detail.origin.request_id,null,detail.origin.finding_id));elements.inspector.append(read);
+      }
+      const evidenceStart=elements.inspector.children.length;
       elements.inspector.append(node("h3", "", "Research summary"), node("p", "country-summary", detail.summary));
       if(detail.synthetic===false && detail.findings)window.GradCompassLocal?.countryFindings(elements.inspector,detail.findings);
       for(const [field,title] of (detail.synthetic===false && detail.findings ? [] : [["funding_routes","Funding routes"],["costs","Costs"],["work_rules","Work rules"]])) {
@@ -349,6 +355,9 @@ if (typeof document !== "undefined") {
         revision.append(node("summary","","Source revision details"),node("p","source-revision",(detail.synthetic===false ? "Source revision: " : "Demo source revision: ")+detail.revision));
         elements.inspector.append(revision);
       }
+      const evidence=node('details','country-evidence-secondary');evidence.append(node('summary','','Evidence, sources and earlier revisions'));
+      while(elements.inspector.children.length>evidenceStart)evidence.append(elements.inspector.children[evidenceStart]);
+      elements.inspector.append(evidence);
       elements.inspector.focus({preventScroll:true});
     } catch {
       if (sequence !== state.detailSequence) return;
@@ -453,7 +462,8 @@ if (typeof document !== "undefined") {
       const card = node("button", "country-card" + (selected ? " selected" : ""));
       card.type = "button"; card.dataset.country = country.code; card.setAttribute("aria-pressed", String(selectingCountries ? saveSelection.has(country.code) : selected));
       card.classList.toggle("bulk-selected", selectingCountries && saveSelection.has(country.code));
-      card.append(node("span", "country-tag", /^[A-Z]{3}$/.test(country.code) ? country.code : "Country / territory"), node("span", "university-name", country.flag + " " + country.name), node("span", "card-meta", count + " saved universities"), node("span", "coverage-hint", "Research coverage incomplete"), node("span", "decision-badge", state.decisions[country.code] || "No personal decision"));
+      const progress=window.GradCompassResearch.countryStatus(country.code,count);
+      card.append(node("span", "country-tag", /^[A-Z]{3}$/.test(country.code) ? country.code : "Country / territory"), node("span", "university-name", country.flag + " " + country.name), node("span", "coverage-hint", progress.report),node('span','coverage-hint',progress.review),node('span','coverage-hint',progress.discovery), node("span", "decision-badge", state.decisions[country.code] || "No personal decision"));
       card.addEventListener("click", () => activateCountry(country.code));
       const entry = node("div", "country-entry"); entry.append(card,window.GradCompassResearch.cardControls(country.code)); elements.results.append(entry);
       const row = node("tr", selected ? "selected" : ""); row.dataset.country = country.code;
@@ -468,7 +478,7 @@ if (typeof document !== "undefined") {
   }
   function universityEmptyMessage() {
     const noSavedHere = elements.country.value && !state.universities.some(university => university.country_code === elements.country.value);
-    return noSavedHere ? "No universities saved here yet. Research coverage is incomplete; this does not establish suitability." : "No universities match these filters. Try another country or search.";
+    return noSavedHere ? 'No universities saved here yet. '+window.GradCompassResearch.countryStatus(elements.country.value).discovery+'. Empty results do not establish suitability.' : "No universities match these filters. Try another country or search.";
   }
   function renderResults() {
     if (state.mode === "countries") { renderCountries(); return; }

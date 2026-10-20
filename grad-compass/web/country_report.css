@@ -1,0 +1,58 @@
+/* A reading destination, retaining the live map beneath it for an exact return. */
+#research-dialog { inset:0; margin:0; width:100vw; max-width:none; height:100dvh; max-height:none; border:0; border-radius:0; padding:22px clamp(16px,3vw,48px) 48px; background:#f4f7f9; box-shadow:none; overflow:auto; }
+#research-dialog::backdrop { background:#f4f7f9; backdrop-filter:none; }
+#research-dialog .report-topbar { align-items:center; gap:18px; max-width:1600px; margin:0 auto 16px; padding-bottom:16px; border-bottom:1px solid #ccdade; }
+#research-dialog .report-topbar h2 { font-size:1.35rem; margin:3px 0; }
+#research-dialog .report-topbar .request-hint { margin:0; }
+#research-dialog .research-layout { grid-template-columns:220px minmax(0,1fr); max-width:1600px; margin:auto; gap:28px; }
+.report-navigation { position:sticky; top:0; align-self:start; max-height:calc(100dvh - 60px); overflow:auto; min-width:0; }
+#research-dialog #research-request-list { position:static; max-height:none; }
+#research-dialog #research-message:empty { display:none; }
+#research-dialog .inbox-receipt { max-width:1600px; margin:0 auto 20px; padding:6px 12px; background:white; }
+#research-dialog #inbox-status { margin:6px 0; }
+.country-report { background:white; border:1px solid #d9e3e8; border-radius:18px; overflow:hidden; box-shadow:0 8px 32px #15304408; }
+.report-photo { position:relative; height:160px; margin:0; background:linear-gradient(125deg,#123548,#18738a); overflow:hidden; }
+.report-photo img { width:100%; height:100%; object-fit:cover; object-position:center 52%; }
+.photo-fallback { position:absolute; right:28px; top:32px; font-size:3rem; color:white; }
+.report-photo img + .photo-fallback { display:none; }
+.report-photo figcaption { position:absolute; right:12px; bottom:10px; background:#102c3de8; padding:5px 10px; border-radius:5px; font-size:.65rem; }
+.report-photo figcaption a { color:#fff; }
+#research-request-detail .report-photo figcaption a { color:#fff; }
+.report-heading { padding:24px 32px; border-bottom:1px solid var(--line); }
+#research-dialog .report-heading h1 { font-size:2rem; line-height:1.2; margin:12px 0 18px; }
+.report-badges { display:flex; gap:8px; flex-wrap:wrap; }
+.report-badges span { background:#eaf4f6; color:#144b5a; padding:6px 10px; border-radius:7px; font-size:.75rem; font-weight:650; }
+#research-dialog .report-heading p { color:#344f60; font-size:.85rem; line-height:1.65; }
+.report-facts { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:0; padding:24px 32px; background:#f5fafb; }
+.report-facts div { border-left:3px solid #398ba0; padding-left:12px; }
+.report-facts dt { font-size:.7rem; color:#425c6c; margin-bottom:7px; }
+.report-facts dd { margin:0; font-size:.85rem; line-height:1.55; font-weight:600; }
+.report-tools { padding:10px 32px 0; }
+.report-reading-layout { display:flex; gap:28px; padding:0 32px 32px; align-items:flex-start; }
+.report-reading-column { min-width:0; flex:1; max-width:76ch; margin:auto; }
+.report-outline { display:flex; gap:8px 16px; flex-wrap:wrap; padding:20px 0; border-bottom:1px solid var(--line); }
+.report-outline a { font-size:.8rem; }
+.report-section { margin:32px 0; scroll-margin-top:24px; }
+#research-dialog .report-section h2 { font-size:1.45rem; margin:0 0 16px; }
+#research-dialog .report-section h3 { font-size:.9rem; margin:0 0 8px; }
+#research-request-detail .country-report p { font-size:1rem; line-height:1.85; color:#243f50; white-space:pre-line; }
+#research-request-detail .country-report a { color:#066785; text-underline-offset:3px; }
+.report-glance { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.report-glance > div { background:#f0f7f8; border:1px solid #d9e9ec; padding:16px; border-radius:10px; }
+#research-request-detail .report-glance p { font-size:.82rem; line-height:1.65; margin:0; }
+.report-claim { padding-bottom:22px; margin-bottom:22px; border-bottom:1px solid #e5ecef; }
+.claim-tools { display:flex; align-items:flex-start; flex-wrap:wrap; gap:12px; }
+.claim-tools > button { border:1px solid #bbd6de; background:#edf6f9; color:#075c76; border-radius:6px; padding:7px 12px; font-size:.75rem; }
+.claim-sources { flex:1 1 200px; font-size:.75rem; }
+.claim-sources summary { cursor:pointer; }
+.claim-sources a { display:block; margin:10px 0; overflow-wrap:anywhere; }
+#research-request-detail .claim-sources p,.report-source p { font-size:.8rem; }
+.report-source { border-top:1px solid var(--line); padding:16px 0; overflow-wrap:anywhere; }
+.report-annotation-panel { flex:0 0 240px; position:sticky; top:20px; border:1px solid #cddfe5; background:#f3f8fa; padding:16px; border-radius:12px; }
+.report-annotation-panel textarea { width:100%; font:inherit; resize:vertical; min-height:130px; padding:10px; }
+#research-request-detail .report-annotation-panel p { font-size:.8rem; }
+.report-reading-layout:has(.report-annotation-panel:not([hidden])) { flex-wrap:wrap; }
+.report-secondary { padding:20px; margin-top:24px; border:1px solid #ccdce3; border-radius:12px; background:white; }
+.report-secondary > summary { cursor:pointer; color:#244b5c; font-weight:650; }
+@media(max-width:1000px){#research-dialog .research-layout{grid-template-columns:180px minmax(0,1fr);gap:16px}.report-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.report-glance{grid-template-columns:1fr}.report-heading,.report-facts{padding:20px}.report-reading-layout{padding:0 20px 20px}.report-tools{padding-left:20px}}
+@media(max-width:700px){#research-dialog{padding:16px 12px 32px}#research-dialog .report-topbar{flex-wrap:wrap}#research-dialog .research-layout{grid-template-columns:minmax(0,1fr)}.report-navigation{position:static;max-height:none}.report-navigation h3{margin:8px 0}.report-navigation #research-request-list{display:flex;overflow:auto;max-height:150px}.report-photo{height:120px}.report-heading{padding:16px}.report-reading-layout{display:block;padding:0 16px 16px}.report-facts{padding:16px;gap:16px}.report-annotation-panel{position:static;margin-top:24px}.report-glance{grid-template-columns:1fr}.country-report{border-radius:12px}}

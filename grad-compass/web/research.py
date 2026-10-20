@@ -92,10 +92,20 @@ class ResearchWorkspace:
                 ack = self._body(db.execute("SELECT body FROM research_acks WHERE request_id=?",(request["request_id"],)).fetchone())
                 results = db.execute("SELECT body FROM research_results WHERE request_id=? ORDER BY revision",(request["request_id"],)).fetchall()
                 count = len(results)
+                reports={}
+                for result_row in results:
+                    revision_reports={}
+                    for finding in self._body(result_row)['findings']:
+                        if finding['kind']=='country':
+                            code=finding['country_code'];previous=revision_reports.get(code)
+                            review=finding.get('review_status','unknown')
+                            revision_reports[code]={'review_status':review if not previous or previous['review_status']==review else 'mixed'}
+                    reports.update(revision_reports)
                 requests.append({"request_id":request["request_id"],"revision":request["revision"],"digest":request["digest"],
                     "scope":request["scope"],"countries":request["countries"],"created_at":request["created_at"],
                     "state":"results_received" if count else ack["state"] if ack else "prepared", "result_count":count,
                     "completion":self._body(results[-1]).get("completion") if results else None,
+                    "country_reports":reports,
                     "execution_progress":ack.get("execution_progress") if ack else None})
             return {"synthetic":self.synthetic,"countries":{row["code"]:{"watched":bool(row["watched"]),"note":row["note"]}
                     for row in db.execute("SELECT * FROM country_personal ORDER BY code")},"requests":requests,

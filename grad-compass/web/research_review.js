@@ -60,7 +60,8 @@
     const heading=node("h3","Review returned findings");heading.id="research-findings-title";
     section.append(heading,versions,node("p","Earlier result revisions remain available. Factual review, your assessment, and import approval are separate."));
     const result=selected.envelope;
-    const changes=node("details",undefined,"result-changes");changes.id="research-material-changes";changes.open=result.revision>1 || request.prior_results.length>0;
+    if(real)window.GradCompassCountryReport?.render(ctx,result);
+    const changes=node("details",undefined,"result-changes");changes.id="research-material-changes";changes.open=!real && (result.revision>1 || request.prior_results.length>0);
     changes.append(node("summary",`${result.revision>1 || request.prior_results.length ? "Material changes since referenced research" : "New findings"} (${selected.changes.length})`));
     for(const change of selected.changes){
       const box=node("div",undefined,"material-change");box.dataset.field=change.field;
@@ -121,7 +122,7 @@
       section.append(card);
     }
     section.append(technical("Result identity, source revision and delivery binding",{result:result.result_id,revision:result.revision,digest:result.digest,request_digest:result.request_digest,private_version:result.schema_version,country_version:"0.1.0",public_batch:result.public_batch?.batch_id || "None"}));
-    if(ctx.finding)requestAnimationFrame(()=>[...section.querySelectorAll(".finding-card")].find(card=>card.dataset.finding===ctx.finding)?.scrollIntoView({block:"nearest"}));
+    if(ctx.finding && !section.querySelector('#country-report'))requestAnimationFrame(()=>[...section.querySelectorAll(".finding-card")].find(card=>card.dataset.finding===ctx.finding)?.scrollIntoView({block:"nearest"}));
   }
   window.GradCompassResearchReview=Object.freeze({render});
 })();

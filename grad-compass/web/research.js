@@ -13,6 +13,15 @@
     return element;
   };
   const personal = code => data.countries[code] || {watched:false,note:""};
+  function countryStatus(code,count=0){
+    const requests=(data.requests || []).filter(item=>item.countries.includes(code));
+    const country=requests.find(item=>item.country_reports?.[code]);
+    const report=country?.country_reports[code];
+    const discovery=requests.find(item=>item.scope==='universities_programs');
+    return {report:report ? 'Country report available'+(country.completion==='partial' ? ' · partial request' : '') : 'Country report not received',
+      review:report ? 'Factual review: '+report.review_status : 'Factual review: no report to review',
+      discovery:count ? count+' saved universities · coverage is bounded' : discovery ? 'University discovery: '+stateLabel(discovery.state,discovery.completion) : 'University discovery not started'};
+  }
   const status = text => { get("research-toolbar-status").textContent = text; };
   function toolbar() {
     get("research-selected").disabled = selected.size === 0;
@@ -104,6 +113,7 @@
   let current;
   let currentRevision;
   let currentFinding;
+  let reportCountry=null;
   let openSequence = 0;
   function summary(preferences) {
     const values = preferenceFields.filter(key=>preferences?.[key]).map(key=>`${preferenceLabels[key]}: ${preferences[key]}`);
@@ -168,7 +178,7 @@
   async function handoff(requestId,feedbackId) {
     const exported=await post("/api/research/export",{request_id:requestId,...(feedbackId?{feedback_id:feedbackId}:{})});
     let box=get("research-handoff-box");
-    if(!box){box=node("section");box.id="research-handoff-box";get("research-request-detail").prepend(box);}
+    if(!box){box=node("section");box.id="research-handoff-box";const secondary=get('report-history');if(secondary){secondary.insertBefore(box,secondary.children[1] || null);secondary.open=true;}else get("research-request-detail").prepend(box);}
     box.replaceChildren(node("h3","Instructions for Dave"),node("p","Your request is already saved. Use these instructions to invoke Dave manually. Copying does not record acknowledgement. Responses will appear automatically."));
     const prompt=node("textarea",undefined,"handoff-text");prompt.id="research-handoff";prompt.readOnly=true;prompt.value=exported.prompt;prompt.rows=5;
     async function copyInstructions(){
@@ -184,6 +194,9 @@
     await copyInstructions();
   }
   function renderList(identity,items=data.requests,archive=false) {
+    const countries=get('report-country-navigation'),chosen=countries.value;
+    countries.replaceChildren(new Option('All countries',''),...[...new Set((items || []).flatMap(item=>item.countries))].map(code=>new Option(countryLabel(code),code)));
+    countries.value=[...countries.options].some(v=>v.value===chosen)?chosen:'';
     const list=get("research-request-list");list.replaceChildren();
     if(!items?.length){list.append(node("p","No requests saved yet."));return;}
     for(const item of items){
@@ -206,7 +219,7 @@
       await reload();if(sequence!==openSequence)return;
       const archiveItems=archive ? (await (await fetch("/api/local/history")).json()).requests : null;
       const items=archive ? archiveItems : data.requests;
-      identity=identity || items?.[0]?.request_id;
+      identity=identity || items?.find(item=>item.result_count>0)?.request_id || items?.[0]?.request_id;
       renderList(identity,items,archive);
       if(!identity){get("research-request-detail").replaceChildren(node("p",archive ? "No sample requests were saved. The original sample workspace remains preserved." : "Save countries and select them for research in the map panel to prepare your first request."));get("research-message").textContent=archive ? "Sample history · read only." : "";return;}
       const response=await fetch((archive ? "/api/local/history/" : "/api/research/requests/")+encodeURIComponent(identity),{cache:"no-store"});
@@ -235,7 +248,14 @@
     if(request.legacy) { for(const id of ["prepare-research-handoff","request-follow-up"]) actions.querySelector("#"+id).disabled=true; section.append(node("p","Legacy synthetic history — original digest semantics preserved. Prepare a new request to use the corrected handoff.")); }
     section.append(actions,technical("Identifiers & exact request binding",{request:request.request_id,revision:request.revision,digest:request.digest}));
     // Response and revision review shares this dialog through its synthetic adapter.
-    if(window.GradCompassResearchReview)window.GradCompassResearchReview.render({section,current,revision:currentRevision,finding:currentFinding,openRequests:(id,rev,find)=>openRequests(id,rev,find,!!current.archive),openRequest,handoff,post,reload,action,node,technical,notify:()=>window.dispatchEvent(new Event("grad-compass:discovery-updated"))});
+    if(window.GradCompassResearchReview)window.GradCompassResearchReview.render({section,current,revision:currentRevision,finding:currentFinding,country:reportCountry,openRequests:(id,rev,find)=>openRequests(id,rev,find,!!current.archive),openRequest,handoff,post,reload,action,node,technical,notify:()=>window.dispatchEvent(new Event("grad-compass:discovery-updated"))});
+    const report=section.querySelector('#country-report');
+    if(report){
+      reportCountry=report.dataset.country;get('report-country-navigation').value=reportCountry;
+      const secondary=node('details',undefined,'report-secondary');secondary.id='report-history';secondary.append(node('summary','Request progress, revision history, comparisons and recovery'));
+      for(const child of [...section.children])if(child!==report)secondary.append(child);
+      section.replaceChildren(report,secondary);
+    }
   }
   function resultLink(origin,label="Review source research") {
     const box=node("div",undefined,"result-origin");
@@ -253,7 +273,7 @@
     if(sequence!==openSequence || !researchDialog.open)return;
     if(JSON.stringify([current.acknowledgement,current.results])===JSON.stringify([next.acknowledgement,next.results]))return;
     const section=get('research-request-detail');
-    const editing=[...section.querySelectorAll('textarea:not([readonly])')].some(input=>input.value || input===document.activeElement)
+    const editing=[...section.querySelectorAll('textarea:not([readonly])')].some(input=>(input.id==='report-personal-note' ? input.value!==input.defaultValue : input.value) || input===document.activeElement)
       || section.querySelector('#research-response-review[open]');
     if(editing){
       get('show-received-results').hidden=false;
@@ -266,10 +286,12 @@
   }
   get('show-received-results').addEventListener('click',()=>{get('show-received-results').hidden=true;openRequests(current?.request.request_id,currentRevision,currentFinding);});
   get("open-research").addEventListener("click",()=>openRequests());
+  get('report-country-navigation').addEventListener('change',()=>{const code=get('report-country-navigation').value;reportCountry=code || null;const candidates=(data.requests || []).filter(v=>!code || v.countries.includes(code));const selected=candidates.find(v=>v.country_reports?.[code] || v.result_count>0) || candidates[0];if(selected)openRequests(selected.request_id);});
+  researchDialog.addEventListener('close',()=>window.dispatchEvent(new Event('grad-compass:panels-resized')));
   get("close-research").addEventListener("click",()=>{++openSequence;researchDialog.close();});
   window.addEventListener("grad-compass:prepare-request",event=>openRequest(event.detail));
   window.addEventListener("grad-compass:open-result",event=>openRequests(event.detail.request_id,event.detail.revision,event.detail.finding_id));
   // Changing map filters never changes the pending multi-country selection.
   get("research-selected").addEventListener("click",()=>window.dispatchEvent(new CustomEvent("grad-compass:prepare-request",{detail:{countries:[...selected]}})));
-  window.GradCompassResearch=Object.freeze({hydrate,personal,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests,refreshReceived,resultLink,openArchive:()=>openRequests(null,null,null,true)});
+  window.GradCompassResearch=Object.freeze({hydrate,personal,countryStatus,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests,refreshReceived,resultLink,openArchive:()=>openRequests(null,null,null,true)});
 })();
