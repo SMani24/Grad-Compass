@@ -31,7 +31,7 @@ def main():
     from preview_capture import PreviewCapture
     output=private_directory(args.screenshots);downloads=private_directory(output/'downloads'/str(uuid4()));names=[]
     window=webview.create_window('Grad Compass — reader refinement check (isolated copy)',f'http://127.0.0.1:{server.server_port}/',width=1440,height=1000,min_size=(390,640))
-    capture=PreviewCapture(window,output,prefix='2026-10-20-reader-'+('restart-' if args.restart else ''))
+    capture=PreviewCapture(window,output,prefix='2026-10-21-reader-'+('restart-' if args.restart else ''))
     def choose(name):names.append(name);return str(downloads/name)
     handler=DesktopDownloads(window,choose_path=choose);passed=[]
     watchdog=threading.Timer(240,lambda:os._exit(1));watchdog.daemon=True;watchdog.start()
@@ -80,19 +80,28 @@ def main():
                 assert abs(edge-top-position['offset'])<10,(edge,top,position)
                 shot('reading-position');passed.append(True);print('Native restart passed: remembered width/sidebar and exact-version passage position.',flush=True);return
             assert js("document.querySelector('.canonical-report').dataset.readingEdition==='reader'")
+            def alignment():
+                assert js("[...document.querySelectorAll('.canonical-reading .report-section')].every(section=>{const heading=section.querySelector('h2');return [...section.children].filter(n=>n.matches('.canonical-passage,.report-terms,.report-table-wrap')).every(n=>Math.abs(n.getBoundingClientRect().left-heading.getBoundingClientRect().left)<2);})")
+                assert js("document.querySelector('.report-table-wrap').clientWidth<=document.querySelector('.canonical-reading').clientWidth+1")
+            alignment()
+            assert js("document.querySelector('.reader-selection-actions').hidden")
+            assert js("document.querySelector('.canonical-reading [data-report-block]').getBoundingClientRect().top<innerHeight*.7")
             assert js("document.querySelector('.canonical-reading').textContent.includes('fully English-taught') && !document.querySelector('.canonical-reading').textContent.includes('Derived arithmetic and its limits')")
             wait("!!document.querySelector('.inline-evidence')");js("document.querySelector('.inline-evidence').click()");wait("document.getElementById('report-source-dialog').open");assert js("document.querySelectorAll('#report-source-dialog a[href^=https]').length>0");shot('compact-sources');click('close-report-sources')
-            click('reader-full-report');wait("document.querySelector('.canonical-report').dataset.readingEdition==='detailed'");assert js("document.querySelector('.canonical-reading').textContent.includes('Derived arithmetic and its limits')");shot('full-report');click('reader-show-report');wait("document.querySelector('.canonical-report').dataset.readingEdition==='reader'")
+            click('reader-full-report');wait("document.querySelector('.canonical-report').dataset.readingEdition==='detailed'");assert js("document.querySelector('.canonical-reading').textContent.includes('Derived arithmetic and its limits')");alignment();shot('full-report');click('reader-show-report');wait("document.querySelector('.canonical-report').dataset.readingEdition==='reader'")
             shot('comfortable')
+            js("document.querySelector('.reader-options>summary').click()");assert js("document.querySelector('.reader-options').open && document.getElementById('reader-width').getBoundingClientRect().width>0");time.sleep(.5);assert js("document.querySelector('.reader-options').open");shot('reading-options');assert js("document.querySelector('.reader-options').open");js("document.querySelector('.reader-options>summary').click()")
+            js("document.querySelector('.reader-exports>summary').click()");assert js("document.getElementById('reader-download-pdf').getBoundingClientRect().width>0 && !document.getElementById('export-personal-annotations').checked");time.sleep(.5);assert js("document.querySelector('.reader-exports').open");shot('export-menu');assert js("document.querySelector('.reader-exports').open");js("document.querySelector('.reader-exports>summary').click()")
             select('reader-width','wide');wait("document.getElementById('research-dialog').dataset.readingWidth==='wide'");click('report-sidebar-toggle');wait("document.getElementById('research-dialog').classList.contains('requests-collapsed')");time.sleep(.3)
             assert js("document.querySelector('.canonical-table').clientWidth>900")
             shot('wide-header')
-            select('reader-sections','canonical-funding-attractive-possibilities-important-limits');time.sleep(.3);shot('wide-funding')
+            select('reader-sections','canonical-funding-attractive-possibilities-important-limits');time.sleep(.3);alignment();assert js("document.querySelector('#canonical-funding-attractive-possibilities-important-limits h2').getBoundingClientRect().top>=document.querySelector('.reader-toolbar').getBoundingClientRect().bottom");shot('wide-funding')
             before_width=js("document.querySelector('.canonical-reading').clientWidth");click('reader-annotations');wait("document.querySelector('.annotation-panel').hidden===false")
             assert js("document.querySelector('.canonical-reading').clientWidth")<before_width
             click('reader-annotations');wait("document.querySelector('.annotation-panel').hidden===true");assert js("document.querySelector('.canonical-reading').clientWidth")==before_width
             # Private annotation is created only in this disposable copy, for explicit export checks.
-            js("""(()=>{const block=document.querySelector('#canonical-the-useful-routes [data-report-block]');const node=document.createTreeWalker(block,NodeFilter.SHOW_TEXT);while(node.nextNode() && !node.currentNode.textContent.trim()){}const r=document.createRange();r.selectNodeContents(node.currentNode);getSelection().removeAllRanges();getSelection().addRange(r);document.querySelector('.canonical-reading').dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));})()""")
+            js("""(()=>{const block=document.querySelector('#canonical-the-useful-routes [data-report-block]');const node=document.createTreeWalker(block,NodeFilter.SHOW_TEXT);while(node.nextNode() && !node.currentNode.textContent.trim()){}const r=document.createRange();r.selectNodeContents(node.currentNode);getSelection().removeAllRanges();getSelection().addRange(r);document.querySelector('.canonical-reading').dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowRight',shiftKey:true,bubbles:true}));})()""")
+            assert js("!document.querySelector('.reader-selection-actions').hidden && !document.getElementById('reader-comment').disabled")
             click('reader-comment');wait("!!document.getElementById('new-annotation-comment-text')");js("document.getElementById('new-annotation-comment-text').value='Disposable reader export comment'");click('save-new-annotation');wait("document.getElementById('reader-status').textContent.includes('saved privately')");click('reader-annotations')
             js("document.getElementById('reader-export-options').open=true")
             default=download('reader-download-markdown');text=default.read_text();assert 'Disposable reader export comment' not in text and 'full costs of one academic year' in text and 'a598ad20db0b' in text and 'finding-level' in text
@@ -105,18 +114,18 @@ def main():
             click('reader-show-report');wait("!!document.querySelector('.canonical-table')")
             versions=js("[...document.getElementById('canonical-version').options].map(o=>({key:o.value,label:o.textContent}))")
             latest=versions[0]['key'];earlier=next(v['key'] for v in versions if v['label'].startswith('Report v1'))
-            select('canonical-version',earlier);wait("document.querySelector('.canonical-report').dataset.canonical==="+json.dumps(earlier)+" && document.getElementById('reader-status').textContent.includes('Viewing saved report')")
+            select('canonical-version',earlier);wait("document.querySelector('.canonical-report').dataset.canonical==="+json.dumps(earlier)+" && !!document.querySelector('.canonical-table') && document.getElementById('reader-status').textContent.includes('Viewing saved report')")
             oldpdf=download('reader-download-pdf');assert '-v1-reader.pdf' in oldpdf.name
             oldmd=download('reader-download-markdown');assert '-v1-detailed.md' in oldmd.name and 'Canonical report v1' in oldmd.read_text() and '18b0e08c8147' in oldmd.read_text()
             assert js("!document.getElementById('export-personal-annotations').checked")
             select('reader-sections','canonical-at-a-glance');time.sleep(.7)
-            select('canonical-version',latest);wait("document.querySelector('.canonical-report').dataset.canonical==="+json.dumps(latest)+" && document.getElementById('reader-status').textContent.includes('Viewing saved report')")
+            select('canonical-version',latest);wait("document.querySelector('.canonical-report').dataset.canonical==="+json.dumps(latest)+" && !!document.querySelector('.canonical-table') && document.getElementById('reader-status').textContent.includes('Viewing saved report')")
             for width in (1440,820,390):
                 window.resize(width,1000 if width>390 else 740);wait('innerWidth',lambda v:v==width)
                 for scale in (1,1.15,1.3,1.5):
                     js("document.documentElement.style.setProperty('--text-scale',"+str(scale)+")")
                     wait("document.getElementById('research-dialog').scrollWidth<=document.getElementById('research-dialog').clientWidth")
-                    assert js("document.querySelector('.canonical-reading').clientWidth>0 && document.getElementById('reader-width').getBoundingClientRect().width>0")
+                    assert js("document.querySelector('.canonical-reading').clientWidth>0 && document.querySelector('.reader-options>summary').getBoundingClientRect().width>0");alignment()
                 js("document.querySelector('.report-heading').scrollIntoView({block:'start'})");shot('width-'+str(width)+'-large-text')
             window.resize(1440,1000);wait('innerWidth===1440');js("document.documentElement.style.setProperty('--text-scale',1)");select('reader-sections','canonical-regional-guides-to-costs');time.sleep(.8)
             position_identity=latest+':'+js("document.querySelector('.canonical-report').dataset.document");expected=preferences(workspace)['positions'][position_identity];assert expected['anchor'].startswith('regional-guides'),expected

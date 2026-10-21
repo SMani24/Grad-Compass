@@ -6,6 +6,7 @@
   let session;
   const selected = new Set();
   const busy = new Set();
+  let matching=[],selectionLoaded=false,selectionQueue=Promise.resolve(),selectionGeneration=0;
   const node = (tag, text, className) => {
     const element = document.createElement(tag);
     if (text !== undefined) element.textContent = text;
@@ -25,12 +26,18 @@
   const status = text => { get("research-toolbar-status").textContent = text; };
   function toolbar() {
     get("research-selected").disabled = selected.size === 0;
+    get("research-clear-selection").disabled = selected.size === 0;
+    get("research-select-matching").textContent = `Select all matching (${matching.length})`;
+    get("research-select-matching").disabled = matching.length === 0;
+    const outside=[...selected].filter(code=>!matching.includes(code)).length;
+    get("research-selection-summary").textContent = `${selected.size} selected${outside ? ` · ${outside} outside this filter` : ''}`;
+    for(const input of document.querySelectorAll('[data-research-country]'))input.checked=selected.has(input.dataset.researchCountry);
     get("research-selected").textContent = `Research selected (${selected.size})`;
   }
   function hydrate(next, token) {
     data = next || {countries:{}};
     if (token) session = token;
-    for (const code of selected) if (!personal(code).watched) selected.delete(code);
+    if(!selectionLoaded){for(const code of data.draft_selection || [])selected.add(code);selectionLoaded=true;}
     for (const button of document.querySelectorAll("[data-saved-country]")) {
       const code = button.dataset.savedCountry;
       button.textContent = personal(code).watched ? "Remove from saved" : "Save country";
@@ -40,7 +47,7 @@
     toolbar();
   }
   async function post(path, payload) {
-    const response = await fetch(path,{method:"POST",keepalive:path==="/api/reports/reading",headers:{"Content-Type":"application/json","X-Grad-Compass-Session":session,"X-Grad-Compass-Workspace":window.GradCompassWorkspace?.session || session},body:JSON.stringify(payload)});
+    const response = await fetch(path,{method:"POST",keepalive:["/api/reports/reading","/api/research/draft-selection"].includes(path),headers:{"Content-Type":"application/json","X-Grad-Compass-Session":session,"X-Grad-Compass-Workspace":window.GradCompassWorkspace?.session || session},body:JSON.stringify(payload)});
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Could not save. Please retry.");
     return result;
@@ -72,19 +79,25 @@
     });
     return button;
   }
+  function persistSelection(){
+    toolbar();const countries=[...selected],generation=++selectionGeneration;
+    status('Saving research selection…');
+    selectionQueue=selectionQueue.catch(()=>{}).then(()=>post('/api/research/draft-selection',{countries}));
+    selectionQueue.then(()=>{if(generation===selectionGeneration)status('Research selection saved. No research has started.');},error=>{if(generation===selectionGeneration)status('Selection not saved. '+error.message+' Change the selection to retry.');});
+  }
   function selection(code) {
     const label = node("label",undefined,"research-selection");
     const input = node("input"); input.type="checkbox";input.dataset.researchCountry=code;
-    input.checked=selected.has(code); input.disabled=!personal(code).watched;
-    input.addEventListener("change",() => { if(input.checked) selected.add(code); else selected.delete(code);
-      for (const other of document.querySelectorAll("[data-research-country]")) if(other.dataset.researchCountry===code) other.checked=input.checked;
-      toolbar(); });
+    input.checked=selected.has(code);input.setAttribute('aria-label','Select '+countryLabel(code)+' for research');
+    input.addEventListener("change",() => { if(input.checked) selected.add(code); else selected.delete(code);persistSelection(); });
     label.append(input,node("span","Select for research")); return label;
   }
+  // The complete filtered catalogue, independent of rendered cards/rows.
+  function setMatching(countries){matching=countries.map(c=>c.code);toolbar();}
+  get('research-select-matching').addEventListener('click',()=>{for(const code of matching)selected.add(code);persistSelection();});
+  get('research-clear-selection').addEventListener('click',()=>{selected.clear();persistSelection();});
   function cardControls(code) {
-    const box=node("div",undefined,"country-watch-controls");box.append(watchButton(code,"card"));
-    if(personal(code).watched) box.append(selection(code));
-    return box;
+    const box=node("div",undefined,"country-watch-controls");box.append(watchButton(code,"card"),selection(code));return box;
   }
   function detailControls(code) {
     const box=node("section",undefined,"country-watch-detail");
@@ -131,10 +144,17 @@
     try {
       await reload();
       draft={countries:context.countries || [...selected],parent_request_id:context.parent_request_id || null,parent_request_revision:context.parent_request_revision ?? null,parent_request_digest:context.parent_request_digest || null,prior_results:context.prior_results || [],submission_key:crypto.randomUUID()};
-      if(!draft.countries.length) { status("Save countries and select them for research first.");return; }
+      if(!draft.countries.length) { status("Select countries or territories for the research draft first.");return; }
       get("request-form").reset();get("request-bounds").hidden=data.synthetic!==false;
       get("request-max-institutions").value=context.bounds?.institutions ?? 5;get("request-max-programs").value=context.bounds?.programs ?? 5;get("request-form").dataset.submitting="false";
-      get("request-countries").textContent=draft.countries.map(countryLabel).join(" · ");
+      get('request-countries').dataset.countryCodes=JSON.stringify(draft.countries);
+      get("request-countries").textContent=draft.countries.length+' selected — '+draft.countries.map(countryLabel).join(" · ");
+      const unsupported=draft.countries.filter(code=>!(/^[A-Z]{3}$/.test(code)) || code==='XKX');
+      const scopeBlocked=draft.countries.length>20 || unsupported.length>0;
+      get('request-submit').disabled=scopeBlocked;
+      get('request-form').dataset.scopeBlocked=String(scopeBlocked);
+      const scopeNotice=scopeBlocked ? ' Full scope preserved. The current handoff supports up to 20 assigned country codes per request; '+(unsupported.length ? 'territory mappings need producer agreement ('+unsupported.map(countryLabel).join(', ')+'). ' : '')+'Narrow your draft selection before saving a bounded request. Nothing has been submitted.' : '';
+      get('request-countries').dataset.scopeNotice=scopeNotice;
       get("request-scope").value=context.scope || "country_conditions";
       get("request-scope").querySelector('option[value="refresh"]').disabled=!draft.parent_request_id;
       get("request-lineage").hidden=!draft.parent_request_id;
@@ -144,7 +164,7 @@
       get("request-preferences").open=!data.has_preferences;
       get("request-context").value=context.context || "";
       get('request-only').checked=!!context.request_only;
-      get("request-form-status").textContent="This will be saved locally for manual handoff, not sent to an agent.";
+      get("request-form-status").textContent="This will be saved locally for manual handoff, not sent to an agent."+get("request-countries").dataset.scopeNotice;
       requestDialog.showModal();
     } catch(error) {status(error.message);}
   }
@@ -155,7 +175,7 @@
   get("close-request").addEventListener("click",closeRequest);
   requestDialog.addEventListener("cancel",event=>{if(get("request-form").dataset.submitting==="true") event.preventDefault();});
   get("request-form").addEventListener("submit",async event=>{
-    event.preventDefault();if(!draft || get("request-form").dataset.submitting==="true")return;
+    event.preventDefault();if(!draft || get("request-form").dataset.submitting==="true" || get("request-form").dataset.scopeBlocked==="true")return;
     const payload={...draft,scope:get("request-scope").value,preferences:Object.fromEntries(preferenceFields.map(key=>[key,get("request-"+key).value || null])),
       ...(data.synthetic===false ? {bounds:{institutions:Number(get("request-max-institutions").value),programs:Number(get("request-max-programs").value)}} : {}),remember_preferences:!get("request-only").checked,limits:get("request-limits").value || null,context:get("request-context").value || null};
     get("request-form").dataset.submitting="true";get("request-submit").disabled=true;get("cancel-request").disabled=true;get("close-request").disabled=true;
@@ -298,5 +318,5 @@
   window.addEventListener("grad-compass:open-result",event=>openRequests(event.detail.request_id,event.detail.revision,event.detail.finding_id));
   // Changing map filters never changes the pending multi-country selection.
   get("research-selected").addEventListener("click",()=>window.dispatchEvent(new CustomEvent("grad-compass:prepare-request",{detail:{countries:[...selected]}})));
-  window.GradCompassResearch=Object.freeze({hydrate,personal,countryStatus,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests,refreshReceived,resultLink,openArchive:()=>openRequests(null,null,null,true)});
+  window.GradCompassResearch=Object.freeze({hydrate,personal,setMatching,countryStatus,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests,refreshReceived,resultLink,openArchive:()=>openRequests(null,null,null,true)});
 })();

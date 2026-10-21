@@ -12,11 +12,11 @@
     if(value.session && value.session!==window.GradCompassWorkspace?.session)throw new Error('This profile changed. Close this window and reopen Grad Compass.');
     const changed=inboxVersion===null || inboxVersion!==value.version;
     inboxVersion=value.version;inboxStatus=value;
-    get('inbox-indicator').hidden=false;get('inbox-receipt').hidden=false;
+    get('inbox-indicator').hidden=false;get('inbox-receipt').hidden=!(value.errors.length || value.pending || !get('show-received-results').hidden);
     get('results-ready').hidden=!value.ready_count;
     get('results-ready').textContent=`Results ready (${value.ready_count})`;
     get('inbox-errors-action').hidden=!value.errors.length;
-    const text=value.errors.length ? `${value.errors.length} incoming response(s) need attention. Open Requests for details.` : !get('show-received-results').hidden ? 'New responses received. Your draft is kept; show latest results when ready.' : value.pending ? 'Waiting for incoming files to finish…' : 'Responses arrive automatically. Dave is invoked manually.';
+    const text=value.errors.length ? `${value.errors.length} incoming response(s) need attention. Open Requests for details.` : !get('show-received-results').hidden ? 'New responses received. Your draft is kept; show latest results when ready.' : value.pending ? 'Waiting for incoming files to finish…' : 'Inbox up to date.';
     for(const id of ['inbox-workspace-status','inbox-status']){
       if(get(id).textContent!==text)get(id).textContent=text;
       get(id).title=value.checked_at ? 'Last inbox check: '+new Date(value.checked_at).toLocaleString() : 'Checking inbox';
@@ -98,7 +98,8 @@
     document.querySelector(".preview-label").textContent="Private local workspace";
     renderProfiles(workspace.profiles);
     document.querySelector("#request-title").parentElement.querySelector(".eyebrow").textContent="MANUAL RESEARCH HANDOFF";
-    document.querySelector("#research-dialog .request-hint").textContent="Saved requests and returned findings. Invoke Dave manually; responses arrive automatically with their actual review status.";
+    document.querySelector("#research-dialog .request-hint").textContent="Saved requests, reports and sources.";
+    if(!get('research-context-help')){const help=element('details');help.id='research-context-help';help.append(element('summary','How research works'),element('p','Save a bounded request, copy instructions for Dave and invoke him manually. Responses arrive automatically with their actual review status. Receipt does not imply factual acceptance.'));document.querySelector('#research-dialog .report-topbar>div').append(help);}
     pollInbox();if(!inboxTimer)inboxTimer=setInterval(pollInbox,3000);
   }
   get("refresh-local").addEventListener("click",async()=>{

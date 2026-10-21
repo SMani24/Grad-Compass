@@ -143,3 +143,10 @@ textarea:focus-visible { outline: 3px solid #56b9d5; outline-offset: 3px; }
 #removed-universities .removed-university { margin: 12px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 #removed-universities .removed-university span { flex: 1 1 140px; overflow-wrap: anywhere; }
 #local-confirm::backdrop,#reset-dialog::backdrop { background: #15304466; }
+
+.catalogue-hint,#research-selection-summary{font-size:.75rem;line-height:1.5;color:#395c6c;margin:10px 0 0}
+#research-selection-summary{font-weight:650}
+#request-countries{max-height:30dvh;overflow:auto;padding:12px;border:1px solid #c8dce4;border-radius:8px;line-height:1.7}
+
+.research-bulk-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.research-bulk-actions button{font-size:.7rem;padding:8px}

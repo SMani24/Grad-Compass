@@ -84,6 +84,8 @@ class ResearchWorkspace:
         return envelopes.saved(row["body"], synthetic=self.synthetic) if row else None
 
     def snapshot(self):
+        from web.research_selection import selection
+        draft_selection=selection(self.workspace)["countries"]
         with self.lock, closing(self.connect()) as db:
             preference = db.execute("SELECT body FROM research_preferences WHERE id=1").fetchone()
             requests = []
@@ -107,7 +109,7 @@ class ResearchWorkspace:
                     "completion":self._body(results[-1]).get("completion") if results else None,
                     "country_reports":reports,
                     "execution_progress":ack.get("execution_progress") if ack else None})
-            return {"synthetic":self.synthetic,"countries":{row["code"]:{"watched":bool(row["watched"]),"note":row["note"]}
+            return {"synthetic":self.synthetic,"draft_selection":draft_selection,"countries":{row["code"]:{"watched":bool(row["watched"]),"note":row["note"]}
                     for row in db.execute("SELECT * FROM country_personal ORDER BY code")},"requests":requests,
                     "has_preferences":preference is not None,
                     "preferences":json.loads(preference[0]) if preference else {key:None for key in envelopes.PREFERENCE_FIELDS}}

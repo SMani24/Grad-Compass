@@ -47,7 +47,10 @@
           <label class="search-label" for="search">Search your universities</label>
           <input id="search" type="search" placeholder="University or city…" autocomplete="off">
           <div id="country-tools" hidden>
-            <label for="country-list-scope">Explore</label><select id="country-list-scope"><option value="all">All countries</option><option value="watched">Saved countries</option></select>
+            <label for="country-list-scope">Explore</label><select id="country-list-scope"><option value="all">All countries and territories</option><option value="watched">Saved countries</option></select>
+            <p class="catalogue-hint">Countries and territories. Selection prepares a draft; research starts only after manual invocation.</p>
+            <div class="research-toolbar research-bulk-actions"><button id="research-select-matching" type="button">Select all matching (0)</button><button id="research-clear-selection" type="button" disabled>Clear selection</button></div>
+            <p id="research-selection-summary" role="status" aria-live="polite">0 selected</p>
             <div class="research-toolbar"><button id="research-selected" type="button" disabled>Research selected (0)</button><button id="open-research" type="button">Requests</button></div>
             <p id="research-toolbar-status" role="status" aria-live="polite"></p>
           </div>

@@ -237,7 +237,7 @@ if (typeof document !== "undefined") {
     get("country-tools").hidden = mode !== "countries";
     get("atlas-label").textContent = mode === "countries" ? "YOUR COUNTRY ATLAS" : "YOUR UNIVERSITY ATLAS";
     get("exploration-title").textContent = mode === "countries" ? "Explore countries" : "Explore universities";
-    get("results-title").textContent = mode === "countries" ? "Countries" : "Saved universities";
+    get("results-title").textContent = mode === "countries" ? "Countries and territories" : "Saved universities";
     get("list-label").textContent = mode === "countries" ? "YOUR COUNTRY ATLAS" : "YOUR SAVED UNIVERSITIES";
     get("list-title").textContent = mode === "countries" ? "Compare countries" : "Compare your universities";
     document.querySelector(".search-label").textContent = mode === "countries" ? "Search countries" : "Search your universities";
@@ -456,6 +456,7 @@ if (typeof document !== "undefined") {
   }
   function renderCountries() {
     const countries = filterCountries(state.countries, elements.search.value).filter(country => get("country-list-scope").value !== "watched" || window.GradCompassResearch.personal(country.code).watched);
+    window.GradCompassResearch.setMatching(countries);
     elements.results.replaceChildren();
     get("result-count").textContent = countries.length;
     get("mapped-count").textContent = "Saved university counts describe coverage, not suitability";
@@ -478,7 +479,7 @@ if (typeof document !== "undefined") {
       const name = node("td"); const button = node("button", "", country.flag + " " + country.name);
       button.addEventListener("click", () => activateCountry(country.code)); name.append(button);
       const watch = node("td"); watch.append(window.GradCompassResearch.watchButton(country.code,"list"));
-      if (window.GradCompassResearch.personal(country.code).watched) watch.append(window.GradCompassResearch.selection(country.code));
+      watch.append(window.GradCompassResearch.selection(country.code));
       row.append(name, node("td", "", count), node("td", "", state.decisions[country.code] || "No decision"),watch); body.append(row);
     }
     table.append(body);
