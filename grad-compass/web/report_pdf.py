@@ -13,7 +13,7 @@ from web.report_packages import immutable
 
 PDF_LOCK=threading.RLock()
 ASSETS=Path(__file__).parent/'assets'
-RENDERER='country-reader-6'
+RENDERER='country-reader-8'
 
 
 def styles():
@@ -34,15 +34,23 @@ def styles():
             'source_title':ParagraphStyle('source_title',parent=base,fontName='Compass-Bold',fontSize=9,leading=13,spaceBefore=10,spaceAfter=4,keepWithNext=True)}
 
 
-def _asset():
-    manifest=json.loads((ASSETS/'countries.json').read_text())
-    return manifest.get('BEL',{})
-
-
 def _path(asset):
-    path=ASSETS/Path(asset['path']).name
+    path=Path(asset['_local_path'])
     if hashlib.sha256(path.read_bytes()).hexdigest()!=asset['sha256']:raise ValueError('Report visual asset hash mismatch')
     return path
+
+
+def _flag_image(asset):
+    path=_path(asset)
+    if path.suffix.lower()!='.svg':return path
+    # Only shipped SVGs enter this adapter; producer visuals are bounded PNG/JPEG.
+    from PyQt6.QtCore import QByteArray,QBuffer,QIODevice
+    from PyQt6.QtGui import QImage,QPainter
+    from PyQt6.QtSvg import QSvgRenderer
+    image=QImage(96,64,QImage.Format.Format_ARGB32);image.fill(0)
+    painter=QPainter(image);QSvgRenderer(QByteArray(path.read_bytes())).render(painter);painter.end()
+    buffer=QBuffer();buffer.open(QIODevice.OpenModeFlag.WriteOnly);image.save(buffer,'PNG')
+    return io.BytesIO(bytes(buffer.data()))
 
 
 def build(report):
@@ -53,26 +61,25 @@ def build(report):
     s=styles();meta=report['metadata'];doc=meta['canonical_document'];editorial=report.get('reader')
     tree=editorial['content'] if editorial else report['content'];review=meta.get('canonical_factual_review',{'state':'pending'})
     body=[];width=A4[0]-96
-    concise=bool(editorial) or any(section['id']=='at-a-glance' for section in tree['sections'])
+    concise=bool(editorial)
     if editorial:sections=[section for section in tree['sections'] if section['id'] not in ('introduction','source-guide','evidence-map-binding')]
-    else:sections=[section for section in tree['sections'] if section['id']=='at-a-glance' or section['id'].startswith('costs') or section['id'].startswith('timing')] if concise else tree['sections']
+    else:sections=tree['sections']
     def p(text,style='body'):return Paragraph(text,s[style])
-    class Flag(Flowable):
-        def __init__(self):super().__init__();self.width=24;self.height=16
-        def draw(self):
-            for i,color in enumerate(('#171717','#f6ca35','#eb3c45')):self.canv.setFillColor(HexColor(color));self.canv.rect(i*8,0,8,16,fill=1,stroke=0)
-    brand=p('GRAD COMPASS · COUNTRY REPORT · READER EDITION','small')
-    if meta['country_code']=='BEL':
-        branding=Table([[Flag(),brand]],colWidths=[36,width-36]);branding.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'MIDDLE'),('LEFTPADDING',(0,0),(-1,-1),0),('RIGHTPADDING',(0,0),(-1,-1),0),('TOPPADDING',(0,0),(-1,-1),0),('BOTTOMPADDING',(0,0),(-1,-1),8)]));body.append(branding)
+    visuals=report.get('visuals',{});flag=visuals.get('flag')
+    edition_label='CONCISE READER EDITION' if editorial else 'RECEIVED FINDINGS' if report.get('model',{}).get('kind')=='received_findings' else 'FULL REPORT'
+    brand=p('GRAD COMPASS · COUNTRY REPORT · '+edition_label,'small')
+    if flag:
+        branding=Table([[Image(_flag_image(flag),width=24,height=16),brand]],colWidths=[36,width-36]);branding.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'MIDDLE'),('LEFTPADDING',(0,0),(-1,-1),0),('RIGHTPADDING',(0,0),(-1,-1),0),('TOPPADDING',(0,0),(-1,-1),0),('BOTTOMPADDING',(0,0),(-1,-1),8)]));body.append(branding)
     else:body.append(brand)
-    facts=[p(escape(tree['title']),'title'),p('Canonical report v'+str(doc['revision_number'])+' · '+escape(meta.get('report_date') or report['content']['report_date'] or 'Date unknown'),'small'),
+    version_label=report['model']['version_label'] if report.get('model',{}).get('kind')=='received_findings' else 'Canonical report v'+str(doc['revision_number'])
+    facts=[p(escape(tree['title']),'title'),p(escape(version_label)+' · '+escape(meta.get('report_date') or report['content']['report_date'] or 'Date unknown'),'small'),
         p('Canonical factual review: <b>'+escape(review.get('state','pending'))+'</b> · '+escape(review.get('reviewed_at') or review.get('time') or 'Review date not supplied'),'small')]
     if editorial:
         er=editorial['metadata']['factual_review'];facts.append(p('Reader edition r'+str(editorial['metadata']['revision_number'])+' · Factual review: <b>'+escape(er['state'])+'</b> · Human approval: '+escape(editorial['metadata']['human_approval']['state']),'small'))
-    else:facts.append(p('Human approval: '+escape(meta.get('human_approval',{}).get('state','unknown')),'small'))
+    facts.append(p('Canonical human approval: '+escape(meta.get('human_approval',{}).get('state','unknown')),'small'))
     labels=' · '.join(label['text'] for label in report['content'].get('labels',[]))
     facts.append(p('Evidence observed: '+escape(meta.get('source_artifact',{}).get('observed_on','date not supplied'))+'. '+escape(labels or 'Observation dates and applicable academic years are distinct.')+' Bounded country conditions; university discovery is separate.','small'))
-    asset=_asset() if meta['country_code']=='BEL' else {}
+    asset=visuals.get('photo',{})
     if asset:
         # A portrait inset preserves the spire and square; the old panoramic crop
         # cut through the subject. The source asset stays byte-for-byte intact.
@@ -81,13 +88,12 @@ def build(report):
         visual=[Image(raster,width=112,height=126),p(escape(asset['credit'])+' · '+escape(asset['license'])+'<br/><a href="'+escape(asset['source_url'])+'">Photo source</a>','small')]
         cover=Table([[facts,visual]],colWidths=[width-132,132]);cover.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(0,0),0),('RIGHTPADDING',(0,0),(0,0),16),('LEFTPADDING',(1,0),(1,0),12),('RIGHTPADDING',(1,0),(1,0),0),('TOPPADDING',(0,0),(-1,-1),0),('BOTTOMPADDING',(0,0),(-1,-1),6)]));body.append(cover)
     else:body.extend(facts)
-    body.append(p('A concise rendition of the selected canonical research. The detailed Markdown contains the complete research, dated public evidence, qualifications, calculations and open questions.','small'))
-    if not concise:body.append(PageBreak())
+    body.append(p('Concise producer-written rendition of the selected research; detailed Markdown retains the complete context.' if concise else 'Complete available content; no separate concise edition was published. This export does not establish complete research coverage.','small'))
     used_refs=set()
     def linked(block):
         def replace(match):
-            return re.sub(r'E\d{2}',lambda m:'<link href="#'+m[0]+'" color="#08647c">'+m[0]+'</link>' if m[0] in tree['sources'] else m[0],match[0])
-        return re.sub(r'\[(E\d{2}[^\]]*)\]',replace,block['pdf'])
+            return re.sub(r'(?:[A-Z]{2,8}-\d{2,3}|E\d{2})',lambda m:'<link href="#'+m[0]+'" color="#08647c">'+m[0]+'</link>' if m[0] in tree['sources'] else m[0],match[0])
+        return re.sub(r'\[((?:[A-Z]{2,8}-\d{2,3}|E\d{2})[^\]]*)\]',replace,block['pdf'])
     for section in sections:
         section_heading=p(escape(section['title']),'heading');body.append(section_heading)
         for item in section['items']:
@@ -127,7 +133,7 @@ def build(report):
     def document(output):return SimpleDocTemplate(output,pagesize=A4,leftMargin=48,rightMargin=48,topMargin=38,bottomMargin=46,title=tree['title'],subject=provenance,author='Grad Compass',pageCompression=1)
     first=document(io.BytesIO());first.build(deepcopy(body));total=first.page
     def footer(canvas,doc):
-        canvas.saveState();canvas.setFont('Compass',7);canvas.setFillColor(HexColor('#466473'));canvas.drawString(48,26,'Grad Compass · '+meta['country_code']+' · canonical report v'+str(report['metadata']['canonical_document']['revision_number'])+' · reader edition');canvas.drawRightString(A4[0]-48,26,str(doc.page)+' / '+str(total));canvas.restoreState()
+        canvas.saveState();canvas.setFont('Compass',7);canvas.setFillColor(HexColor('#466473'));canvas.drawString(48,26,'Grad Compass · '+meta['country_code']+' · '+version_label.lower()+' · '+edition_label.lower());canvas.drawRightString(A4[0]-48,26,str(doc.page)+' / '+str(total));canvas.restoreState()
     output=io.BytesIO();pdf=document(output);pdf.build(body,onFirstPage=footer,onLaterPages=footer);return output.getvalue()
 
 
@@ -153,7 +159,8 @@ def ensure_pdf(workspace,report,pdf_sha256=None):
         if source:
             from web.report_editions import get as get_edition
             export_report['reader']=get_edition(workspace,report,source[1])
-        filename=export_filename(export_report,('-reader' if path.stem.startswith('country-reader-') else '')+'.pdf')
+        historic_concise=path.stem in {'country-reader-'+str(n) for n in range(1,7)}
+        filename=export_filename(export_report,('-reader' if export_report.get('reader') or historic_concise else '-findings' if report.get('model',{}).get('kind')=='received_findings' else '-full')+'.pdf')
         return {'path':path,'sha256':hashlib.sha256(raw).hexdigest(),'filename':filename,'edition':report['edition']}
 
 

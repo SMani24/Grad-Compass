@@ -95,18 +95,18 @@ class ReportPackageTests(unittest.TestCase):
 
     def test_pdf_shared_text_links_geometry_and_digest(self):
         pdf=ensure_pdf(self.workspace,self.report);page=page_data(self.workspace,self.report,0)
-        self.assertEqual(pdf['filename'],'can-country-report-2026-10-20-v1-reader.pdf');self.assertEqual(pdf['sha256'],reports.digest(pdf['path'].read_bytes()))
+        self.assertEqual(pdf['filename'],'canada-country-report-2026-10-20-v1-full.pdf');self.assertEqual(pdf['sha256'],reports.digest(pdf['path'].read_bytes()))
         texts='';links=[]
         for n in range(page['pages']):
             data=page_data(self.workspace,self.report,n);texts+=data['text'];links+=data['links']
             self.assertTrue(all(w['x']>=0 and w['y']>=0 and w['x']+w['width']<=data['width']+1 and w['y']+w['height']<=data['height']+1 for w in data['words']))
         self.assertIn('invented passage',texts);self.assertIn('€1,234',texts);self.assertTrue(any(l.get('url')=='https://example.org/evidence' for l in links))
-        self.assertTrue(any(l.get('page',0)>0 for l in links),'Internal evidence destinations must survive page numbering')
+        self.assertTrue(any('page' in l and 0<=l['page']<page['pages'] for l in links),'Internal evidence destinations must survive page numbering')
         self.assertEqual(ensure_pdf(self.workspace,self.report)['sha256'],pdf['sha256'])
 
     def test_pdf_annotation_binds_exact_page_digest_and_passage(self):
-        data=page_data(self.workspace,self.report,1);word=next(w for w in data['words'] if len(w['text'])>3)
-        selector={'view':'pdf','edition':self.report['edition'],'pdf_sha256':data['pdf_sha256'],'page':1,'start':word['start'],'end':word['end'],'quote':data['text'][word['start']:word['end']]}
+        data=page_data(self.workspace,self.report,0);word=next(w for w in data['words'] if len(w['text'])>3)
+        selector={'view':'pdf','edition':self.report['edition'],'pdf_sha256':data['pdf_sha256'],'page':0,'start':word['start'],'end':word['end'],'quote':data['text'][word['start']:word['end']]}
         a=self.annotate(selector=selector);self.assertEqual(a['selector'],selector)
         selector['pdf_sha256']='0'*64
         with self.assertRaisesRegex(ValueError,'exact saved PDF'):self.annotate(selector=selector)
@@ -141,13 +141,13 @@ class ReportPackageTests(unittest.TestCase):
         self.assertEqual(report['content'],self.report['content']);self.assertTrue(ensure_pdf(self.workspace,report)['path'].is_file())
 
     def test_annotations_keep_the_old_pdf_after_renderer_update(self):
-        data=page_data(self.workspace,self.report,1);word=data['words'][0]
-        selector={'view':'pdf','edition':self.report['edition'],'pdf_sha256':data['pdf_sha256'],'page':1,'start':word['start'],'end':word['end'],'quote':word['text']}
+        data=page_data(self.workspace,self.report,0);word=data['words'][0]
+        selector={'view':'pdf','edition':self.report['edition'],'pdf_sha256':data['pdf_sha256'],'page':0,'start':word['start'],'end':word['end'],'quote':word['text']}
         a=self.annotate(selector=selector)
         with patch('web.report_pdf.RENDERER','country-print-next-test'):
             ensure_pdf(self.workspace,self.report)
             reports.save_annotation(self.workspace,{'key':self.report['key'],'id':a['id'],'comment':'Still on the retained PDF'})
-            self.assertEqual(page_data(self.workspace,self.report,1,pdf_sha256=data['pdf_sha256'])['text'],data['text'])
+            self.assertEqual(page_data(self.workspace,self.report,0,pdf_sha256=data['pdf_sha256'])['text'],data['text'])
 
     def test_pdf_corruption_is_rejected_against_its_inventory(self):
         pdf=ensure_pdf(self.workspace,self.report);pdf['path'].write_bytes(pdf['path'].read_bytes()+b' changed')
@@ -201,16 +201,16 @@ class ReportPackageTests(unittest.TestCase):
         with self.assertRaises(ValueError):preferences(self.workspace,{'position':{**position,'anchor':'nonexistent'}})
         with self.assertRaises(ValueError):preferences(self.workspace,{'position':{**position,'key':'0'*64}})
 
-    def test_short_reader_and_selected_version_export_do_not_rewrite_old_pdf(self):
+    def test_missing_editorial_exports_full_selected_content_without_rewriting_old_pdf(self):
         from PyQt6.QtPdf import QPdfDocument
         original=ensure_pdf(self.workspace,self.report);original_bytes=original['path'].read_bytes()
         old=self.report;self.markdown+='\n## At a glance\n\nA complete invented summary. [E01]\n\n## Detailed additional findings\n\nPrivate synthetic detail with qualifications.\n'
         self.meta['canonical_document']={**self.meta['canonical_document'],'revision_id':str(uuid4()),'revision_number':2,'sha256':reports.digest(self.markdown.encode())}
         self.root=self.root.parent/'revision-0002';self.root.mkdir();(self.root/'report.md').write_text(self.markdown);(self.root/'map.md').write_text(self.evidence);self.write()
         report=reports.catalog(self.workspace)['reports'][0];pdf=ensure_pdf(self.workspace,report);q=QPdfDocument(None);q.load(str(pdf['path']));text=''.join(q.getAllText(p).text() for p in range(q.pageCount()))
-        self.assertIn('complete invented summary',text);self.assertNotIn('Private synthetic detail',text);self.assertIn('canonical report v2',text)
-        self.assertIn('-v2-reader.pdf',pdf['filename']);self.assertEqual(original['path'].read_bytes(),original_bytes)
-        self.assertIn('-v1-reader.pdf',ensure_pdf(self.workspace,old)['filename'])
+        self.assertIn('complete invented summary',text);self.assertIn('Private synthetic detail',text);self.assertIn('canonical report v2',text)
+        self.assertIn('-v2-full.pdf',pdf['filename']);self.assertEqual(original['path'].read_bytes(),original_bytes)
+        self.assertIn('-v1-full.pdf',ensure_pdf(self.workspace,old)['filename'])
 
 
 if __name__=='__main__':unittest.main()

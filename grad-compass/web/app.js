@@ -299,7 +299,7 @@ if (typeof document !== "undefined") {
         const reportResponse=await api('/api/reports?request_id='+detail.origin.request_id).catch(()=>null);
         if(sequence!==state.detailSequence)return;
         const report=reportResponse?.reports?.find(r=>r.metadata.country_code===code);
-        if(report)availability.textContent='Country report available · '+(report.content.report_date || report.metadata.report_date || 'date unknown')+' · v'+report.metadata.canonical_document.revision_number;
+        if(report){const prepared=report.model?.kind==='prepared_report';read.textContent=prepared?'Read country report':'Read received findings';availability.textContent=(prepared?'Country report available':'Received findings; prepared report not yet published')+' · '+(report.content.report_date || report.metadata.report_date || 'date unknown')+' · '+(report.model?.version_label || 'v'+report.metadata.canonical_document.revision_number);}
         availability.append(document.createTextNode(' · Factual review: '+(report?.metadata.canonical_factual_review?.state || detail.review_status)));
       }
       const explore = node("button", "portal-link explore-country", "Explore universities");

@@ -17,10 +17,10 @@
   function countryStatus(code,count=0){
     const requests=(data.requests || []).filter(item=>item.countries.includes(code));
     const country=requests.find(item=>item.country_reports?.[code]);
-    const report=country?.country_reports[code];
+    const report=country?.country_reports[code],prepared=data.report_preparation?.[country?.request_id]?.[code];
     const discovery=requests.find(item=>item.scope==='universities_programs');
-    return {report:report ? 'Country report available'+(country.completion==='partial' ? ' · partial request' : '') : 'Country report not received',
-      review:report ? 'Factual review: '+report.review_status : 'Factual review: no report to review',
+    return {report:prepared?.kind==='prepared_report' ? 'Country report available · '+prepared.version : report ? 'Country findings received · prepared report not yet published' : 'Country research not received',
+      review:prepared?.kind==='prepared_report' ? 'Report factual review: '+prepared.review : report ? 'Finding factual review: '+report.review_status : 'Factual review: no report to review',
       discovery:count ? count+' saved universities · coverage is bounded' : discovery ? 'University discovery: '+stateLabel(discovery.state,discovery.completion) : 'University discovery not started'};
   }
   const status = text => { get("research-toolbar-status").textContent = text; };
@@ -35,7 +35,7 @@
     get("research-selected").textContent = `Research selected (${selected.size})`;
   }
   function hydrate(next, token) {
-    data = next || {countries:{}};
+    data = next ? {...next,report_preparation:next.report_preparation || data.report_preparation} : {countries:{}};
     if (token) session = token;
     if(!selectionLoaded){for(const code of data.draft_selection || [])selected.add(code);selectionLoaded=true;}
     for (const button of document.querySelectorAll("[data-saved-country]")) {

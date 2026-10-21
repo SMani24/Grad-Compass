@@ -58,11 +58,11 @@ class InboxReceiver:
                             if self.signature(path)!=signatures[path.name]:pending+=1;continue
                             packages.receive_notice(self.workspace,value)
                             self.processed[path.name]=signatures[path.name];self.errors.pop(path.name,None);continue
-                    except (ValueError,OSError,KeyError,TypeError):
+                    except (ValueError,OSError,KeyError,TypeError) as error:
                         # The normal scanner supplies its exact error for malformed
                         # response transports; report notices get a scoped error.
                         if isinstance(value,dict) and value.get('schema_version')==packages.NOTICE:
-                            self.errors[path.name]='Invalid report delivery: package bytes, review or request binding failed';continue
+                            self.errors[path.name]='Invalid report delivery: '+str(error);continue
                     ordinary.append(path)
                 candidates=ordinary
                 receipt=self.workspace.research.scan_inbox(candidates,before_record=backup_once)

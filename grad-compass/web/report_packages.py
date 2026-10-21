@@ -40,7 +40,8 @@ def validate(workspace,path,retained=False,expected_metadata_sha=None):
     if len(raw)>100_000:raise ValueError('Report metadata is too large')
     if expected_metadata_sha is not None and digest(raw)!=expected_metadata_sha:raise ValueError('Report delivery metadata digest mismatch')
     meta=env.loads(raw)
-    if meta.get('schema_version')!=SCHEMA:raise ValueError('Unknown private report package version')
+    if not isinstance(meta,dict) or meta.get('schema_version') not in (SCHEMA,'grad-compass-private-report-package-0.2'):raise ValueError('Unknown private report package version')
+    if any(not isinstance(meta.get(k),dict) for k in ('request','canonical_document','evidence_map')):raise ValueError('Report request, canonical document and evidence map must be objects')
     env.identifier(meta.get('report_id'));request_ref=meta['request'];doc=meta['canonical_document']
     request=workspace.research.request(request_ref['id'])['request']
     if request['revision']!=request_ref['revision'] or request['digest']!=request_ref['sha256'] or meta['country_code'] not in request['countries']:raise ValueError('Report must bind its saved country/request revision and exact digest')
@@ -51,27 +52,41 @@ def validate(workspace,path,retained=False,expected_metadata_sha=None):
         if digest(canonical)!=doc['sha256'] or digest(evidence)!=meta['evidence_map']['sha256']:raise ValueError('Retained canonical report digest mismatch')
     else:canonical=checked_file(path.parent,doc);evidence=checked_file(path.parent,meta['evidence_map'])
     review=meta.get('canonical_factual_review',{'state':'pending'})
+    if not isinstance(review,dict):raise ValueError('Report factual review must be an object')
     state=review.get('state','pending')
     if state not in ('pending','unknown','accepted','accepted_with_caveats','pass','pass_with_caveats','rejected','needs_correction'):raise ValueError('Unrecognized canonical report review disposition')
     if state not in ('pending','unknown'):
         if review.get('canonical_revision_id')!=doc['revision_id'] or review.get('canonical_sha256')!=doc['sha256'] or not review.get('review_id') or not review.get('scope') or not (review.get('reviewed_at') or review.get('time')):raise ValueError('Factual review must name the exact canonical revision/hash, reviewer record, time and scope')
     human=meta.get('human_approval',{'state':'unknown'})
-    if human.get('state')!='unknown':
+    if not isinstance(human,dict):raise ValueError('Report human approval must be an object')
+    if human.get('state') not in ('unknown','not_requested'):
         if human.get('canonical_revision_id')!=doc['revision_id'] or human.get('canonical_sha256')!=doc['sha256'] or not human.get('approval_id'):raise ValueError('Human approval must bind this exact canonical report separately')
     producer=meta.get('producer_result');finding=None
+    if producer is not None and not isinstance(producer,dict):raise ValueError('Report producer-result binding must be an object')
+    if meta['schema_version']=='grad-compass-private-report-package-0.2' and not producer:raise ValueError('Ordinary reports require an exact received producer-result binding')
     if producer:
         detail=workspace.research.request(request['request_id'])
         result=next((r['envelope'] for r in detail['results'] if r['envelope']['result_id']==producer['id'] and r['envelope']['revision']==producer['revision'] and r['envelope']['digest']==producer['body_sha256']),None)
         if result is None:raise ValueError('Report producer-result binding is not recorded in this profile')
-        finding=next((f for f in result['findings'] if f['kind']=='country' and f['country_code']==meta['country_code'] and f['finding_revision']==producer['finding_revision']),None)
+        finding=next((f for f in result['findings'] if f['kind']=='country' and f['country_code']==meta['country_code'] and f['finding_revision']==producer['finding_revision'] and ('finding_id' not in producer or f['finding_id']==producer['finding_id'])),None)
         if finding is None:raise ValueError('Report finding revision is not bound to its producer result')
     if not retained:
         for asset in meta.get('attachments',[]):checked_file(path.parent,asset,20_000_000)
         if meta.get('pdf'):checked_file(path.parent,meta['pdf'],25_000_000)
+    if producer and sum(1 for f in result['findings'] if f.get('kind')=='country' and f['country_code']==meta['country_code'] and f['finding_revision']==producer['finding_revision'])!=1:raise ValueError('Report producer finding binding is ambiguous')
     key=digest((meta['report_id']+':'+doc['revision_id']+':'+doc['sha256']).encode())
     content=parse_report(canonical.decode('utf-8'),evidence.decode('utf-8'))
-    return {'key':key,'edition':digest(raw),'metadata':meta,'content':content,'finding':finding,
-            'metadata_bytes':raw,'canonical_bytes':canonical,'evidence_bytes':evidence}
+    if 'coverage' in meta:
+        from web.report_model import validate_coverage
+        validate_coverage(meta['coverage'],content)
+    report={'key':key,'edition':digest(raw),'metadata':meta,'content':content,'finding':finding,
+            'metadata_bytes':raw,'canonical_bytes':canonical,'evidence_bytes':evidence,'delivery':{'completion':result.get('completion'),'result_revision':result['revision'],'issued_at':result.get('issued_at')} if producer else {}}
+    if meta['schema_version']=='grad-compass-private-report-package-0.2':
+        from web.report_delivery import validate_extension
+        validate_extension(workspace,path.parent,report,retained)
+    if finding:report['finding_reviews']=[{'finding_id':finding['finding_id'],'finding_revision':finding['finding_revision'],'factual_review':finding.get('review',{'decision':finding.get('review_status','unknown')}),'human_approval':finding.get('human_approval',{'state':'unknown'})}]
+    report['_source_root']=str(path.parent.relative_to(workspace.directory))
+    return report
 
 
 def immutable(path,body):
@@ -94,6 +109,12 @@ def immutable(path,body):
 def retain(workspace,report):
     target=workspace.directory/'report-cache'/report['key']/report['edition']
     immutable(target/'canonical.md',report['canonical_bytes']);immutable(target/'evidence.md',report['evidence_bytes'])
+    for asset in report.get('assets',{}).values():
+        if not (target/'assets'/asset['sha256']).exists():
+            source=member(workspace.directory,report['_source_root']+'/'+asset['relative_path'])
+            immutable(target/'assets'/asset['sha256'],source.read_bytes())
+    from web.report_editions import retain as retain_edition
+    for edition in report.get('bundled_editions',{}).values():retain_edition(workspace,report,edition)
     immutable(target/'metadata.local.json',report['metadata_bytes'])
 
 
@@ -105,8 +126,10 @@ def _cached(workspace,path):
     return report
 
 
-def catalog(workspace,request_id=None):
-    if not getattr(workspace,'operational',False):return {'reports':[],'errors':[]}
+def _catalog(workspace,request_id=None):
+    if not getattr(workspace,'operational',False):
+        from web.report_projection import catalog as projections
+        return projections(workspace,request_id)
     with workspace.state_lock,closing(workspace.connect()):
         found={};errors=[];bindings={}
         cache=workspace.directory/'report-cache'
@@ -123,6 +146,9 @@ def catalog(workspace,request_id=None):
                 if any(p.startswith('.') for p in path.relative_to(root).parts):continue
                 if 'editions' in path.relative_to(root).parts:continue
                 try:
+                    candidate=env.loads(path.read_bytes())
+                    if not isinstance(candidate,dict):raise ValueError('Report metadata must be an object')
+                    if candidate.get('schema_version')=='grad-compass-private-report-package-0.2' and not (workspace.directory/'report-receipts'/(digest(path.read_bytes())+'.json')).is_file():continue
                     report=validate(workspace,path);doc=report['metadata']['canonical_document'];identity=(doc['id'],doc['revision_id'])
                     if identity in bindings and bindings[identity]!=doc['sha256']:raise ValueError('Canonical revision has conflicting bytes')
                     bindings[identity]=doc['sha256'];retain(workspace,report);found[(report['key'],report['edition'])]=report
@@ -137,22 +163,73 @@ def catalog(workspace,request_id=None):
         from web.report_editions import attach
         parents={r['metadata']['canonical_document']['revision_id'] for r in reports}
         for report in versions.values():attach(workspace,report,errors,parents)
-        return {'reports':list(versions.values()),'errors':errors}
+        from web.report_projection import catalog as projections
+        legacy=projections(workspace,request_id);errors.extend(legacy['errors'])
+        prepared=list(versions.values())
+        covered={(r['metadata']['request']['id'],r['metadata']['country_code'],r['metadata'].get('producer_result',{}).get('revision')) for r in prepared}
+        combined=prepared+[r for r in legacy['reports'] if (r['metadata']['request']['id'],r['metadata']['country_code'],r['metadata']['producer_result']['revision']) not in covered]
+        from web.report_model import normalize
+        from web.report_assets import attach as assets
+        for report in combined:normalize(assets(workspace,report))
+        combined.sort(key=lambda r:(r['delivery'].get('result_revision',0),r['model']['kind']=='prepared_report',r['metadata']['canonical_document']['revision_number']),reverse=True)
+        return {'reports':combined,'errors':errors}
+
+
+def _fingerprint(workspace):
+    paths=[]
+    for name in ('reports','report-cache','editorial-cache','report-projections','report-receipts'):
+        root=workspace.directory/name
+        if root.exists():
+            for path in root.rglob('*'):
+                if path.is_file() and not any(part.startswith('.') for part in path.relative_to(root).parts) and (name in ('reports','report-receipts') or path.suffix in ('.md','.json') or 'assets' in path.relative_to(root).parts):
+                    if path.name.endswith('.manifest.json'):continue
+                    stat=path.lstat();paths.append((str(path),stat.st_ino,stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
+    for suffix in ('','-wal','-journal'):
+        path=workspace.directory/('research.sqlite'+suffix)
+        if path.exists():
+            stat=path.lstat();paths.append((str(path),stat.st_ino,stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
+    return tuple(sorted(paths))
+
+
+def catalog(workspace,request_id=None):
+    # Validation is shared by workspace/cards, inbox, reader and image/PDF routes.
+    # Every relevant file/receipt/DB change invalidates; exports do not cause a
+    # complete reparse. The marker/path guard still runs for cache hits.
+    with workspace.state_lock,closing(workspace.connect()):
+        signature=_fingerprint(workspace);cached=getattr(workspace,'_validated_report_catalog',None)
+        if cached is None or cached[0]!=signature:
+            value=_catalog(workspace)
+            workspace._validated_report_catalog=(_fingerprint(workspace),value)
+        else:value=cached[1]
+        return {'reports':[r for r in value['reports'] if request_id is None or r['metadata']['request']['id']==request_id], 'errors':value['errors']}
 
 
 def public(report):
-    from web.report_editions import public as public_edition
-    return {k:public_edition(v) if k in ('reader','detailed') and v else v for k,v in report.items() if not k.endswith('_bytes')}
+    def safe(value):
+        if isinstance(value,dict):return {k:safe(v) for k,v in value.items() if not k.endswith('_bytes') and not k.startswith('_') and k!='bundled_editions'}
+        if isinstance(value,list):return [safe(v) for v in value]
+        return value
+    return safe(report)
 
 
 def get(workspace,key,edition=None):
     if not re.fullmatch('[a-f0-9]{64}',key):raise ValueError('Choose a saved report version')
+    current=next((r for r in catalog(workspace)['reports'] if r['key']==key and (edition is None or r['edition']==edition)),None)
+    if current is not None:return current
     if edition is not None:
         if not re.fullmatch('[a-f0-9]{64}',edition):raise ValueError('Choose a saved PDF edition')
         path=workspace.directory/'report-cache'/key/edition/'metadata.local.json'
-        if not path.is_file():raise ValueError('Saved report edition not found')
+        if not path.is_file():
+            from web.report_projection import cached
+            projection=workspace.directory/'report-projections'/key/edition/'metadata.local.json'
+            if projection.is_file():
+                from web.report_assets import attach as assets
+                return assets(workspace,cached(workspace,projection))
+            raise ValueError('Saved report edition not found')
         from web.report_editions import attach
-        return attach(workspace,_cached(workspace,path),[])
+        from web.report_model import normalize
+        from web.report_assets import attach as assets
+        return normalize(assets(workspace,attach(workspace,_cached(workspace,path),[])))
     report=next((r for r in catalog(workspace)['reports'] if r['key']==key),None)
     if report is None:raise ValueError('Saved report version not found in this profile')
     return report
@@ -164,7 +241,9 @@ def receive_notice(workspace,value):
     if not value['metadata_path'].startswith('reports/'):raise ValueError('Report delivery must name private report storage')
     report=validate(workspace,path,expected_metadata_sha=value['metadata_sha256']);request=report['metadata']['request']
     if (request['id'],request['revision'],request['sha256'])!=(value['request_id'],value['request_revision'],value['request_sha256']):raise ValueError('Report delivery request binding mismatch')
-    retain(workspace,report);return report['key']
+    retain(workspace,report)
+    immutable(workspace.directory/'report-receipts'/(report['edition']+'.json'),(env.compact(value)+'\n').encode())
+    return report['key']
 
 
 def state(workspace):
@@ -184,6 +263,7 @@ def save_annotation(workspace,payload):
     with workspace.state_lock:
         if not isinstance(payload,dict) or set(payload)-{'key','id','selector','comment','delete'} or not {'key','id'}<=set(payload):raise ValueError('Review the annotation fields')
         env.identifier(payload['id']);report=get(workspace,payload['key']);saved=state(workspace)
+        if report['metadata'].get('archived'):raise ValueError('Archived invented reports are read-only; annotations stay in the original archive')
         existing=next((a for a in saved['annotations'] if a['id']==payload['id']),None)
         if existing and existing['report_key']!=payload['key']:raise ValueError('Annotation belongs to another report version')
         if payload.get('delete') is True:
@@ -224,13 +304,23 @@ def save_annotation(workspace,payload):
 def prepare_draft(workspace,payload):
     with workspace.state_lock:
         if not isinstance(payload,dict) or set(payload)!={'key','annotation_ids'} or not isinstance(payload['annotation_ids'],list) or not payload['annotation_ids']:raise ValueError('Choose annotations for a feedback draft')
-        report=get(workspace,payload['key']);saved=state(workspace);ids=payload['annotation_ids']
+        report=get(workspace,payload['key'])
+        if report['metadata'].get('archived'):raise ValueError('Archived invented reports are read-only; annotations stay in the original archive')
+        saved=state(workspace);ids=payload['annotation_ids']
         selected=[a for a in saved['annotations'] if a['report_key']==payload['key'] and a['id'] in ids]
         if len(selected)!=len(set(ids)):raise ValueError('Annotations must belong to this report version')
         meta=report['metadata'];doc=meta['canonical_document'];producer=meta.get('producer_result')
         if not producer:raise ValueError('This report has no received finding binding for feedback yet; Marry owns that handoff')
         request=workspace.research.request(meta['request']['id']);result=next(r['envelope'] for r in request['results'] if r['envelope']['digest']==producer['body_sha256'])
-        finding=next(f for f in result['findings'] if f['kind']=='country' and f['country_code']==meta['country_code'] and f['finding_revision']==producer['finding_revision'])
+        finding=next(f for f in result['findings'] if f['kind']=='country' and f['country_code']==meta['country_code'] and f['finding_revision']==producer['finding_revision'] and ('finding_id' not in producer or f['finding_id']==producer['finding_id']))
+        if meta.get('schema_version')=='grad-compass-received-report-projection-1.0' and len(meta.get('finding_reviews',[]))>1:
+            origins=[]
+            for annotation in selected:
+                origin=meta.get('passage_origins',{}).get(annotation['selector'].get('block_id'))
+                if origin is None:raise ValueError('Select an original finding passage for feedback; use Advanced finding feedback for PDF or shared context')
+                origins.append(origin)
+            if any(origin!=origins[0] for origin in origins):raise ValueError('Select annotations from one original finding at a time; no feedback was sent')
+            finding=next(f for f in result['findings'] if f['finding_id']==origins[0]['finding_id'] and f['finding_revision']==origins[0]['finding_revision'])
         lines=[report['content']['title'],f"Canonical report v{doc['revision_number']} · {doc['revision_id']} · SHA-256 {doc['sha256']}"]
         for a in selected:
             s=a['selector'];location=('PDF page '+str(s['page']+1)+' · PDF SHA-256 '+s['pdf_sha256']) if s['view']=='pdf' else s['block_id']+(' · editorial edition '+s['document'] if s['view']=='editorial' else '')

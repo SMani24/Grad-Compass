@@ -273,6 +273,12 @@ class ResearchWorkspace:
                         "flush/fsync and close it, then atomically rename to a unique non-hidden .json filename. Never edit a finalized file. "
                         f"Finalize any referenced exchange batches under {self.directory / 'batches'} before publishing their result. "
                         "The app receives finalized responses automatically; the applicant must not relay response files. "
+                        "For every country-conditions report, also deliver the complete detailed Markdown, separately written concise edition, "
+                        "explicit seven-topic coverage and exact-source/review bindings under private report package 0.2. "
+                        "Follow grad-compass-workspace/design/country-report-contract.md. After actual review/release disposition, publish the finalized directory "
+                        f"with grad-compass/envGradCompass/bin/python -B grad-compass/scripts/publish_country_report.py --handoff {path if kind=='request' else self.directory / 'research-handoff' / ('request-'+request_id+'.json')} --package FINALIZED_DIRECTORY. "
+                        "Publish response progress independently; response completion does not imply that report preparation or coverage is complete. "
+                        "Never fabricate a concise edition, research, acceptance or a missing section to satisfy publication. "
                         "No automatic invocation, outreach, faculty investigation or profile/CV transfer is authorized. "
                         "Request submission is not factual acceptance. Copying this handoff is not delivery or acknowledgement.")
             return {"prompt":prompt,"path":str(path),"digest":value["digest"],"kind":kind}

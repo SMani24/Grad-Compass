@@ -4,10 +4,14 @@ import json
 
 def filename(report,suffix):
     meta=report['metadata'];tree=report['content']
-    country='belgium' if meta['country_code']=='BEL' else meta['country_code'].lower()
+    from web.report_assets import country_name
+    import re
+    country=re.sub('[^a-z0-9]+','-',country_name(meta['country_code']).lower()).strip('-')
     for kind in ('reader','detailed'):
         edition=report.get(kind)
         if edition and suffix.startswith('-'+kind):suffix=suffix.replace('-'+kind,'-'+kind+'-r'+str(edition['metadata']['revision_number'])+'-'+edition['id'][:8],1)
+    if report.get('model',{}).get('kind')=='received_findings':
+        return f"{country}-received-findings-{meta.get('report_date') or 'undated'}-result-r{meta['producer_result']['revision']}{suffix}"
     return f"{country}-country-report-{meta.get('report_date') or tree['report_date'] or 'undated'}-v{meta['canonical_document']['revision_number']}{suffix}"
 
 
@@ -15,13 +19,15 @@ def markdown(workspace,report,include_annotations=False):
     meta=report['metadata'];doc=meta['canonical_document'];review=meta.get('canonical_factual_review',{'state':'pending'})
     detailed=report.get('detailed')
     lines=['# Detailed country report — portable edition','',
-      f"Canonical report v{doc['revision_number']} · {meta['country_code']} · {meta.get('report_date') or report['content']['report_date'] or 'Report date unknown'}",'',
-      'This file contains complete detailed research and its evidence map, with portable provenance and passage locators. It is a bounded country-conditions report, not exhaustive country coverage or a university/program shortlist. Personal decisions and factual acceptance are separate.','',
+      f"{report.get('model',{}).get('version_label') or ('Canonical report v'+str(doc['revision_number']))} · {meta['country_code']} · {meta.get('report_date') or report['content']['report_date'] or 'Report date unknown'}",'',
+      'This file contains all available delivered content and its evidence references. It is a bounded report, not exhaustive country coverage. Preparation, original finding review, report review and personal decisions are separate.','',
       f"Factual review: **{review.get('state','pending')}**. Review date: {review.get('reviewed_at') or review.get('time') or 'not supplied'}. Review scope: {review.get('scope') or 'not supplied'}.",
       f"Human approval: **{meta.get('human_approval',{}).get('state','unknown')}**.",
       f"Evidence observed: {meta.get('source_artifact',{}).get('observed_on') or 'see source records below'}. Report date, observation dates and applicable academic years are distinct.",
       'Historical figures, regional categories, conditional awards, unresolved conflicts and calculations retain their original qualifications. Missing target-year terms remain unknown.','',
       ]
+    if report.get('model'):
+        lines += ['## Delivery, preparation and research coverage','', '```json',json.dumps(report['model'],ensure_ascii=False,indent=2),'```','']
     if detailed:
         dm=detailed['metadata'];lines += [f"Detailed editorial edition r{dm['revision_number']} · factual review **{dm['factual_review']['state']}** · human approval **{dm['human_approval']['state']}**.",
           'The reader PDF is an intentionally shorter rendition of the same canonical origin. Its editorial revision and review are separate from this detailed edition.','',
@@ -30,7 +36,7 @@ def markdown(workspace,report,include_annotations=False):
     if not detailed or report['evidence_bytes'].decode('utf-8') not in detailed['document_bytes'].decode('utf-8'):
         lines+=['## Editorial evidence map (complete)','',
       'E references preserve the producer’s editorial topic mappings. Original inbox sources remain finding-level; this export does not invent claim-level support or turn an earlier source-artifact review into approval of this report.','',
-      report['evidence_bytes'].decode('utf-8'),'']
+      (('```json\n'+report['evidence_bytes'].decode('utf-8')+'\n```') if report['evidence_bytes'].lstrip().startswith(b'{') else report['evidence_bytes'].decode('utf-8')),'']
     lines+=['## Public source records from the bound country finding','']
     finding=report.get('finding') or {}
     # Include all public fields rather than silently dropping observation dates or

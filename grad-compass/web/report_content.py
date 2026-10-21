@@ -28,12 +28,22 @@ def inline(tokens, pdf=False):
     return ''.join(out)
 
 
+REF_PATTERN=r'(?:[A-Z]{2,8}-\d{2,3}|E\d{2})'
+
+
 def refs(text):
     result=[]
-    for group in re.findall(r'\[(E\d{2}[^\]]*)\]',text):
-        for first,last in re.findall(r'E(\d{2})(?:[–—-]E?(\d{2}))?',group):
-            for n in range(int(first),int(last or first)+1):
-                if n<100 and 'E%02d'%n not in result:result.append('E%02d'%n)
+    for group in re.findall(r'\[([^\]]+)\]',text):
+        # Preserve supplied identities; support both old E01 ranges and generic
+        # producer source labels such as ABC-01, without country-specific code.
+        for match in re.finditer(r'('+REF_PATTERN+r')(?:[–—-]('+REF_PATTERN+r'|\d{2,3}))?',group):
+            first,last=match.groups();prefix=re.match(r'(.*?)(\d+)$',first)
+            if last:
+                end=re.search(r'\d+$',last)
+                values=[prefix[1]+str(n).zfill(len(prefix[2])) for n in range(int(prefix[2]),int(end[0])+1)]
+            else:values=[first]
+            for ref in values:
+                if ref not in result:result.append(ref)
     return result
 
 
@@ -88,7 +98,15 @@ def parse_report(markdown,evidence):
                         walk(t.get('children',[]))
                 walk(cells[-1]['children'])
                 sources[ref]={'id':ref,'topic':plain(cells[1]['children']),'text':plain(cells[-1]['children']),'links':links}
-    prepared=re.search(r'\*\*Prepared:\*\*\s*(\d{1,2} \w+ \d{4})',markdown)
+    if evidence.lstrip().startswith('{'):
+        from web.research_envelopes import loads
+        value=loads(evidence)
+        if not isinstance(value,dict) or value.get('schema_version')!='grad-compass-private-report-evidence-map-0.2' or not isinstance(value.get('sources'),dict):raise ValueError('Unknown structured report evidence map')
+        for ref,source in value['sources'].items():
+            if not re.fullmatch(REF_PATTERN,ref) or not isinstance(source,dict) or not isinstance(source.get('source_url'),str) or not re.match(r'^https?://',source['source_url']):raise ValueError('Invalid public report source reference')
+            sources[ref]={'id':ref,'topic':source.get('locator',ref),'text':'Observed '+str(source.get('observed_at','unknown'))+' · '+str(value.get('citation_scope','precision not supplied')),
+              'links':[{'label':source.get('locator',ref),'url':source['source_url']}],'source_record':source}
+    prepared=re.search(r'prepared(?:[:* ·—-]*)\s*(\d{1,2} \w+ \d{4})',markdown,re.I)
     try:report_date=datetime.strptime(prepared[1],'%d %B %Y').date().isoformat() if prepared else None
     except ValueError:report_date=None
     text='\n'.join(b['text'] for b in blocks.values())

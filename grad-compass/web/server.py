@@ -215,7 +215,8 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                     return self.respond(200,(APP_ROOT/"ui/data/countries.geo.json").read_bytes())
                 if route == "/api/workspace":
                     from web.discovery import overview
-                    return self.respond(200,{**overview(workspace, exchange), "country_decisions": workspace.country_decisions(), "research": workspace.research.snapshot(), "session": session_token, "receipt": getattr(workspace,"last_receipt",None), "profiles":profiles.snapshot() if profiles else None})
+                    from web.report_model import research_snapshot
+                    return self.respond(200,{**overview(workspace, exchange), "country_decisions": workspace.country_decisions(), "research": research_snapshot(workspace), "session": session_token, "receipt": getattr(workspace,"last_receipt",None), "profiles":profiles.snapshot() if profiles else None})
                 if route == "/api/local/removed" and getattr(workspace,"operational",False):
                     return self.respond(200,{"universities":workspace.removed_universities()})
                 if route == "/api/local/inbox" and getattr(workspace,"operational",False):
@@ -233,8 +234,9 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                 if request_match:
                     return self.respond(200,workspace.research.request(request_match[1]))
                 if route == "/api/research":
-                    return self.respond(200,{**workspace.research.snapshot(), "session": session_token})
-                if route.startswith('/api/reports') and getattr(workspace,'operational',False):
+                    from web.report_model import research_snapshot
+                    return self.respond(200,{**research_snapshot(workspace), "session": session_token})
+                if route.startswith('/api/reports'):
                     from web import report_packages as packages
                     query=parse_qs(urlsplit(self.path).query)
                     if route=='/api/reports':
@@ -243,6 +245,12 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                     if route=='/api/reports/reading':
                         from web.report_reading import preferences as reading_preferences
                         return self.respond(200,reading_preferences(workspace))
+                    asset_match=re.fullmatch(r'/api/reports/([a-f0-9]{64})/asset/([a-f0-9]{64})',route)
+                    if asset_match:
+                        report=packages.get(workspace,asset_match[1],query.get('edition',[None])[0])
+                        asset=next((a for a in report.get('visuals',{}).values() if a['sha256']==asset_match[2]),None)
+                        if not asset:return self.respond(404,{'error':'This asset was not published with the selected report'})
+                        return self.respond(200,Path(asset['_local_path']).read_bytes(),asset['media_type'])
                     match=re.fullmatch(r'/api/reports/([a-f0-9]{64})/(annotations|pdf|page|image|markdown|editorial)',route)
                     if match:
                         key,operation=match.groups()
@@ -307,7 +315,7 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
             profile_operation=profiles is not None and route in ('/api/local/profiles/create','/api/local/profiles/switch','/api/local/reset')
             preferences = route == "/api/display-preferences"
             layout = route == '/api/panel-widths'
-            report_operation = getattr(workspace,'operational',False) and route in ('/api/reports/annotate','/api/reports/draft','/api/reports/reading')
+            report_operation = route in ('/api/reports/annotate','/api/reports/draft','/api/reports/reading')
             if not (report_operation or layout or preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
                 return self.respond(405,{"error":"This endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"

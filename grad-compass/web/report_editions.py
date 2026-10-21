@@ -27,7 +27,7 @@ def validate(workspace,report,path,retained=False):
     if state not in ('pending','unknown') and (review.get('document_revision_id')!=meta['document_revision_id'] or review.get('document_sha256')!=meta['sha256'] or not review.get('review_id') or not review.get('scope') or not (review.get('reviewed_at') or review.get('time'))):raise ValueError('Editorial factual review must bind its exact document, review record, time and scope')
     approval=meta.get('human_approval',{})
     if not isinstance(approval,dict):raise ValueError('Editorial human approval must be an object')
-    if approval.get('state')!='unknown' and (approval.get('document_revision_id')!=meta['document_revision_id'] or approval.get('document_sha256')!=meta['sha256'] or not approval.get('approval_id')):raise ValueError('Editorial human approval must bind its exact document separately')
+    if approval.get('state') not in ('unknown','not_requested') and (approval.get('document_revision_id')!=meta['document_revision_id'] or approval.get('document_sha256')!=meta['sha256'] or not approval.get('approval_id')):raise ValueError('Editorial human approval must bind its exact document separately')
     return {'id':digest(raw),'metadata':meta,'content':parse_report(body.decode('utf-8'),report['evidence_bytes'].decode('utf-8')),'document_bytes':body,'metadata_bytes':raw}
 
 
@@ -82,3 +82,26 @@ def select(workspace,report,reader=None,detailed=None):
 
 
 def public(edition):return {k:v for k,v in edition.items() if not k.endswith('_bytes')}
+
+
+def inline_edition(workspace,report,root,retained=False):
+    """Adapt producer inline editorial metadata without rewriting original bytes."""
+    from web.report_packages import checked_file,digest
+    import json
+    ref=report['metadata']['reader_editorial'];canonical=report['metadata']['canonical_document'];evidence=report['metadata']['evidence_map']
+    env.identifier(ref.get('revision_id'))
+    if type(ref.get('revision_number')) is not int or ref['revision_number']<1:raise ValueError('Reader revision must be positive')
+    if (ref.get('parent_canonical_revision_id'),ref.get('parent_canonical_sha256'),ref.get('evidence_map_revision_id'),ref.get('evidence_map_sha256'))!=(canonical['revision_id'],canonical['sha256'],evidence.get('revision_id'),evidence['sha256']):raise ValueError('Inline reader parent/evidence binding mismatch')
+    review=ref.get('factual_review',{})
+    if not isinstance(review,dict):raise ValueError('Reader factual review must be an object')
+    if review.get('state') not in REVIEW_STATES:raise ValueError('Unknown reader review state')
+    if review['state'] not in ('pending','unknown') and (review.get('document_revision_id')!=ref['revision_id'] or review.get('document_sha256')!=ref['sha256'] or not review.get('review_id') or not review.get('scope') or not (review.get('reviewed_at') or review.get('time'))):raise ValueError('Reader review must bind exact document/review/time/scope')
+    approval=ref.get('human_approval',{'state':'unknown'})
+    if not isinstance(approval,dict):raise ValueError('Reader human approval must be an object')
+    if approval.get('state') not in ('unknown','not_requested'):raise ValueError('Inline reader approval requires a separately agreed exact-record representation')
+    meta={'schema_version':SCHEMA,'country_code':report['metadata']['country_code'],'edition':'reader','document_revision_id':ref['revision_id'],'revision_number':ref['revision_number'],'filename':ref['relative_path'],'sha256':ref['sha256'],
+      **{k:ref[k] for k in ('parent_canonical_revision_id','parent_canonical_sha256','evidence_map_revision_id','evidence_map_sha256')},'factual_review':review,'human_approval':approval,'origin_package_sha256':report['edition']}
+    raw=(env.compact(meta)+'\n').encode();identity=digest(raw)
+    if retained:return get(workspace,report,identity)
+    body=checked_file(root,ref)
+    return {'id':identity,'metadata':meta,'metadata_bytes':raw,'document_bytes':body,'content':parse_report(body.decode(),report['evidence_bytes'].decode())}
