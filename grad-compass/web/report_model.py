@@ -52,10 +52,17 @@ def normalize(report):
 def research_snapshot(workspace):
     """UI availability is derived separately; research envelopes stay untouched."""
     from web.report_packages import catalog
-    snapshot=workspace.research.snapshot();preparation={}
-    for report in catalog(workspace)['reports']:
+    snapshot=workspace.research.snapshot();preparation={};available=catalog(workspace)['reports']
+    for report in available:
         meta=report['metadata'];values=preparation.setdefault(meta['request']['id'],{})
         values.setdefault(meta['country_code'],{'kind':report['model']['kind'],'version':report['model']['version_label'],
           'date':meta.get('report_date') or report['content']['report_date'],'review':report['model']['review']['report']['state'],'overview':report['model']['preparation']['overview']})
-    snapshot['report_preparation']=preparation
+    requests={r['request_id']:r for r in snapshot['requests']}
+    prepared=[r for r in available if r['model']['kind']=='prepared_report' and r['metadata']['request']['id'] in requests and not r['metadata'].get('archived')]
+    prepared.sort(key=lambda r:(r['metadata'].get('report_date') or r['content']['report_date'] or '',requests[r['metadata']['request']['id']]['created_at'],r['metadata']['canonical_document']['revision_number']),reverse=True)
+    preferred={}
+    for report in prepared:
+        meta=report['metadata'];summary=preparation[meta['request']['id']][meta['country_code']]
+        preferred.setdefault(meta['country_code'],{**summary,'request_id':meta['request']['id'],'key':report['key'],'edition':report['edition']})
+    snapshot['report_preparation']=preparation;snapshot['preferred_country_reports']=preferred
     return snapshot

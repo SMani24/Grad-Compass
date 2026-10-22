@@ -178,5 +178,16 @@ class SharedReportTests(unittest.TestCase):
         self.assertEqual(len(report['content']['sources']),2)
         self.assertIn('https://example.invalid/another-revision',markdown(self.ws,report).decode())
 
+    def test_country_navigation_uses_prepared_request_without_rebinding_newer_findings(self):
+        from web.report_model import research_snapshot
+        prepared,_=self.publish();original=prepared['metadata']['request']['id']
+        receive_country(self.case,code='NZL',completion='partial');new_id=self.case.request['request_id']
+        self.assertNotEqual(new_id,original)
+        view=research_snapshot(self.ws)
+        self.assertEqual(view['preferred_country_reports']['NZL']['request_id'],original)
+        self.assertEqual(view['preferred_country_reports']['NZL']['key'],prepared['key'])
+        self.assertEqual(view['report_preparation'][new_id]['NZL']['kind'],'received_findings')
+        self.assertFalse(any(r['model']['kind']=='prepared_report' for r in reports.catalog(self.ws,new_id)['reports']))
+
 
 if __name__=='__main__':unittest.main()

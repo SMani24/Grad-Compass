@@ -20,7 +20,12 @@ function projectCountryReport(result,request,code){
     result_digest:result.digest,report_date:result.issued_at || result.created_at,observations:[...new Set(findings.map(f=>f.observed_at).filter(Boolean))],
     applicable_academic_year:null,sections,sources,findings};
 }
-if(typeof module!=='undefined')module.exports={projectCountryReport,REPORT_SECTIONS};
+function selectCountryReport(reports,revision=null){
+  const eligible=revision==null ? reports : reports.filter(r=>r.delivery?.result_revision===revision);
+  const prepared=eligible.filter(r=>r.model?.kind==='prepared_report').sort((a,b)=>String(b.metadata.report_date || b.content?.report_date || '').localeCompare(a.metadata.report_date || a.content?.report_date || '') || b.metadata.canonical_document.revision_number-a.metadata.canonical_document.revision_number);
+  return prepared[0] || eligible[0] || null;
+}
+if(typeof module!=='undefined')module.exports={projectCountryReport,REPORT_SECTIONS,selectCountryReport};
 if(typeof document!=='undefined')(() => {
   function render(ctx,result){
     const codes=[...new Set(result.findings.filter(f=>f.kind==='country').map(f=>f.country_code))];
@@ -31,5 +36,5 @@ if(typeof document!=='undefined')(() => {
     article.append(ctx.node('p','Opening the saved country report…','reader-status'));ctx.section.append(article);
     window.GradCompassReportReader.upgrade(article,ctx,code);return true;
   }
-  window.GradCompassCountryReport=Object.freeze({render,project:projectCountryReport});
+  window.GradCompassCountryReport=Object.freeze({render,project:projectCountryReport,select:selectCountryReport});
 })();

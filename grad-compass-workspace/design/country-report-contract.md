@@ -60,3 +60,12 @@ grad-compass/envGradCompass/bin/python -B -m unittest discover -s grad-compass/t
 ```
 
 Real acceptance additionally requires the corrected Germany/Canada package revisions, their actual dispositions/release, normal receipt and desktop reading/export evidence alongside Belgium. Passing the invented fixture alone does not complete that delivery.
+
+
+## APP-018 display reconciliation — 22 October 2026
+
+Ordinary country-card and country-selector navigation prefers a valid prepared report across the active profile’s existing requests and shows its actual source request. This does not rebind that report to a newer request. Explicit request/result history remains scoped to the selected request and response revision. Within that scope, normal reading prefers the latest valid prepared version; historical findings explain their exact scope and can return to an existing prepared report without preparing another request.
+
+Editorial compatibility includes the complete `(country, canonical revision/hash, evidence-map revision/hash)` tuple. A later evidence-map edition can retain the same canonical text. Earlier editorials remain valid only against their own retained tuple, with their original citations, exports and annotations. Unknown tuples and corrupt historical bytes still fail validation. Historical status is not an exception to digest checks.
+
+Producer bookkeeping metadata under `reports/COUNTRY/maps/` is a separate reference-only artifact, not an ordinary canonical package. The existing unversioned sidecar is checked for a positive revision, document identity, safe filename/exact digest and a matching received canonical/map tuple. Its supplied review state is retained; classification does not promote a pending map or replace the report package’s exact review record. No public exchange, producer or response schema changes are required.

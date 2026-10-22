@@ -17,10 +17,11 @@
   function countryStatus(code,count=0){
     const requests=(data.requests || []).filter(item=>item.countries.includes(code));
     const country=requests.find(item=>item.country_reports?.[code]);
-    const report=country?.country_reports[code],prepared=data.report_preparation?.[country?.request_id]?.[code];
+    const report=country?.country_reports[code],prepared=data.preferred_country_reports?.[code] || data.report_preparation?.[country?.request_id]?.[code];
     const discovery=requests.find(item=>item.scope==='universities_programs');
     return {report:prepared?.kind==='prepared_report' ? 'Country report available · '+prepared.version : report ? 'Country findings received · prepared report not yet published' : 'Country research not received',
       review:prepared?.kind==='prepared_report' ? 'Report factual review: '+prepared.review : report ? 'Finding factual review: '+report.review_status : 'Factual review: no report to review',
+      prepared:prepared?.kind==='prepared_report'?prepared:null,
       discovery:count ? count+' saved universities · coverage is bounded' : discovery ? 'University discovery: '+stateLabel(discovery.state,discovery.completion) : 'University discovery not started'};
   }
   const status = text => { get("research-toolbar-status").textContent = text; };
@@ -35,7 +36,7 @@
     get("research-selected").textContent = `Research selected (${selected.size})`;
   }
   function hydrate(next, token) {
-    data = next ? {...next,report_preparation:next.report_preparation || data.report_preparation} : {countries:{}};
+    data = next ? {...next,report_preparation:next.report_preparation || data.report_preparation,preferred_country_reports:next.preferred_country_reports || data.preferred_country_reports} : {countries:{}};
     if (token) session = token;
     if(!selectionLoaded){for(const code of data.draft_selection || [])selected.add(code);selectionLoaded=true;}
     for (const button of document.querySelectorAll("[data-saved-country]")) {
@@ -243,7 +244,8 @@
       await reload();if(sequence!==openSequence)return;
       const archiveItems=archive ? (await (await fetch("/api/local/history")).json()).requests : null;
       const items=archive ? archiveItems : data.requests;
-      identity=identity || items?.find(item=>item.result_count>0)?.request_id || items?.[0]?.request_id;
+      identity=identity || (!archive && data.preferred_country_reports?.[reportCountry]?.request_id) || items?.find(item=>item.result_count>0)?.request_id || items?.[0]?.request_id;
+      if(!archive && !finding && revision==null && !reportCountry)reportCountry=Object.keys(data.preferred_country_reports || {}).find(code=>data.preferred_country_reports[code].request_id===identity) || null;
       renderList(identity,items,archive);
       if(!identity){get("research-request-detail").replaceChildren(node("p",archive ? "No sample requests were saved. The original sample workspace remains preserved." : "Save countries and select them for research in the map panel to prepare your first request."));get("research-message").textContent=archive ? "Sample history · read only." : "";return;}
       const response=await fetch((archive ? "/api/local/history/" : "/api/research/requests/")+encodeURIComponent(identity),{cache:"no-store"});
@@ -286,6 +288,11 @@
     const button=node("button",`${label} · revision ${origin.revision}`);button.type="button";
     button.addEventListener("click",()=>openRequests(origin.request_id,origin.revision,origin.finding_id));box.append(button);return box;
   }
+  function openCountryReport(code,fallback=null){
+    reportCountry=code;
+    const preferred=data.preferred_country_reports?.[code];
+    return openRequests(preferred?.request_id || fallback?.request_id,null,null);
+  }
   async function refreshReceived(){
     await reload();
     if(!researchDialog.open || !current || current.archive)return;
@@ -311,12 +318,12 @@
   }
   get('show-received-results').addEventListener('click',()=>{get('show-received-results').hidden=true;openRequests(current?.request.request_id,currentRevision,currentFinding);});
   get("open-research").addEventListener("click",()=>openRequests());
-  get('report-country-navigation').addEventListener('change',()=>{const code=get('report-country-navigation').value;reportCountry=code || null;const candidates=(data.requests || []).filter(v=>!code || v.countries.includes(code));const selected=candidates.find(v=>v.country_reports?.[code] || v.result_count>0) || candidates[0];if(selected)openRequests(selected.request_id);});
+  get('report-country-navigation').addEventListener('change',()=>{const code=get('report-country-navigation').value;reportCountry=code || null;const candidates=(data.requests || []).filter(v=>!code || v.countries.includes(code));const selected=candidates.find(v=>v.country_reports?.[code] || v.result_count>0) || candidates[0];if(selected)openCountryReport(code,selected);});
   researchDialog.addEventListener('close',()=>window.dispatchEvent(new Event('grad-compass:panels-resized')));
   get("close-research").addEventListener("click",()=>{++openSequence;researchDialog.close();});
   window.addEventListener("grad-compass:prepare-request",event=>openRequest(event.detail));
   window.addEventListener("grad-compass:open-result",event=>openRequests(event.detail.request_id,event.detail.revision,event.detail.finding_id));
   // Changing map filters never changes the pending multi-country selection.
   get("research-selected").addEventListener("click",()=>window.dispatchEvent(new CustomEvent("grad-compass:prepare-request",{detail:{countries:[...selected]}})));
-  window.GradCompassResearch=Object.freeze({hydrate,personal,setMatching,countryStatus,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests,refreshReceived,resultLink,openArchive:()=>openRequests(null,null,null,true)});
+  window.GradCompassResearch=Object.freeze({hydrate,personal,setMatching,countryStatus,cardControls,detailControls,watchButton,selection,post,openRequest,openRequests,openCountryReport,refreshReceived,resultLink,openArchive:()=>openRequests(null,null,null,true)});
 })();

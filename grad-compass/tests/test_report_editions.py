@@ -97,5 +97,42 @@ class EditorialEditionTests(unittest.TestCase):
         packages.save_annotation(self.w,self.annotation());self.assertNotIn('Private edition comment',markdown(self.w,report).decode());self.assertIn('Private edition comment',markdown(self.w,report,True).decode())
         self.assertIn('-detailed-r1-',filename(report,'-detailed.md'));self.assertIn('pending',text);self.assertIn(self.meta['parent_canonical_sha256'],text)
 
+    def test_new_map_keeps_old_editorial_context_annotations_and_pinned_exports(self):
+        old=self.current;old_reader=self.reader;oldmap=old['metadata']['evidence_map']['sha256']
+        packages.save_annotation(self.w,self.annotation());old_pdf=ensure_pdf(self.w,old)
+        parent=self.fixture.root.parent/'new-map';shutil.copytree(self.fixture.root,parent)
+        meta=deepcopy(self.fixture.meta);mapping=self.fixture.evidence.replace('Invented test topic','Revised test topic')
+        (parent/'map.md').write_text(mapping);meta['evidence_map'].update(sha256=packages.digest(mapping.encode()),revision_id=str(uuid4()))
+        doc=meta['canonical_document'];meta['canonical_factual_review']={'state':'pass','review_id':str(uuid4()),'canonical_revision_id':doc['revision_id'],'canonical_sha256':doc['sha256'],'scope':'Invented exact map revision','reviewed_at':'2026-10-22'}
+        atomic_json(parent/'metadata.local.json',meta)
+        self.root=self.root.parent/'reader-new-map';self.root.mkdir();self.text+='\nA distinct new-map edition.\n'
+        self.meta={**self.meta,'revision_number':2,'document_revision_id':str(uuid4()),'sha256':packages.digest(self.text.encode()),'evidence_map_revision_id':meta['evidence_map']['revision_id'],'evidence_map_sha256':meta['evidence_map']['sha256']};self.write()
+        catalog=packages.catalog(self.w);self.assertEqual(catalog['errors'],[])
+        current=catalog['reports'][0];self.assertNotEqual(current['edition'],old['edition'])
+        self.assertEqual(current['reader']['metadata']['revision_number'],2)
+        prior=editions.get(self.w,current,old_reader['id'])
+        self.assertEqual(prior['content']['sources']['E01']['topic'],'Invented test topic')
+        pinned=editions.select(self.w,current,old_reader['id'],None)
+        self.assertEqual(pinned['metadata']['evidence_map']['sha256'],oldmap)
+        self.assertEqual(ensure_pdf(self.w,pinned)['sha256'],old_pdf['sha256'])
+        self.assertEqual(packages.annotations(self.w,current['key'])['annotations'][0]['selector']['document'],old_reader['id'])
+        # Historical classification must still reject corrupt retained bytes.
+        cached=self.w.directory/'editorial-cache'/old['key']/old_reader['id']/'document.md'
+        cached.write_bytes(cached.read_bytes()+b'\nCorrupt test bytes')
+        self.assertTrue(any('digest' in e['error'] for e in packages.catalog(self.w)['errors']))
+
+    def test_map_sidecar_is_validated_as_an_artifact_not_a_report(self):
+        meta=deepcopy(self.fixture.meta);revision=str(uuid4());meta['evidence_map']['revision_id']=revision
+        atomic_json(self.fixture.root/'metadata.local.json',meta)
+        root=self.w.directory/'reports/CAN/maps/map-three';root.mkdir(parents=True)
+        (root/'map.md').write_text(self.fixture.evidence)
+        sidecar={'country_code':'CAN','revision_number':3,'document_revision_id':revision,'filename':'map.md','sha256':meta['evidence_map']['sha256'],'parent_canonical_revision_id':meta['canonical_document']['revision_id'],'parent_canonical_sha256':meta['canonical_document']['sha256'],'factual_review':{'state':'pending'}}
+        atomic_json(root/'metadata.local.json',sidecar)
+        catalog=packages.catalog(self.w);self.assertEqual(catalog['errors'],[])
+        self.assertEqual(catalog['artifacts'][0]['status'],'validated_reference_only')
+        self.assertEqual(catalog['artifacts'][0]['factual_review']['state'],'pending')
+        sidecar['sha256']='0'*64;atomic_json(root/'metadata.local.json',sidecar)
+        self.assertTrue(any('digest' in e['error'] for e in packages.catalog(self.w)['errors']))
+
 
 if __name__=='__main__':unittest.main()

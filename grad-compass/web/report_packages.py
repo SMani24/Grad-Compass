@@ -131,7 +131,7 @@ def _catalog(workspace,request_id=None):
         from web.report_projection import catalog as projections
         return projections(workspace,request_id)
     with workspace.state_lock,closing(workspace.connect()):
-        found={};errors=[];bindings={}
+        found={};errors=[];bindings={};map_sidecars=[];artifacts=[]
         cache=workspace.directory/'report-cache'
         if cache.exists():
             for path in cache.glob('*/*/metadata.local.json'):
@@ -148,12 +148,25 @@ def _catalog(workspace,request_id=None):
                 try:
                     candidate=env.loads(path.read_bytes())
                     if not isinstance(candidate,dict):raise ValueError('Report metadata must be an object')
+                    # Producer evidence-map metadata is a separate artifact, not
+                    # a canonical report. Validate its exact referenced parent below.
+                    if 'maps' in path.relative_to(root).parts and 'schema_version' not in candidate:
+                        map_sidecars.append((path,candidate));continue
                     if candidate.get('schema_version')=='grad-compass-private-report-package-0.2' and not (workspace.directory/'report-receipts'/(digest(path.read_bytes())+'.json')).is_file():continue
                     report=validate(workspace,path);doc=report['metadata']['canonical_document'];identity=(doc['id'],doc['revision_id'])
                     if identity in bindings and bindings[identity]!=doc['sha256']:raise ValueError('Canonical revision has conflicting bytes')
                     bindings[identity]=doc['sha256'];retain(workspace,report);found[(report['key'],report['edition'])]=report
                 except (OSError,ValueError,KeyError,TypeError,UnicodeError) as error:errors.append({'file':str(path.relative_to(workspace.directory)),'error':str(error)})
         reports=list(found.values())
+        for path,meta in map_sidecars:
+            try:
+                env.identifier(meta.get('document_revision_id'))
+                if type(meta.get('revision_number')) is not int or meta['revision_number']<1:raise ValueError('Evidence-map revision must be positive')
+                checked_file(path.parent,{'relative_path':meta.get('filename'),'sha256':meta.get('sha256')})
+                parent=next((r for r in reports if (r['metadata']['country_code'],r['metadata']['canonical_document']['revision_id'],r['metadata']['canonical_document']['sha256'],r['metadata']['evidence_map'].get('revision_id'),r['metadata']['evidence_map']['sha256'])==(meta.get('country_code'),meta.get('parent_canonical_revision_id'),meta.get('parent_canonical_sha256'),meta.get('document_revision_id'),meta.get('sha256'))),None)
+                if parent is None:raise ValueError('Evidence-map sidecar is not bound to a valid received report')
+                artifacts.append({'file':str(path.relative_to(workspace.directory)),'kind':'evidence_map_sidecar','status':'validated_reference_only','report_key':parent['key'],'edition':parent['edition'],'factual_review':meta.get('factual_review',{'state':'unknown'})})
+            except (OSError,ValueError,KeyError,TypeError) as error:errors.append({'file':str(path.relative_to(workspace.directory)),'error':str(error)})
         reports.sort(key=lambda r:(r['metadata']['canonical_document']['revision_number'],r['metadata'].get('canonical_factual_review',{}).get('reviewed_at') or r['metadata'].get('canonical_factual_review',{}).get('time') or '',r['edition']),reverse=True)
         # Same canonical content can acquire an exact-bound review delivery. Keep all
         # PDF editions on disk while showing that content version once in navigation.
@@ -161,8 +174,7 @@ def _catalog(workspace,request_id=None):
         for report in reports:
             if request_id is None or report['metadata']['request']['id']==request_id:versions.setdefault(report['key'],report)
         from web.report_editions import attach
-        parents={r['metadata']['canonical_document']['revision_id'] for r in reports}
-        for report in versions.values():attach(workspace,report,errors,parents)
+        for report in versions.values():attach(workspace,report,errors,reports)
         from web.report_projection import catalog as projections
         legacy=projections(workspace,request_id);errors.extend(legacy['errors'])
         prepared=list(versions.values())
@@ -172,7 +184,8 @@ def _catalog(workspace,request_id=None):
         from web.report_assets import attach as assets
         for report in combined:normalize(assets(workspace,report))
         combined.sort(key=lambda r:(r['delivery'].get('result_revision',0),r['model']['kind']=='prepared_report',r['metadata']['canonical_document']['revision_number']),reverse=True)
-        return {'reports':combined,'errors':errors}
+        errors=list({(e['file'],e['error']):e for e in errors}.values())
+        return {'reports':combined,'errors':errors,'artifacts':artifacts}
 
 
 def _fingerprint(workspace):
@@ -201,7 +214,7 @@ def catalog(workspace,request_id=None):
             value=_catalog(workspace)
             workspace._validated_report_catalog=(_fingerprint(workspace),value)
         else:value=cached[1]
-        return {'reports':[r for r in value['reports'] if request_id is None or r['metadata']['request']['id']==request_id], 'errors':value['errors']}
+        return {'reports':[r for r in value['reports'] if request_id is None or r['metadata']['request']['id']==request_id], 'errors':value['errors'],'artifacts':value.get('artifacts',[])}
 
 
 def public(report):

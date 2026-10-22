@@ -295,10 +295,10 @@ if (typeof document !== "undefined") {
       const actions=node('div','country-primary-actions');
       if(detail.origin){
         const read=node('button','portal-link read-report-primary','Read country report');read.id='read-country-report';read.type='button';
-        read.addEventListener('click',()=>window.GradCompassResearch.openRequests(detail.origin.request_id,null,detail.origin.finding_id));actions.append(read);
-        const reportResponse=await api('/api/reports?request_id='+detail.origin.request_id).catch(()=>null);
+        read.addEventListener('click',()=>window.GradCompassResearch.openCountryReport(code,detail.origin));actions.append(read);
+        const reportResponse=await api('/api/reports?request_id='+(progress.prepared?.request_id || detail.origin.request_id)).catch(()=>null);
         if(sequence!==state.detailSequence)return;
-        const report=reportResponse?.reports?.find(r=>r.metadata.country_code===code);
+        const report=window.GradCompassCountryReport.select((reportResponse?.reports || []).filter(r=>r.metadata.country_code===code));
         if(report){const prepared=report.model?.kind==='prepared_report';read.textContent=prepared?'Read country report':'Read received findings';availability.textContent=(prepared?'Country report available':'Received findings; prepared report not yet published')+' · '+(report.content.report_date || report.metadata.report_date || 'date unknown')+' · '+(report.model?.version_label || 'v'+report.metadata.canonical_document.revision_number);}
         availability.append(document.createTextNode(' · Factual review: '+(report?.metadata.canonical_factual_review?.state || detail.review_status)));
       }
