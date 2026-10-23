@@ -112,6 +112,17 @@ class LocalTests(unittest.TestCase):
         self.assertEqual(self.workspace.directory.stat().st_mode&0o777,0o700)
         self.assertEqual(path.stat().st_mode&0o777,0o600)
 
+    def test_ordinary_country_handoff_names_private_brief_and_review_contract(self):
+        request=self.store.submit(self.submission(countries=['CAN'],scope='country_conditions',
+                                                 bounds={'institutions':0,'programs':0}))['request']
+        exported=self.store.export(request['request_id'])
+        prompt=exported['prompt']
+        self.assertIn('exact approved Applicant Profile revision and digest',prompt)
+        self.assertIn('ordinary-country-reports.md',prompt)
+        self.assertIn('three-dimension review acceptance contract',prompt)
+        self.assertIn('private report package 0.2',prompt)
+        self.assertEqual(hashlib.sha256(Path(exported['path']).read_bytes()).hexdigest(),request['digest'])
+
     def test_real_transport_rejects_wrong_scope_duplicate_keys_and_changed_bytes(self):
         value=self.ack();packet=env.packet(value)
         for change in ({**packet,'body':packet['body']+' '},env.packet({**value,'synthetic':True}),
