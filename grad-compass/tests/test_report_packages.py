@@ -180,9 +180,11 @@ class ReportPackageTests(unittest.TestCase):
         from web.report_export import markdown
         annotation=self.annotate();before=self.workspace.research.snapshot()
         text=markdown(self.workspace,self.report).decode()
-        self.assertIn(self.markdown,text);self.assertIn(self.evidence,text)
+        self.assertIn(self.markdown[self.markdown.index('## Overview'):],text)
+        self.assertIn('**Prepared:** 20 October 2026',text);self.assertIn('E01 · Invented test topic',text)
+        self.assertEqual(text.count('https://example.org/evidence'),1)
         self.assertIn('https://example.org/evidence',text);self.assertIn(self.report['metadata']['canonical_document']['sha256'],text)
-        self.assertIn(self.selector()['block_id'],text);self.assertIn('finding-level',text)
+        self.assertIn(self.selector()['block_id'],text);self.assertIn('finding-level',text.lower())
         self.assertNotIn(annotation['comment'],text);self.assertNotIn(str(self.workspace.directory),text)
         private=markdown(self.workspace,self.report,True).decode();self.assertIn(annotation['comment'],private);self.assertIn(annotation['selector']['quote'],private)
         self.assertEqual(self.workspace.research.snapshot(),before)

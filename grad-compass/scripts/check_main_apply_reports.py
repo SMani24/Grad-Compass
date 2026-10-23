@@ -41,7 +41,7 @@ def main():
     from preview_capture import PreviewCapture
     out=private_directory(args.screenshots);downloads=private_directory(out/'downloads');names=[]
     window=webview.create_window('Grad Compass',f'http://127.0.0.1:{server.server_port}/',width=1440,height=1000,min_size=(390,640))
-    capture=PreviewCapture(window,out,prefix='2026-10-22-main-apply-'+('restart-' if args.restart else ''))
+    capture=PreviewCapture(window,out,prefix='2026-10-23-main-apply-'+('restart-' if args.restart else ''))
     def choose(name):names.append(name);return str(downloads/name)
     handler=DesktopDownloads(window,choose_path=choose);passed=[]
     watchdog=threading.Timer(240,lambda:os._exit(1));watchdog.daemon=True;watchdog.start()
@@ -85,12 +85,15 @@ def main():
                 wait("!!document.querySelector('.country-card[data-country="+code+"]')")
                 js("document.querySelector('.country-card[data-country="+code+"]').click()")
                 wait("!!document.getElementById('read-country-report')")
-                wait("document.getElementById('read-country-report').textContent==='Read country report' && document.querySelector('.country-report-availability').textContent.includes('Report v3')");shot(code.lower()+'-map-action')
+                wait("document.getElementById('read-country-report').textContent==='Read country report' && document.querySelector('.country-report-availability').textContent.includes("+json.dumps(r['model']['version_label'])+")");shot(code.lower()+'-map-action')
                 click('read-country-report');loaded(r)
                 assert js("document.querySelector('.canonical-report').dataset.document==="+json.dumps(r['reader']['id']))
                 assert js("!document.getElementById('reader-show-report').disabled && !document.querySelector('.report-package-error')")
-                assert js("document.querySelector('.report-badges').textContent.includes("+json.dumps(r['metadata']['canonical_factual_review']['state'])+")")
+                assert js("document.querySelector('.report-badges').textContent.includes("+json.dumps(r['reader']['metadata']['factual_review']['state'])+")")
                 assert js("document.getElementById('inbox-errors').hidden")
+                assert js("document.querySelector('.report-coverage').closest('#reader-report-details')!==null")
+                assert js("[...document.querySelectorAll('.canonical-reading>.report-section h2')].every(n=>!n.textContent.includes('Seven-topic coverage'))")
+                assert js("document.querySelectorAll('.report-source a').length===new Set([...document.querySelectorAll('.report-source a')].map(a=>a.href)).size")
                 shot(code.lower()+'-prepared-overview')
                 # Country navigation must agree with the card entry point.
                 other='CAN' if code=='DEU' else 'DEU'
@@ -100,8 +103,12 @@ def main():
                 js("document.getElementById('reader-export-options').open=true")
                 md=download('reader-download-markdown');pdf=download('reader-download-pdf')
                 assert r['metadata']['canonical_document']['sha256'] in md.read_text()
-                assert (r['detailed']['document_bytes'] if r.get('detailed') else r['canonical_bytes']).decode() in md.read_text()
-                assert r['evidence_bytes'].decode() in md.read_text()
+                from web.report_composition import markdown_sections,source_inventory
+                detail=r.get('detailed');tree=detail['content'] if detail else r['content']
+                for chunk in markdown_sections((detail['document_bytes'] if detail else r['canonical_bytes']).decode()):
+                    if chunk['role']=='research':assert chunk['markdown'] in md.read_text()
+                for source in source_inventory(r,tree):assert source['url'] in md.read_text()
+                assert md.read_text().index('## Sources')<md.read_text().index('## Report details and technical appendix')
                 assert not js("!!document.querySelector('.report-locator')")
                 receipt[code]={'request_id':r['metadata']['request']['id'],'key':r['key'],'metadata_sha256':r['edition'],'canonical_revision_id':r['metadata']['canonical_document']['revision_id'],'canonical_sha256':r['metadata']['canonical_document']['sha256'],'report_version':r['metadata']['canonical_document']['revision_number'],'reader_revision':r['reader']['metadata']['revision_number'],'reader_sha256':r['reader']['metadata']['sha256'],'detailed_revision':r['detailed']['metadata']['revision_number'] if r.get('detailed') else r['metadata']['canonical_document']['revision_number'],'detailed_sha256':r['detailed']['metadata']['sha256'] if r.get('detailed') else r['metadata']['canonical_document']['sha256'],'review':r['metadata']['canonical_factual_review']['state'],'reader_review':r['reader']['metadata']['factual_review']['state'],'human':r['metadata']['human_approval']['state'],'pdf':pdf.name,'pdf_sha256':hashlib.sha256(pdf.read_bytes()).hexdigest(),'markdown':md.name,'markdown_sha256':hashlib.sha256(md.read_bytes()).hexdigest(),'annotations_readback':reports.annotations(w,r['key']),'locator_omitted':True}
                 click('reader-show-pdf');wait("document.querySelector('.pdf-page>img')?.naturalWidth>0");shot(code.lower()+'-pdf')

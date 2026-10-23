@@ -13,7 +13,7 @@ from web.report_packages import immutable
 
 PDF_LOCK=threading.RLock()
 ASSETS=Path(__file__).parent/'assets'
-RENDERER='country-reader-8'
+RENDERER='country-reader-10'
 
 
 def styles():
@@ -26,12 +26,14 @@ def styles():
         if name not in pdfmetrics.getRegisteredFontNames():pdfmetrics.registerFont(TTFont(name,str(root/file)))
     pdfmetrics.registerFontFamily('Compass',normal='Compass',bold='Compass-Bold',italic='Compass-Italic',boldItalic='Compass-BoldItalic')
     base=ParagraphStyle('body',fontName='Compass',fontSize=9.5,leading=15,textColor='#193c4e',spaceAfter=10,allowWidows=0,allowOrphans=0)
-    return {'body':base,'title':ParagraphStyle('title',parent=base,fontName='Compass-Bold',fontSize=24,leading=30,spaceAfter=18),
+    return {'body':base,'title':ParagraphStyle('title',parent=base,fontName='Compass-Bold',fontSize=20,leading=25,spaceAfter=12),
             'heading':ParagraphStyle('heading',parent=base,fontName='Compass-Bold',fontSize=16,leading=21,spaceBefore=20,spaceAfter=12,keepWithNext=True),
             'small':ParagraphStyle('small',parent=base,fontSize=8,leading=12,spaceAfter=7),
             'cell':ParagraphStyle('cell',parent=base,fontSize=8,leading=12,spaceAfter=3),
             'header':ParagraphStyle('header',parent=base,fontName='Compass-Bold',fontSize=8,leading=12,textColor='#ffffff'),
-            'source_title':ParagraphStyle('source_title',parent=base,fontName='Compass-Bold',fontSize=9,leading=13,spaceBefore=10,spaceAfter=4,keepWithNext=True)}
+            'source_title':ParagraphStyle('source_title',parent=base,fontName='Compass-Bold',fontSize=9,leading=13,spaceBefore=10,spaceAfter=4,keepWithNext=True),
+            'source_heading':ParagraphStyle('source_heading',parent=base,fontName='Compass-Bold',fontSize=12,leading=16,spaceBefore=14,spaceAfter=8,keepWithNext=True),
+            'source_intro':ParagraphStyle('source_intro',parent=base,fontSize=8,leading=12,spaceAfter=7,keepWithNext=True)}
 
 
 def _path(asset):
@@ -59,11 +61,11 @@ def build(report):
     from reportlab.lib.colors import HexColor
     from PIL import Image as Raster,ImageOps
     s=styles();meta=report['metadata'];doc=meta['canonical_document'];editorial=report.get('reader')
-    tree=editorial['content'] if editorial else report['content'];review=meta.get('canonical_factual_review',{'state':'pending'})
+    from web.report_composition import sections as composed_sections,review as selected_review,source_inventory
+    tree=editorial['content'] if editorial else report['content'];review=selected_review(report,editorial)
     body=[];width=A4[0]-96
     concise=bool(editorial)
-    if editorial:sections=[section for section in tree['sections'] if section['id'] not in ('introduction','source-guide','evidence-map-binding')]
-    else:sections=tree['sections']
+    sections=composed_sections(tree)
     def p(text,style='body'):return Paragraph(text,s[style])
     visuals=report.get('visuals',{});flag=visuals.get('flag')
     edition_label='CONCISE READER EDITION' if editorial else 'RECEIVED FINDINGS' if report.get('model',{}).get('kind')=='received_findings' else 'FULL REPORT'
@@ -73,12 +75,9 @@ def build(report):
     else:body.append(brand)
     version_label=report['model']['version_label'] if report.get('model',{}).get('kind')=='received_findings' else 'Canonical report v'+str(doc['revision_number'])
     facts=[p(escape(tree['title']),'title'),p(escape(version_label)+' · '+escape(meta.get('report_date') or report['content']['report_date'] or 'Date unknown'),'small'),
-        p('Canonical factual review: <b>'+escape(review.get('state','pending'))+'</b> · '+escape(review.get('reviewed_at') or review.get('time') or 'Review date not supplied'),'small')]
+        p(escape(review['document'])+' review: <b>'+escape(review['label'])+'</b>'+(' · '+escape((review.get('reviewed_at') or review.get('time'))[:10]) if review.get('reviewed_at') or review.get('time') else ''),'small')]
     if editorial:
-        er=editorial['metadata']['factual_review'];facts.append(p('Reader edition r'+str(editorial['metadata']['revision_number'])+' · Factual review: <b>'+escape(er['state'])+'</b> · Human approval: '+escape(editorial['metadata']['human_approval']['state']),'small'))
-    facts.append(p('Canonical human approval: '+escape(meta.get('human_approval',{}).get('state','unknown')),'small'))
-    labels=' · '.join(label['text'] for label in report['content'].get('labels',[]))
-    facts.append(p('Evidence observed: '+escape(meta.get('source_artifact',{}).get('observed_on','date not supplied'))+'. '+escape(labels or 'Observation dates and applicable academic years are distinct.')+' Bounded country conditions; university discovery is separate.','small'))
+        facts.append(p('Reader edition r'+str(editorial['metadata']['revision_number'])+' · concise rendition','small'))
     asset=visuals.get('photo',{})
     if asset:
         # A portrait inset preserves the spire and square; the old panoramic crop
@@ -88,7 +87,6 @@ def build(report):
         visual=[Image(raster,width=112,height=126),p(escape(asset['credit'])+' · '+escape(asset['license'])+'<br/><a href="'+escape(asset['source_url'])+'">Photo source</a>','small')]
         cover=Table([[facts,visual]],colWidths=[width-132,132]);cover.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(0,0),0),('RIGHTPADDING',(0,0),(0,0),16),('LEFTPADDING',(1,0),(1,0),12),('RIGHTPADDING',(1,0),(1,0),0),('TOPPADDING',(0,0),(-1,-1),0),('BOTTOMPADDING',(0,0),(-1,-1),6)]));body.append(cover)
     else:body.extend(facts)
-    body.append(p('Concise producer-written rendition of the selected research; detailed Markdown retains the complete context.' if concise else 'Complete available content; no separate concise edition was published. This export does not establish complete research coverage.','small'))
     used_refs=set()
     def linked(block):
         def replace(match):
@@ -117,18 +115,24 @@ def build(report):
             else:
                 block=item['block'];prefix=(str(item['number'])+'. ' if item.get('number') else '• ') if item['type']=='list_item' else ''
                 body.append(p(prefix+linked(block)))
-    body.append(p('Sources','heading'))
-    body.append(p('E references are editorial topic mappings, not audited claim-level citations. Full URLs, passage locators, observation dates and evidence qualifications are in the detailed Markdown.','small'))
+    body.append(p('Sources','source_heading'))
+    body.append(p('References retain the supplied evidence precision; finding-level and editorial topic mappings do not establish audited claim-level support. Detailed Markdown includes full records, dates and qualifications.','source_intro'))
     source_cells=[]
+    for source in source_inventory(report,tree):
+        refs=[ref for ref in source['refs'] if not concise or ref in used_refs]
+        if concise and not refs:continue
+        anchors=''.join('<a name="'+ref+'"/>' for ref in refs)
+        heading=p(anchors+escape(', '.join(refs) or 'Finding-level source'),'source_title')
+        label='; '.join(source['labels']) or 'Public source'
+        source_cells.append([heading,p('<a href="'+escape(source['url'],{'"':'&quot;'})+'" color="#08647c">'+escape(label)+'</a>','small')])
     for ref,source in tree['sources'].items():
-        if concise and ref not in used_refs:continue
-        heading=p('<a name="'+ref+'"/>'+ref+' · '+escape(source['topic'].split(' — ')[0]),'source_title')
-        links=['<a href="'+escape(link['url'],{'"':'&quot;'})+'" color="#08647c">'+escape(link['label'])+'</a>' for link in source['links']]
-        source_cells.append([heading,p(' · '.join(links) if links else 'Editorial synthesis; see the detailed evidence map.','small')])
+        if source['links'] or (concise and ref not in used_refs):continue
+        source_cells.append([p('<a name="'+ref+'"/>'+escape(ref),'source_title'),p('Editorial reference without a direct public URL. See its original mapping and qualifications in detailed Markdown.','small')])
     source_rows=[source_cells[i:i+2]+([[]] if len(source_cells[i:i+2])==1 else []) for i in range(0,len(source_cells),2)]
     if source_rows:
         grid=Table(source_rows,colWidths=[width/2,width/2],hAlign='LEFT');grid.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(-1,-1),0),('RIGHTPADDING',(0,0),(-1,-1),12),('TOPPADDING',(0,0),(-1,-1),0),('BOTTOMPADDING',(0,0),(-1,-1),3)]));body.append(grid)
-    body.append(p('Shared origin: canonical report v'+str(doc['revision_number'])+(' · reader edition r'+str(editorial['metadata']['revision_number']) if editorial else '')+'. The detailed Markdown includes exact version references and full research. Personal annotations are not included.','small'))
+    body.append(p('Report details','source_title'))
+    body.append(p('Shared origin: canonical report v'+str(doc['revision_number'])+(' · reader edition r'+str(editorial['metadata']['revision_number']) if editorial else '')+'. Review scope: '+escape(review.get('scope') or 'Not supplied')+'. Canonical review: '+escape(meta.get('canonical_factual_review',{}).get('state','unknown').replace('_',' '))+'. Human approval: '+escape(meta.get('human_approval',{}).get('state','unknown').replace('_',' '))+'. Observations: '+escape(meta.get('source_artifact',{}).get('observed_on') or 'See dated sources')+'. Coverage is bounded; delivery does not imply exhaustive research. The detailed Markdown includes full qualifications, exact receipts and historical context. Personal annotations are not included.','small'))
     provenance=json.dumps({'canonical_revision_id':doc['revision_id'],'canonical_sha256':doc['sha256'],'reader_document_sha256':editorial['metadata']['sha256'] if editorial else None},sort_keys=True)
     def document(output):return SimpleDocTemplate(output,pagesize=A4,leftMargin=48,rightMargin=48,topMargin=38,bottomMargin=46,title=tree['title'],subject=provenance,author='Grad Compass',pageCompression=1)
     first=document(io.BytesIO());first.build(deepcopy(body));total=first.page

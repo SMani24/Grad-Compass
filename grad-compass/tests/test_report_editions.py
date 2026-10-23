@@ -93,7 +93,7 @@ class EditorialEditionTests(unittest.TestCase):
 
     def test_detailed_export_includes_actual_editorial_context_and_is_private_by_default(self):
         previous=self.root;self.root=previous.parent/'detailed-one';self.root.mkdir();self.text='# Invented detailed research\n\n## Calculations\n\n10 times 12 is 120; qualified invented arithmetic. [E01]\n';self.meta={**self.meta,'edition':'detailed','document_revision_id':str(uuid4()),'sha256':packages.digest(self.text.encode())};self.write()
-        report=packages.catalog(self.w)['reports'][0];text=markdown(self.w,report).decode();self.assertIn(self.text,text);self.assertIn(self.fixture.evidence,text);self.assertIn('https://example.org/evidence',text)
+        report=packages.catalog(self.w)['reports'][0];text=markdown(self.w,report).decode();self.assertIn(self.text,text);self.assertIn('E01 · Invented test topic',text);self.assertEqual(text.count('https://example.org/evidence'),1)
         packages.save_annotation(self.w,self.annotation());self.assertNotIn('Private edition comment',markdown(self.w,report).decode());self.assertIn('Private edition comment',markdown(self.w,report,True).decode())
         self.assertIn('-detailed-r1-',filename(report,'-detailed.md'));self.assertIn('pending',text);self.assertIn(self.meta['parent_canonical_sha256'],text)
 

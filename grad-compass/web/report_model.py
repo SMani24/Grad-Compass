@@ -1,5 +1,6 @@
 """One app report view; publication, coverage and acceptance are independent."""
 import re
+from web.report_composition import COVERAGE_LABELS
 
 VERSION='grad-compass-country-report-view-1.0'
 PACKAGE='grad-compass-private-report-package-0.2'
@@ -39,7 +40,7 @@ def normalize(report):
       'version_label':('Received findings · result r'+str(meta['producer_result']['revision'])) if projection else 'Report v'+str(meta['canonical_document']['revision_number']),
       'preparation':{'detailed':'received_findings' if projection else 'published','overview':'published' if reader else 'not_yet_published',
         'overview_reason':None if reader else 'A producer-written concise edition has not been published for this exact version. Read the available content or prepare a follow-up for Dave.'},
-      'delivery':result,'coverage':[{'id':code,'title':title,**coverage[code]} for code,title in TOPICS],
+      'delivery':result,'coverage':[{'id':code,'title':title,**coverage[code],'label':COVERAGE_LABELS.get(coverage[code]['state'],'Coverage not supplied')} for code,title in TOPICS],
       'review':{'report':meta.get('canonical_factual_review',{'state':'unknown'}),'human':meta.get('human_approval',{'state':'unknown'}),
         'findings':report.get('finding_reviews') or meta.get('finding_reviews',[]),'overview':reader['metadata']['factual_review'] if reader else None},
       'capabilities':{'overview':bool(reader),'content':bool(report['content']['blocks']),'pdf':bool(report['content']['blocks']),

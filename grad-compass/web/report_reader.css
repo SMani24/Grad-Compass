@@ -139,3 +139,8 @@
 .report-capability-note{padding:12px;background:#eff6f8;border-left:3px solid #6c99aa;margin-top:16px;max-width:var(--report-prose)}
 #research-request-detail .report-capability-note p{font-size:.85rem;line-height:1.6}
 .reader-toolbar button:disabled{opacity:.55;cursor:default}
+/* Secondary original context stays reachable without competing with the report. */
+.report-retained-context{margin-block:24px;color:#466473;font-size:.85rem;max-width:var(--report-prose)}
+.report-retained-context>summary{cursor:pointer;padding-block:10px}
+.report-retained-context>.report-section{margin-top:16px}
+.report-retained-context h3{font-size:1rem}

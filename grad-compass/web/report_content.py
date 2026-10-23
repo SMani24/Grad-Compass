@@ -59,14 +59,14 @@ def parse_report(markdown,evidence):
     def ensure():
         nonlocal section
         if section is None:
-            section={'id':'introduction','title':'Report context','items':[]};sections.append(section)
+            section={'id':'introduction','title':'Report context','level':0,'items':[]};sections.append(section)
     for token in PARSER(markdown):
         kind=token['type']
         if kind=='heading':
             text=plain(token['children'])
             if token['attrs']['level']==1 and not title_seen:title=text;title_seen=True;continue
             identity=re.sub('[^a-z0-9]+','-',text.lower()).strip('-')
-            section={'id':identity,'title':text,'items':[]};sections.append(section)
+            section={'id':identity,'title':text,'level':token['attrs']['level'],'items':[]};sections.append(section)
         elif kind in ('paragraph','block_text'):
             ensure();section['items'].append({'type':'paragraph','block':block(token['children'])})
         elif kind=='list':
@@ -119,4 +119,5 @@ def parse_report(markdown,evidence):
             target.extend(p for p in re.findall(r'\b\d{4}[–-]\d{2,4}\b',b['text']) if not historical or p!=historical[1])
     if target:labels.append({'kind':'unknown','text':', '.join(dict.fromkeys(target))+' · terms require confirmation'})
     if re.search(r'competitive',text,re.I):labels.append({'kind':'conditional','text':'Funding is competitive and conditional; no award or full support is established'})
-    return {'title':title,'report_date':report_date,'labels':labels,'sections':sections,'blocks':blocks,'sources':sources}
+    from web.report_composition import attach
+    return attach({'title':title,'report_date':report_date,'labels':labels,'sections':sections,'blocks':blocks,'sources':sources})

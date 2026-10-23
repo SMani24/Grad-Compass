@@ -1,5 +1,6 @@
-"""Self-contained detailed Markdown; original evidence precision is preserved."""
+"""Portable research first, one source inventory, exact provenance in an appendix."""
 import json
+from web.report_composition import markdown_sections,source_inventory,source_notes,review
 
 
 def filename(report,suffix):
@@ -16,58 +17,97 @@ def filename(report,suffix):
 
 
 def markdown(workspace,report,include_annotations=False):
-    meta=report['metadata'];doc=meta['canonical_document'];review=meta.get('canonical_factual_review',{'state':'pending'})
-    detailed=report.get('detailed')
-    lines=['# Detailed country report — portable edition','',
-      f"{report.get('model',{}).get('version_label') or ('Canonical report v'+str(doc['revision_number']))} · {meta['country_code']} · {meta.get('report_date') or report['content']['report_date'] or 'Report date unknown'}",'',
-      'This file contains all available delivered content and its evidence references. It is a bounded report, not exhaustive country coverage. Preparation, original finding review, report review and personal decisions are separate.','',
-      f"Factual review: **{review.get('state','pending')}**. Review date: {review.get('reviewed_at') or review.get('time') or 'not supplied'}. Review scope: {review.get('scope') or 'not supplied'}.",
-      f"Human approval: **{meta.get('human_approval',{}).get('state','unknown')}**.",
-      f"Evidence observed: {meta.get('source_artifact',{}).get('observed_on') or 'see source records below'}. Report date, observation dates and applicable academic years are distinct.",
-      'Historical figures, regional categories, conditional awards, unresolved conflicts and calculations retain their original qualifications. Missing target-year terms remain unknown.','',
-      ]
-    if report.get('model'):
-        lines += ['## Delivery, preparation and research coverage','', '```json',json.dumps(report['model'],ensure_ascii=False,indent=2),'```','']
-    if detailed:
-        dm=detailed['metadata'];lines += [f"Detailed editorial edition r{dm['revision_number']} · factual review **{dm['factual_review']['state']}** · human approval **{dm['human_approval']['state']}**.",
-          'The reader PDF is an intentionally shorter rendition of the same canonical origin. Its editorial revision and review are separate from this detailed edition.','',
-          '## Complete delivered detailed edition','',detailed['document_bytes'].decode('utf-8'),'']
-    else:lines+=['## Canonical report (complete)','',report['canonical_bytes'].decode('utf-8'),'']
-    if not detailed or report['evidence_bytes'].decode('utf-8') not in detailed['document_bytes'].decode('utf-8'):
-        lines+=['## Editorial evidence map (complete)','',
-      'E references preserve the producer’s editorial topic mappings. Original inbox sources remain finding-level; this export does not invent claim-level support or turn an earlier source-artifact review into approval of this report.','',
-      (('```json\n'+report['evidence_bytes'].decode('utf-8')+'\n```') if report['evidence_bytes'].lstrip().startswith(b'{') else report['evidence_bytes'].decode('utf-8')),'']
-    lines+=['## Public source records from the bound country finding','']
-    finding=report.get('finding') or {}
-    # Include all public fields rather than silently dropping observation dates or
-    # locators when producer metadata evolves. No private workspace file is needed.
-    for source in finding.get('sources',[]):
-        lines+=['```json',json.dumps(source,ensure_ascii=False,indent=2),'```','']
-    if not finding.get('sources'):lines+=['No additional finding-level source records were supplied.','']
-    lines+=['## Stable passage locators','',
-      'These locators identify exact passages in the canonical revision below. They identify content, not independently verified claim-to-source bindings. Offsets in private annotations count Unicode code points.','']
+    meta=report['metadata'];doc=meta['canonical_document'];detailed=report.get('detailed')
     tree=detailed['content'] if detailed else report['content']
+    raw=(detailed['document_bytes'] if detailed else report['canonical_bytes']).decode('utf-8')
+    chunks=markdown_sections(raw);current=review(report,detailed)
+    lines=['# '+tree['title'],'']
+    # Preserve original substantive Markdown, including all regional qualifications,
+    # tables and calculations. Selection is structural, never a generated summary.
+    for section in chunks:
+        if section['role']=='research':lines.extend([section['markdown'],''])
+    if not any(c['role']=='research' for c in chunks):
+        lines.extend(['No separate substantive sections were supplied. The retained report context is in the appendix.',''])
+    lines+=['## Sources','',
+      'References retain the supplied evidence precision. Finding-level records and editorial topic mappings do not establish audited claim-level support. Public URLs and available source records are included below.','']
+    inventory=source_inventory(report,tree)
+    for index,source in enumerate(inventory,1):
+        refs=', '.join(source['refs']) or 'Finding-level source'
+        lines += [f"### S{index:02d} · {refs}",'',source['url'],'']
+        labels=list(dict.fromkeys(source['labels']))
+        if labels:lines+=['Source / locator: '+'; '.join(labels),'']
+        for record in source['records']:
+            # URL has one owner above; distinct source revisions/locators remain.
+            record={k:v for k,v in record.items() if k!='source_url'}
+            lines+=['```json',json.dumps(record,ensure_ascii=False,indent=2),'```','']
+    if not inventory:lines+=['No public source records were supplied.','']
+    lines+=['## Evidence references and qualifications','']
+    links={entry['url']:f'S{index:02d}' for index,entry in enumerate(inventory,1)}
+    for ref,source in tree['sources'].items():
+        mapped=', '.join(dict.fromkeys(links[link['url']] for link in source['links'])) or 'No public source link supplied'
+        # Keep the complete supplied map qualification/locator, replacing repeated
+        # URLs with references to the inventory, not dropping their relationships.
+        text=source['text']
+        for url,key in sorted(links.items(),key=lambda item:len(item[0]),reverse=True):text=text.replace(url,key)
+        lines += ['### '+ref+' · '+source['topic'],'',mapped+' · '+text,'']
+    notes=source_notes(tree)
+    if notes:
+        lines+=['### Retained source-context statements','',
+          'The following statements are immutable document text. Any review-time wording is historical; the exact-version receipt below records the selected document’s current disposition.','']
+        for block in notes:
+            text=block['text']
+            for url,key in sorted(links.items(),key=lambda item:len(item[0]),reverse=True):text=text.replace(url,key)
+            lines+=[text,'']
+    lines+=['## Report details and technical appendix','',
+      f"Shared origin: canonical report v{doc['revision_number']} · {meta['country_code']} · report date {meta.get('report_date') or tree['report_date'] or 'unknown'}.",
+      f"Selected detailed content review: **{current['label']}**. Scope: {current.get('scope') or 'not supplied'}. Review date: {current.get('reviewed_at') or current.get('time') or 'not supplied'}.",
+      'The reader PDF is a separately supplied concise rendition of this canonical origin. Delivery, research coverage, content review and human approval are independent. Result revisions and report/edition versions are different identifiers.','']
+    model=report.get('model',{})
+    for item in model.get('coverage',[]):
+        from web.report_composition import COVERAGE_LABELS
+        lines+=['- '+item['title']+': '+COVERAGE_LABELS.get(item['state'],item['state'])+' (`'+item['state']+'`) — '+item['detail']+' Evidence: '+(', '.join(item.get('evidence_refs',[])) or 'none supplied')+'. Applicable year: '+str(item.get('applicable_year') or 'not supplied')+'.']
+    lines+=['']
+    for chunk in chunks:
+        if chunk['role']=='context' and chunk['markdown']:lines+=['### Retained document context (historical)','',chunk['markdown'],'']
+    evidence=report['evidence_bytes'].decode('utf-8')
+    if evidence.lstrip().startswith('{'):
+        # Additional supplied precision/date fields stay portable; source records
+        # and seven-topic coverage already have one home above.
+        value=json.loads(evidence)
+        extra={k:v for k,v in value.items() if k not in ('sources','coverage')}
+        lines+=['### Evidence-map context','', '```json',json.dumps(extra,ensure_ascii=False,indent=2),'```','']
+    else:
+        from web.report_content import parse_report
+        evidence_tree=parse_report(evidence,'')
+        lines+=['### Retained evidence-map context (historical)','']
+        for section in evidence_tree['sections']:
+            for item in section['items']:
+                if item['type']=='table':continue  # The exact ref/topic/source relationships are above.
+                block=item['block'];text=block['text']
+                for url,key in sorted(links.items(),key=lambda item:len(item[0]),reverse=True):text=text.replace(url,key)
+                lines+=[text,'']
+    lines+=['### Stable passage locators','',
+      'These identify exact original passages, including secondary context, without claiming independent evidence verification. Annotation offsets count Unicode code points.','']
     for section in tree['sections']:
-        lines+=['### '+section['title'],'']
         for item in section['items']:
             blocks=[b for row in item['rows'] for b in row] if item['type']=='table' else [item['block']]
-            for block in blocks:lines+=['- `'+block['id']+'` — '+block['text'][:100].replace('\n',' ')+'…']
-    lines+=['## Exact version and review provenance','',
-      'Canonical report version and transport result revision are independent identifiers. A result r2 may supply a report v1 or v2. The canonical revision/hash below identify the content in this export.','',
-      '```json',json.dumps({'report_id':meta['report_id'],'canonical_document':{k:v for k,v in doc.items() if k not in ('relative_path','media_type')},
-        'evidence_map_sha256':meta['evidence_map']['sha256'],'producer_result':meta.get('producer_result'),
-        'canonical_factual_review':review,'human_approval':meta.get('human_approval',{'state':'unknown'}),'request':meta['request'],
-        'source_artifact':meta.get('source_artifact'),'source_citation_scope':meta.get('source_citation_scope'),
-        'editorial_editions':{kind:{'metadata_sha256':report[kind]['id'],**report[kind]['metadata']} for kind in ('reader','detailed') if report.get(kind)}},ensure_ascii=False,indent=2),'```','']
+            lines.extend('- `'+block['id']+'`' for block in blocks)
+    # Public exact identity/bindings only. Do not export local paths, private briefs,
+    # intake, profiles or runtime filenames. Source records have a single home above.
+    def public_ref(value):return {k:v for k,v in value.items() if k not in ('relative_path','media_type','filename')}
+    provenance={'report_id':meta['report_id'],'canonical_document':public_ref(doc),'evidence_map_sha256':meta['evidence_map']['sha256'],
+      'request':meta['request'],'producer_result':meta.get('producer_result'),'canonical_factual_review':meta.get('canonical_factual_review',{'state':'unknown'}),
+      'human_approval':meta.get('human_approval',{'state':'unknown'}),'source_artifact':meta.get('source_artifact'),
+      'source_citation_scope':meta.get('source_citation_scope'),'scope':model.get('scope'),'delivery':model.get('delivery'),
+      'preparation':model.get('preparation'),'editorial_editions':{kind:{'metadata_sha256':report[kind]['id'],**public_ref(report[kind]['metadata'])} for kind in ('reader','detailed') if report.get(kind)}}
+    lines+=['### Exact version and review receipts','', '```json',json.dumps(provenance,ensure_ascii=False,indent=2),'```','']
     if include_annotations:
         from web.report_packages import annotations
         lines+=['## Personal annotations (explicitly included)','',
-          'Private comments are personal observations, not research findings or factual acceptance. PDF annotations retain their exact PDF hash and page; these can differ from a newly generated reader edition.','']
+          'Private comments are personal observations, not research findings or factual acceptance. PDF notes retain their original PDF hash and page.','']
         for a in annotations(workspace,report['key'])['annotations']:
             selector=a['selector'];lines+=['### Annotation '+a['id'],'','> '+selector['quote'].replace('\n','\n> '),'',a['comment'],'',
               'Location: `'+json.dumps(selector,ensure_ascii=False)+'`','']
     else:lines+=['Personal annotations are not included.','']
-    lines+=['Internal review/lineage links and old sibling filenames are historical identifiers. The public source records, detailed research and evidence map are embedded here; no local workspace file is required.','']
-    # Producer narrative can mention a local sibling filename. The full report and
-    # map are included above; no operational/local path from metadata is exported.
+    lines+=['All delivered substantive research, public sources, evidence qualifications and exact version receipts needed to read this file are embedded. Historical internal identifiers require no local workspace access.','']
     return ('\n'.join(lines).rstrip()+'\n').encode('utf-8')
