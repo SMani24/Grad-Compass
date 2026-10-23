@@ -327,12 +327,18 @@ class ResearchWorkspace:
                 if not ack or ack["state"]!="accepted": raise ValueError("Record an explicit accepted producer acknowledgement before results")
                 if value["revision"]>1:
                     prior=self._body(db.execute("SELECT body FROM research_results WHERE id=? AND revision=?",(value["result_id"],value["previous_result_revision"])).fetchone())
-                    if not prior or prior["digest"]!=value["previous_result_digest"]:
+                    if (not prior or prior["digest"]!=value["previous_result_digest"]
+                        or prior['request_id']!=request_id or prior['request_revision']!=value['request_revision']
+                        or prior['request_digest']!=value['request_digest']):
                         raise ValueError("Receive the exact earlier result revision/digest first")
-                    if prior["completion"]=="complete": raise ValueError("A complete result requires a new refresh request")
+                    if prior["completion"]=="complete" and not self._allow_completed_revision(value,prior):
+                        raise ValueError("A complete result requires a new refresh request outside operational country conditions")
                 if before_record:before_record()
                 db.execute("INSERT INTO research_results VALUES(?,?,?,?,?)",(value["result_id"],value["revision"],request_id,envelopes.storage(value),self.clock()))
         return {"changed":True,**self.request(request_id)}
+
+    def _allow_completed_revision(self,value,prior):
+        return False  # The pinned synthetic sequence remains unchanged.
 
     def feedback(self, request_id, result_id, revision, finding_id, comment, submission_key, *,
                  request_revision, request_digest, result_digest, finding_revision):

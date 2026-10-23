@@ -310,6 +310,11 @@ class LocalResearch(ResearchWorkspace):
         if value['envelope_kind']=='result':
             previous=[r['envelope'] for r in current['results']]
             if any(r['result_id']!=value['result_id'] for r in previous):raise ValueError('A request has one result revision sequence; prepare a refresh for a new result')
+            if value['revision']>1:
+                prior=next((r for r in previous if r['revision']==value['previous_result_revision'] and r['digest']==value['previous_result_digest']),None)
+                if prior is None:raise ValueError('Receive the exact earlier result revision/digest first')
+                if prior['completion']=='complete' and not self._allow_completed_revision(value,prior):
+                    raise ValueError('A complete result requires a new refresh request outside operational country conditions')
             for old in previous:
                 for finding in value['findings']:
                     same=next((f for f in old['findings'] if f['finding_id']==finding['finding_id'] and f['finding_revision']==finding['finding_revision']),None)
@@ -322,6 +327,19 @@ class LocalResearch(ResearchWorkspace):
             if len(institutions)>request['bounds']['institutions'] or len(programs)>request['bounds']['programs']:
                 raise ValueError('Cumulative returned records exceed this request’s limits')
         return value
+
+    def _allow_completed_revision(self,value,prior):
+        current=self.request(value['request_id']);request=current['request']
+        if request['scope']!='country_conditions' or value['completion']!='complete':return False
+        old={f['finding_id']:f for f in prior['findings']}
+        for finding in value['findings']:
+            previous=old.get(finding['finding_id'])
+            if previous is not None and previous!=finding:
+                older=[f for row in current['results'] if row['envelope']['revision']<value['revision']
+                       for f in row['envelope']['findings'] if f['finding_id']==finding['finding_id']]
+                if any(f['finding_revision']==finding['finding_revision'] or f['record_revision']==finding['record_revision'] for f in older):
+                    raise ValueError('Changed completed country findings need fresh finding and country record revisions')
+        return True
 
     def preview_response(self,transport_json):
         if not isinstance(transport_json,str) or len(transport_json.encode('utf-8'))>8_000_000:raise ValueError('Choose a bounded producer transport file')
