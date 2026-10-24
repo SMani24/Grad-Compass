@@ -32,6 +32,9 @@ def attach(tree):
                 section['role']='research';groups['research'].append(section['id']);groups['context'].remove(section['id'])
     tree['composition']={'schema_version':VERSION,**groups,'source_list_owner':'consumer'}
     tree['source_inventory']=source_inventory({},tree)
+    assigned={identity for source in tree['source_inventory'] for identity in source['note_ids']}
+    tree['composition']['source_context']=[block['id'] for block in source_notes(tree) if block['id'] not in assigned]
+    tree['composition']['source_context'] += [block['id'] for table in source_tables(tree) for row in table['rows'] for block in row]
     return tree
 
 
@@ -69,8 +72,27 @@ def markdown_sections(markdown):
 def source_notes(tree):
     # Legacy writers embedded a second full inventory. Keep their precision and
     # historical context paragraphs, while the consumer renders the inventory.
-    return [item['block'] for section in sections(tree,'sources') for item in section['items']
-            if item['type']=='paragraph' or (item['type']=='list_item' and not re.search(r'https?://|href=',item['block']['html']))]
+    notes=[]
+    for section in sections(tree,'sources'):
+        for item in section['items']:
+            if item['type']=='table':continue  # Preserve row relationships separately.
+            blocks=[item['block']]
+            for block in blocks:
+                # Only elide the exact old inventory sentence when every field is
+                # already represented by the bound record. Rich or unfamiliar
+                # source notes retain their complete qualifiers and locators.
+                redundant=False
+                for ref,source in tree['sources'].items():
+                    record=source.get('source_record',{})
+                    if len(source['links'])==1 and record:
+                        expected=f"{ref} — {source['links'][0]['label']}; observed {record.get('observed_at')}; source ID {record.get('source_id')}."
+                        if block['text']==expected:redundant=True;break
+                if not redundant:notes.append(block)
+    return notes
+
+
+def source_tables(tree):
+    return [item for section in sections(tree,'sources') for item in section['items'] if item['type']=='table']
 
 
 def review(report,edition=None):
@@ -82,7 +104,7 @@ def review(report,edition=None):
 def source_inventory(report,tree):
     """One public URL entry, retaining distinct records/locators and ref mappings."""
     inventory={}
-    def entry(url):return inventory.setdefault(url,{'url':url,'labels':[],'refs':[],'records':[]})
+    def entry(url):return inventory.setdefault(url,{'url':url,'labels':[],'refs':[],'records':[],'note_ids':[]})
     for ref,source in tree['sources'].items():
         for link in source['links']:
             item=entry(link['url'])
@@ -97,4 +119,13 @@ def source_inventory(report,tree):
         if not url:continue
         item=entry(url)
         if record not in item['records']:item['records'].append(record)
+    # Narrative links are public supplied content too. They remain explicitly
+    # unmapped unless the evidence map supplies a reference; no support is inferred.
+    for block in tree['blocks'].values():
+        for link in block.get('links',[]):
+            item=entry(link['url'])
+            if link['label'] not in item['labels']:item['labels'].append(link['label'])
+    for block in source_notes(tree):
+        urls=[link['url'] for link in block.get('links',[])] or [url for url in inventory if url in block['text']]
+        if urls:entry(urls[0])['note_ids'].append(block['id'])
     return list(inventory.values())

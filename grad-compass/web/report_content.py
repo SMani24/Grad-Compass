@@ -47,6 +47,17 @@ def refs(text):
     return result
 
 
+def public_links(tokens):
+    links=[]
+    for token in tokens:
+        if token['type']=='link' and re.match(r'^https?://',token.get('attrs',{}).get('url',''),re.I):
+            link={'label':plain(token['children']),'url':token['attrs']['url']}
+            if link not in links:links.append(link)
+        for link in public_links(token.get('children',[])):
+            if link not in links:links.append(link)
+    return links
+
+
 def parse_report(markdown,evidence):
     sections=[];blocks={};counts={};title='Country report';title_seen=False;section=None
     def block(tokens):
@@ -54,7 +65,7 @@ def parse_report(markdown,evidence):
         digest=hashlib.sha256(text.encode()).hexdigest()[:12]
         count=counts.get(digest,0);counts[digest]=count+1
         identity=(section['id'] if section else 'introduction')+'/'+digest+'/'+str(count)
-        item={'id':identity,'text':text,'html':inline(tokens),'pdf':inline(tokens,True),'refs':refs(text)}
+        item={'id':identity,'text':text,'html':inline(tokens),'pdf':inline(tokens,True),'refs':refs(text),'links':public_links(tokens)}
         blocks[identity]=item;return item
     def ensure():
         nonlocal section

@@ -1,6 +1,6 @@
 """Portable research first, one source inventory, exact provenance in an appendix."""
 import json
-from web.report_composition import markdown_sections,source_inventory,source_notes,review
+from web.report_composition import markdown_sections,source_inventory,source_notes,source_tables,review
 
 
 def filename(report,suffix):
@@ -31,8 +31,12 @@ def markdown(workspace,report,include_annotations=False):
     lines+=['## Sources','',
       'References retain the supplied evidence precision. Finding-level records and editorial topic mappings do not establish audited claim-level support. Public URLs and available source records are included below.','']
     inventory=source_inventory(report,tree)
+    links={entry['url']:f'S{index:02d}' for index,entry in enumerate(inventory,1)}
+    def portable(text):
+        for url,key in sorted(links.items(),key=lambda item:len(item[0]),reverse=True):text=text.replace(url,key)
+        return text
     for index,source in enumerate(inventory,1):
-        refs=', '.join(source['refs']) or 'Finding-level source'
+        refs=', '.join(source['refs']) or ('Finding-level source' if source['records'] else 'Supplied public link; no bound evidence reference')
         lines += [f"### S{index:02d} · {refs}",'',source['url'],'']
         labels=list(dict.fromkeys(source['labels']))
         if labels:lines+=['Source / locator: '+'; '.join(labels),'']
@@ -40,9 +44,12 @@ def markdown(workspace,report,include_annotations=False):
             # URL has one owner above; distinct source revisions/locators remain.
             record={k:v for k,v in record.items() if k!='source_url'}
             lines+=['```json',json.dumps(record,ensure_ascii=False,indent=2),'```','']
+        for identity in source['note_ids']:
+            block=tree['blocks'][identity]
+            related=', '.join(dict.fromkeys(links[link['url']] for link in block.get('links',[])))
+            lines+=['Supplied source note'+(' (links '+related+')' if related else '')+': '+portable(block['text']),'']
     if not inventory:lines+=['No public source records were supplied.','']
     lines+=['## Evidence references and qualifications','']
-    links={entry['url']:f'S{index:02d}' for index,entry in enumerate(inventory,1)}
     for ref,source in tree['sources'].items():
         mapped=', '.join(dict.fromkeys(links[link['url']] for link in source['links'])) or 'No public source link supplied'
         # Keep the complete supplied map qualification/locator, replacing repeated
@@ -50,7 +57,18 @@ def markdown(workspace,report,include_annotations=False):
         text=source['text']
         for url,key in sorted(links.items(),key=lambda item:len(item[0]),reverse=True):text=text.replace(url,key)
         lines += ['### '+ref+' · '+source['topic'],'',mapped+' · '+text,'']
-    notes=source_notes(tree)
+    for table in source_tables(tree):
+        lines+=['### Supplied source qualifications','']
+        for index,row in enumerate(table['rows']):
+            cells=[]
+            for block in row:
+                related=', '.join(dict.fromkeys(links[link['url']] for link in block.get('links',[])))
+                cells.append(portable(block['text']).replace('|',r'\|').replace('\n','<br>')+(' ('+related+')' if related else ''))
+            lines+=['| '+' | '.join(cells)+' |']
+            if index==0:lines+=['| '+' | '.join('---' for _ in cells)+' |']
+        lines+=['']
+    assigned={identity for source in inventory for identity in source['note_ids']}
+    notes=[block for block in source_notes(tree) if block['id'] not in assigned]
     if notes:
         lines+=['### Retained source-context statements','',
           'The following statements are immutable document text. Any review-time wording is historical; the exact-version receipt below records the selected document’s current disposition.','']

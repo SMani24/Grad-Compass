@@ -13,7 +13,7 @@ from web.report_packages import immutable
 
 PDF_LOCK=threading.RLock()
 ASSETS=Path(__file__).parent/'assets'
-RENDERER='country-reader-10'
+RENDERER='country-reader-11'
 
 
 def styles():
@@ -123,7 +123,7 @@ def build(report):
         if concise and not refs:continue
         anchors=''.join('<a name="'+ref+'"/>' for ref in refs)
         heading=p(anchors+escape(', '.join(refs) or 'Finding-level source'),'source_title')
-        label='; '.join(source['labels']) or 'Public source'
+        label=next(iter(source['labels']),'Public source')
         source_cells.append([heading,p('<a href="'+escape(source['url'],{'"':'&quot;'})+'" color="#08647c">'+escape(label)+'</a>','small')])
     for ref,source in tree['sources'].items():
         if source['links'] or (concise and ref not in used_refs):continue

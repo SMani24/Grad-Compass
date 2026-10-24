@@ -41,6 +41,31 @@ class CompositionTests(unittest.TestCase):
         self.assertEqual(len(inventory),1);self.assertEqual(inventory[0]['refs'],['E01','E02'])
         self.assertEqual(inventory[0]['records'],records)
 
+    def test_source_qualifications_and_unmapped_public_urls_remain_portable(self):
+        case=fixtures.LocalTests();case.setUp();self.addCleanup(case.doCleanups)
+        result=receive_country(case);root,meta=package(case,result)
+        with (root/'detailed.md').open('a') as f:f.write('''\n## Source guide and evidence precision
+
+- [Invented source](https://example.invalid/invented-evidence), section 3; published July 2026; future applicability unknown.
+
+The [ancillary page](https://example.invalid/ancillary) returned HTTP 403 on 23 October 2026. Retrieval failed; the page is not confirmed broken.
+
+| Reference | Locator | Qualification |
+| --- | --- | --- |
+| [Invented source](https://example.invalid/invented-evidence) | Page 7, table 2 | Historical 2025 figure; no target-year value |
+''')
+        meta['canonical_document']['sha256']=reports.digest((root/'detailed.md').read_bytes());meta['reader_editorial']['parent_canonical_sha256']=meta['canonical_document']['sha256'];atomic_json(root/'metadata.local.json',meta)
+        publish(case.workspace,root);self.assertFalse(InboxReceiver(case.workspace,quiet_seconds=0).check()['errors'])
+        report=next(r for r in reports.catalog(case.workspace)['reports'] if r['model']['kind']=='prepared_report')
+        text=markdown(case.workspace,report).decode()
+        self.assertEqual(text.count('https://example.invalid/invented-evidence'),1)
+        self.assertEqual(text.count('https://example.invalid/ancillary'),1)
+        for phrase in ('section 3; published July 2026; future applicability unknown','HTTP 403','not confirmed broken','Page 7, table 2','Historical 2025 figure; no target-year value'):self.assertIn(phrase,text)
+        ancillary=next(s for s in report['content']['source_inventory'] if s['url'].endswith('/ancillary'))
+        self.assertEqual(ancillary['refs'],[]);self.assertEqual(ancillary['records'],[])
+        self.assertIn('Supplied public link; no bound evidence reference',text)
+        self.assertEqual(report['content']['composition']['source_list_owner'],'consumer')
+
     def test_generic_receive_exports_review_and_historical_passages_survive_restart(self):
         case=fixtures.LocalTests();case.setUp();self.addCleanup(case.doCleanups)
         result=receive_country(case);root,meta=package(case,result)
