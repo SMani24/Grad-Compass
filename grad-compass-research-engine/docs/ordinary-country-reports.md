@@ -28,6 +28,8 @@ An evidence map must keep source IDs, exact URLs/locators, dates, applicable yea
 
 ## 3. Independent review and mutable state
 
+Use the [independent review checklist](independent-country-review.md) for exact-byte checks, three-dimension dispositions, metadata reconciliation and correction handoffs.
+
 Alex assesses three dimensions separately for each exact detailed and reader revision/hash: **factual accuracy and evidence support**, **useful coverage and request relevance**, and **readability and consistency between editions**. Each dimension records pass, changes required or unresolved, concrete omissions/corrections, reviewer, UTC time and exact edition binding. A factual pass does not imply useful coverage or readable editions. Discovery revises content on changes required and returns new hashes for review.
 
 The authoritative package metadata holds the current canonical and reader factual review states and their exact document revision/hash bindings. The task review record can add the three-dimension assessment; it does not override package metadata. A reviewer disposition is never inferred from a prior research finding, a report receipt, or an older edition. Human approval remains separate and unknown/not requested until an authorized exact-version record exists. Correct stale current “awaiting review” wording through a new content or metadata revision after the actual disposition; do not rewrite historical files or erase valid evidence-scope cautions.
