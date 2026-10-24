@@ -5,7 +5,7 @@ import unittest
 from uuid import uuid4
 import test_local as fixtures
 from report_fixtures import receive_country,package
-from web.report_composition import markdown_sections,sections,source_inventory
+from web.report_composition import markdown_sections,sections,source_inventory,observation_dates
 from web.report_content import parse_report
 from web.report_delivery import publish
 from web.report_export import markdown
@@ -17,6 +17,10 @@ from web import report_packages as reports
 
 
 class CompositionTests(unittest.TestCase):
+    def test_observation_dates_retain_older_and_newer_sources_separately(self):
+        report={'metadata':{'source_artifact':{'observed_on':'2026-10-23'}},'finding':{'sources':[{'observed_at':'2026-10-19T10:00:00Z'},{'observed_at':'2026-10-23T11:00:00Z'}]}}
+        self.assertEqual(observation_dates(report),['2026-10-19','2026-10-23'])
+
     def test_unheaded_legacy_content_remains_readable_without_a_fake_summary(self):
         text='# Partial finding\n\nOnly this supplied observation is available.'
         tree=parse_report(text,'')

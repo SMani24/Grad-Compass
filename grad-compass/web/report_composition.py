@@ -101,6 +101,13 @@ def review(report,edition=None):
             'document':'Reader edition' if edition and edition['metadata']['edition']=='reader' else 'Detailed edition' if edition else 'Canonical report'}
 
 
+def observation_dates(report):
+    values=[source.get('observed_at') for source in (report.get('finding') or {}).get('sources',[])]
+    artifact=report['metadata'].get('source_artifact')
+    if isinstance(artifact,dict):values.append(artifact.get('observed_on'))
+    return sorted({value[:10] for value in values if isinstance(value,str) and re.match(r'^\d{4}-\d{2}-\d{2}',value)})
+
+
 def source_inventory(report,tree):
     """One public URL entry, retaining distinct records/locators and ref mappings."""
     inventory={}

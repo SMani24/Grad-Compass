@@ -1,6 +1,6 @@
 """One app report view; publication, coverage and acceptance are independent."""
 import re
-from web.report_composition import COVERAGE_LABELS
+from web.report_composition import COVERAGE_LABELS,observation_dates
 
 VERSION='grad-compass-country-report-view-1.0'
 PACKAGE='grad-compass-private-report-package-0.2'
@@ -45,7 +45,7 @@ def normalize(report):
         'findings':report.get('finding_reviews') or meta.get('finding_reviews',[]),'overview':reader['metadata']['factual_review'] if reader else None},
       'capabilities':{'overview':bool(reader),'content':bool(report['content']['blocks']),'pdf':bool(report['content']['blocks']),
         'pdf_kind':'concise_reader' if reader else 'available_findings' if projection else 'full_report','markdown':True,'annotations':not meta.get('archived',False)},
-      'source_precision':meta.get('source_citation_scope','finding'),'assets':report.get('assets',{}),
+      'source_precision':meta.get('source_citation_scope','finding'),'observation_dates':observation_dates(report),'assets':report.get('assets',{}),
       'scope':meta.get('research_scope') or (report.get('finding') or {}).get('coverage') or 'Bounded request; exhaustive country coverage is not established.'}
     return report
 

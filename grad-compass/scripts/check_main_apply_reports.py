@@ -41,7 +41,7 @@ def main():
     from preview_capture import PreviewCapture
     out=private_directory(args.screenshots);downloads=private_directory(out/'downloads');names=[]
     window=webview.create_window('Grad Compass',f'http://127.0.0.1:{server.server_port}/',width=1440,height=1000,min_size=(390,640))
-    capture=PreviewCapture(window,out,prefix='2026-10-23-main-apply-'+('restart-' if args.restart else ''))
+    capture=PreviewCapture(window,out,prefix='main-apply-'+('restart-' if args.restart else ''))
     def choose(name):names.append(name);return str(downloads/name)
     handler=DesktopDownloads(window,choose_path=choose);passed=[]
     watchdog=threading.Timer(240,lambda:os._exit(1));watchdog.daemon=True;watchdog.start()
@@ -89,7 +89,7 @@ def main():
                 click('read-country-report');loaded(r)
                 assert js("document.querySelector('.canonical-report').dataset.document==="+json.dumps(r['reader']['id']))
                 assert js("!document.getElementById('reader-show-report').disabled && !document.querySelector('.report-package-error')")
-                assert js("document.querySelector('.report-badges').textContent.includes("+json.dumps(r['reader']['metadata']['factual_review']['state'])+")")
+                assert js("document.querySelector('.report-badges').textContent.includes("+json.dumps(r['reader']['metadata']['factual_review']['state'].replace('_',' '))+")")
                 assert js("document.getElementById('inbox-errors').hidden")
                 assert js("document.querySelector('.report-coverage').closest('#reader-report-details')!==null")
                 assert js("[...document.querySelectorAll('.canonical-reading>.report-section h2')].every(n=>!n.textContent.includes('Seven-topic coverage'))")
