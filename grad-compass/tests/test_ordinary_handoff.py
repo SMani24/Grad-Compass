@@ -51,6 +51,19 @@ class OrdinaryHandoffTests(unittest.TestCase):
         self.assertTrue(ensure_pdf(self.f.workspace,report)['path'].exists())
         photo.unlink();self.assertEqual(Path(reports.get(LocalWorkspace(self.f.workspace.directory),report['key'])['visuals']['photo']['_local_path']).read_bytes(),body)
         self.assertEqual(receiver.check()['received'],0)
+
+    def test_legacy_photo_without_caption_uses_supplied_alt_without_mutating_asset(self):
+        self.f.complete();saved=self.f.store.request(self.f.request['request_id'])
+        report=projection.build(saved['request'],saved['results'][0]['envelope'],'CAN')
+        from PIL import Image
+        photo=self.f.workspace.directory/'legacy-fixture.jpg';Image.new('RGB',(400,300),(20,80,100)).save(photo)
+        asset={'_local_path':str(photo),'sha256':reports.digest(photo.read_bytes()),'alt':'Invented older photograph description','credit':'Invented fixture author','source_url':'https://example.invalid/photo','license':'Fixture permission'}
+        report['visuals']={'photo':asset};before=deepcopy(asset)
+        pdf=ensure_pdf(self.f.workspace,report)
+        text=' '.join(page_data(self.f.workspace,report,0)['text'].split())
+        self.assertIn(asset['alt'],text);self.assertIn(asset['credit'],text)
+        self.assertEqual(report['visuals']['photo'],before);self.assertNotIn('caption',asset)
+        self.assertTrue(pdf['path'].is_file())
     def test_later_asset_delivery_wins_without_changing_old_metadata_or_replay_order(self):
         result=receive_country(self.f);root,meta=package(self.f,result)
         from web.inbox import InboxReceiver

@@ -28,6 +28,8 @@ def main():
     parser.add_argument('--expect-metadata',action='append',default=[],metavar='COUNTRY=SHA256')
     parser.add_argument('--country',action='append',default=[],help='Countries to verify; defaults to DEU/CAN/BEL')
     parser.add_argument('--require-photo',action='append',default=[],metavar='COUNTRY')
+    parser.add_argument('--narrow',action='store_true',help='Also inspect the reader at a 390px window, retaining the owner text size')
+    parser.add_argument('--allow-findings',action='store_true',help='Allow honestly labelled received findings when no prepared package is published')
     args=parser.parse_args()
     profiles=LocalProfiles(args.local_dir);w=profiles.workspace
     state=profiles.snapshot();active=next(p for p in state['profiles'] if p['id']==state['active_id'])
@@ -43,7 +45,7 @@ def main():
     until=time.monotonic()+25
     while True:
         available=reports.catalog(w)['reports']
-        latest={c:next((r for r in available if r['metadata']['country_code']==c and r['model']['kind']=='prepared_report'),None) for c in (args.country or ('DEU','CAN','BEL'))}
+        latest={c:next((r for r in available if r['metadata']['country_code']==c and (r['model']['kind']=='prepared_report' or args.allow_findings)),None) for c in (args.country or ('DEU','CAN','BEL'))}
         if all(latest.values()) and all(latest.get(code,{}).get('edition')==digest for code,digest in expected.items()):break
         if time.monotonic()>until:raise AssertionError('Expected finalized packages were not received by normal startup/polling')
         time.sleep(.2)
@@ -100,11 +102,12 @@ def main():
                 wait("!!document.querySelector('.country-card[data-country="+code+"]')")
                 js("document.querySelector('.country-card[data-country="+code+"]').click()")
                 wait("!!document.getElementById('read-country-report')")
-                wait("document.getElementById('read-country-report').textContent==='Read country report' && document.querySelector('.country-report-availability').textContent.includes("+json.dumps(r['model']['version_label'])+")");shot(code.lower()+'-map-action')
+                wait("document.querySelector('.country-report-availability').textContent.includes("+json.dumps(r['model']['version_label'])+")");shot(code.lower()+'-map-action')
                 click('read-country-report');loaded(r)
-                assert js("document.querySelector('.canonical-report').dataset.document==="+json.dumps(r['reader']['id']))
-                assert js("!document.getElementById('reader-show-report').disabled && !document.querySelector('.report-package-error')")
-                assert js("document.querySelector('.report-badges').textContent.includes("+json.dumps(r['reader']['metadata']['factual_review']['state'].replace('_',' '))+")")
+                if r.get('reader'):assert js("document.querySelector('.canonical-report').dataset.document==="+json.dumps(r['reader']['id']))
+                assert js("document.getElementById('reader-show-report').disabled==="+json.dumps(not bool(r.get('reader')))+" && !document.querySelector('.report-package-error')")
+                selected_review=(r.get('reader') or {}).get('metadata',{}).get('factual_review',r['metadata']['canonical_factual_review'])
+                assert js("document.querySelector('.report-badges').textContent.includes("+json.dumps(selected_review['state'].replace('_',' '))+")")
                 assert js("document.getElementById('inbox-errors').hidden")
                 assert js("document.querySelector('.report-coverage').closest('#reader-report-details')!==null")
                 assert js("[...document.querySelectorAll('.canonical-reading>.report-section h2')].every(n=>!n.textContent.includes('Seven-topic coverage'))")
@@ -113,7 +116,12 @@ def main():
                     wait("document.querySelector('.report-photo img')?.naturalWidth>0")
                     assert r.get('assets',{}).get('photo'),'Delivered photograph missing'
                     assert js("!!document.querySelector('.report-photo figcaption a')"),'Photo attribution link missing'
-                shot(code.lower()+'-prepared-overview')
+                shot(code.lower()+('-prepared-overview' if r.get('reader') else '-received-findings'))
+                if not r.get('reader'):
+                    js("document.getElementById('reader-report-details').open=true;document.querySelector('.report-coverage').open=true")
+                    js("document.querySelector('.report-coverage').scrollIntoView({block:'center'})")
+                    shot(code.lower()+'-supplied-coverage')
+                    js("document.getElementById('reader-report-details').open=false;document.getElementById('research-dialog').scrollTop=0")
                 # Country navigation must agree with the card entry point.
                 other=next((c for c in latest if c!=code),None)
                 if other:select('report-country-navigation',other);loaded(latest[other])
@@ -129,9 +137,22 @@ def main():
                 for source in source_inventory(r,tree):assert source['url'] in md.read_text()
                 assert md.read_text().index('## Sources')<md.read_text().index('## Report details and technical appendix')
                 assert not js("!!document.querySelector('.report-locator')")
-                receipt[code]={'request_id':r['metadata']['request']['id'],'key':r['key'],'metadata_sha256':r['edition'],'canonical_revision_id':r['metadata']['canonical_document']['revision_id'],'canonical_sha256':r['metadata']['canonical_document']['sha256'],'report_version':r['metadata']['canonical_document']['revision_number'],'reader_revision':r['reader']['metadata']['revision_number'],'reader_sha256':r['reader']['metadata']['sha256'],'detailed_revision':r['detailed']['metadata']['revision_number'] if r.get('detailed') else r['metadata']['canonical_document']['revision_number'],'detailed_sha256':r['detailed']['metadata']['sha256'] if r.get('detailed') else r['metadata']['canonical_document']['sha256'],'review':r['metadata']['canonical_factual_review']['state'],'reader_review':r['reader']['metadata']['factual_review']['state'],'human':r['metadata']['human_approval']['state'],'pdf':pdf.name,'pdf_sha256':hashlib.sha256(pdf.read_bytes()).hexdigest(),'markdown':md.name,'markdown_sha256':hashlib.sha256(md.read_bytes()).hexdigest(),'annotations_readback':reports.annotations(w,r['key']),'locator_omitted':True}
+                receipt[code]={'request_id':r['metadata']['request']['id'],'key':r['key'],'metadata_sha256':r['edition'],'canonical_revision_id':r['metadata']['canonical_document']['revision_id'],'canonical_sha256':r['metadata']['canonical_document']['sha256'],'report_version':r['metadata']['canonical_document']['revision_number'],'reader_revision':r['reader']['metadata']['revision_number'] if r.get('reader') else None,'reader_sha256':r['reader']['metadata']['sha256'] if r.get('reader') else None,'detailed_revision':r['detailed']['metadata']['revision_number'] if r.get('detailed') else r['metadata']['canonical_document']['revision_number'],'detailed_sha256':r['detailed']['metadata']['sha256'] if r.get('detailed') else r['metadata']['canonical_document']['sha256'],'review':r['metadata']['canonical_factual_review']['state'],'reader_review':r['reader']['metadata']['factual_review']['state'] if r.get('reader') else None,'human':r['metadata']['human_approval']['state'],'pdf':pdf.name,'pdf_sha256':hashlib.sha256(pdf.read_bytes()).hexdigest(),'markdown':md.name,'markdown_sha256':hashlib.sha256(md.read_bytes()).hexdigest(),'annotations_readback':reports.annotations(w,r['key']),'locator_omitted':True}
                 receipt[code]['photo']=r.get('assets',{}).get('photo')
+                receipt[code]['kind']=r['model']['kind'];receipt[code]['coverage']=r['model']['coverage']
                 click('reader-show-pdf');wait("document.querySelector('.pdf-page>img')?.naturalWidth>0");shot(code.lower()+'-pdf')
+                if args.narrow:
+                    click('reader-show-report' if r.get('reader') else 'reader-full-report');wait("document.querySelector('.canonical-report').dataset.readingEdition==="+json.dumps('reader' if r.get('reader') else 'canonical'))
+                    window.resize(390,740);wait('innerWidth===390');js("document.getElementById('research-dialog').scrollTop=0")
+                    assert js('document.body.scrollWidth<=innerWidth')
+                    shot(code.lower()+'-narrow-overview')
+                    if code in args.require_photo:
+                        js("document.querySelector('.photo-attribution').open=true")
+                        assert js("getComputedStyle(document.querySelector('.report-photo figcaption')).position==='static'")
+                        assert js("getComputedStyle(document.querySelector('.report-photo figcaption a')).color!=='rgb(255, 255, 255)'")
+                        shot(code.lower()+'-narrow-photo-credits')
+                        js("document.querySelector('.photo-attribution').open=false")
+                    window.resize(1440,1000);wait('innerWidth===1440')
                 # Explicit result history remains a findings view, with honest labels.
                 if code=='DEU':
                     select('research-result-revision','1')

@@ -13,7 +13,7 @@ from web.report_packages import immutable
 
 PDF_LOCK=threading.RLock()
 ASSETS=Path(__file__).parent/'assets'
-RENDERER='country-reader-13'
+RENDERER='country-reader-14'
 
 
 def styles():
@@ -84,8 +84,8 @@ def build(report):
         # cut through the subject. The source asset stays byte-for-byte intact.
         with Raster.open(_path(asset)) as image:
             image=ImageOps.fit(image,(672,756),centering=(asset.get('crop',{}).get('x',.5),asset.get('crop',{}).get('y',.48)));raster=io.BytesIO();image.save(raster,format='JPEG');raster.seek(0)
-        visual=[Image(raster,width=112,height=126),p(escape(asset['caption'])+'<br/>'+escape(asset.get('creator') or asset['credit'])+' · '+('<a href="'+escape(asset['license_url'])+'">'+escape(asset['license'])+'</a>' if asset.get('license_url') else escape(asset['license']))+' · cropped/resized for this layout<br/><a href="'+escape(asset['source_url'])+'">Photo source</a>','small')]
-        cover=Table([[facts,visual]],colWidths=[width-132,132]);cover.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(0,0),0),('RIGHTPADDING',(0,0),(0,0),16),('LEFTPADDING',(1,0),(1,0),12),('RIGHTPADDING',(1,0),(1,0),0),('TOPPADDING',(0,0),(-1,-1),0),('BOTTOMPADDING',(0,0),(-1,-1),6)]));body.append(cover)
+        cover=Table([[facts,Image(raster,width=96,height=108)]],colWidths=[width-116,116]);cover.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(0,0),0),('RIGHTPADDING',(0,0),(0,0),16),('LEFTPADDING',(1,0),(1,0),12),('RIGHTPADDING',(1,0),(1,0),0),('TOPPADDING',(0,0),(-1,-1),0),('BOTTOMPADDING',(0,0),(-1,-1),6)]));body.append(cover)
+        body.append(p(escape(asset.get('caption') or asset['alt'])+' · '+escape(asset.get('creator') or asset['credit'])+' · '+('<a href="'+escape(asset['license_url'])+'">'+escape(asset['license'])+'</a>' if asset.get('license_url') else escape(asset['license']))+' · cropped/resized for this layout · <a href="'+escape(asset['source_url'])+'">Photo source</a>','small'))
     else:body.extend(facts)
     used_refs=set()
     def linked(block):

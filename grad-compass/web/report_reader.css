@@ -15,6 +15,12 @@
 .canonical-report .report-photo{grid-column:2;grid-row:1;height:auto;min-height:120px;max-height:180px;align-self:stretch;border-radius:0;margin:0}
 .canonical-report .report-photo img{object-position:center 48%}
 .canonical-report .report-photo figcaption{inset:auto 6px 6px 6px;font-size:.55rem;padding:4px 6px}
+.canonical-report .report-photo:has(img){height:auto;max-height:none;min-height:0;align-self:start;background:#edf5f5}
+.canonical-report .report-photo:has(img) img{height:120px;display:block}
+.canonical-report .report-photo:has(img) figcaption{position:static;color:#193c4e;background:#edf5f5;border-radius:0;font-size:.65rem;line-height:1.5;padding:8px 10px;overflow-wrap:anywhere}
+#research-request-detail .canonical-report .report-photo:has(img) figcaption a{color:#075f7a}
+.photo-attribution summary{cursor:pointer;color:#075f7a;margin-top:4px}
+#research-request-detail .photo-attribution p{font-size:inherit;line-height:1.5;margin:6px 0}
 .canonical-report .report-photo:not(:has(img)) figcaption{color:#fff;font-size:.7rem;line-height:1.4}
 .canonical-report .report-heading{grid-column:1;grid-row:1;padding:16px 22px;border:0;min-width:0}
 #research-dialog .canonical-report .report-heading h1{font-size:1.8rem;margin:0 0 6px;line-height:1.2}
@@ -121,6 +127,7 @@
  .canonical-header{grid-template-columns:minmax(0,1fr)}.canonical-report .report-photo{grid-column:1;grid-row:2;height:70px;min-height:70px}.canonical-report .report-photo figcaption{inset:auto 6px 4px auto}
  .canonical-report .report-heading{padding:14px}.canonical-header:has(.report-version-context[open]) .report-photo{height:70px}
  .canonical-report .report-photo .photo-fallback{top:8px;right:12px;font-size:1.75rem}
+ .canonical-report .report-photo:has(img) img{height:90px}
  .canonical-report .report-photo:not(:has(img)) figcaption{inset:auto auto 6px 6px;max-width:calc(100% - 75px)}
  #research-dialog .canonical-report .report-heading h1{font-size:1.5rem}
  .canonical-layout{padding:0 12px 20px;display:block}.canonical-reading{max-width:100%}
