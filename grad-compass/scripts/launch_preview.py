@@ -72,7 +72,9 @@ def main():
 
     if local_mode:
         from web.local import create_local_server
-        server=create_local_server(workspace,port=0,profiles=profiles,clipboard=DesktopClipboard())
+        from desktop_exports import DesktopExports
+        export_settings=DesktopExports()
+        server=create_local_server(workspace,port=0,profiles=profiles,clipboard=DesktopClipboard(),desktop_exports=export_settings)
     else:
         server = create_server(directory, port=0, exchange_directory=Path(temporary_exchange.name) if temporary_exchange else args.exchange_dir)
     worker = threading.Thread(target=server.serve_forever, daemon=True)
@@ -92,7 +94,7 @@ def main():
         from desktop_controls import DesktopControls
         controls = DesktopControls(window)
         from desktop_downloads import DesktopDownloads
-        downloads=DesktopDownloads(window)
+        downloads=DesktopDownloads(window,workspace=(lambda:profiles.workspace) if local_mode else None)
         capture = None
         if args.review_screenshots:
             from core.paths import validate_data_directory

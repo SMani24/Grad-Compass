@@ -26,6 +26,7 @@ STATIC_FILES = {
     "/research_review.js": (APP_ROOT / "web" / "research_review.js", "text/javascript; charset=utf-8"),
     "/research.js": (APP_ROOT / "web" / "research.js", "text/javascript; charset=utf-8"),
     "/research.css": (APP_ROOT / "web" / "research.css", "text/css; charset=utf-8"),
+    "/dispatch.js": (APP_ROOT / "web" / "dispatch.js", "text/javascript; charset=utf-8"),
     "/settings.js": (APP_ROOT / "web" / "settings.js", "text/javascript; charset=utf-8"),
     "/panels.js": (APP_ROOT / "web" / "panels.js", "text/javascript; charset=utf-8"),
     "/panels.css": (APP_ROOT / "web" / "panels.css", "text/css; charset=utf-8"),
@@ -174,7 +175,7 @@ class DemoWorkspace:
             return {"university":dict(university), "professors":professors, "tasks":tasks}
 
 
-def handler_for(workspace, exchange=None, session_token=None, profiles=None, clipboard=None):
+def handler_for(workspace, exchange=None, session_token=None, profiles=None, clipboard=None, desktop_exports=None):
     initial_workspace=workspace
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):
@@ -211,6 +212,12 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                 if route in STATIC_FILES:
                     filename, content_type = STATIC_FILES[route]
                     return self.respond(200,filename.read_bytes(),content_type)
+                if route == '/api/dispatch' and getattr(workspace,'operational',False):
+                    from web.dispatch import Dispatch
+                    return self.respond(200,Dispatch(workspace).snapshot())
+                if route == '/api/exports':
+                    from web.export_preferences import preference
+                    return self.respond(200,{**preference(workspace),'native':desktop_exports is not None})
                 if route == "/api/map":
                     return self.respond(200,(APP_ROOT/"ui/data/countries.geo.json").read_bytes())
                 if route == "/api/workspace":
@@ -315,8 +322,10 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
             profile_operation=profiles is not None and route in ('/api/local/profiles/create','/api/local/profiles/switch','/api/local/reset')
             preferences = route == "/api/display-preferences"
             layout = route == '/api/panel-widths'
+            dispatch_operation = route in ('/api/dispatch/prepare','/api/dispatch/confirm','/api/dispatch/retry','/api/dispatch/cancel') and getattr(workspace,'operational',False)
+            export_operation = route == '/api/exports'
             report_operation = route in ('/api/reports/annotate','/api/reports/draft','/api/reports/reading')
-            if not (report_operation or layout or preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
+            if not (dispatch_operation or export_operation or report_operation or layout or preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
                 return self.respond(405,{"error":"This endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"
             if (self.headers.get("Host") != origin.removeprefix("http://")
@@ -331,6 +340,19 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                     raise ValueError("A small JSON request is required")
                 from web.research_envelopes import loads
                 payload = loads(self.rfile.read(length))
+                if dispatch_operation:
+                    from web.dispatch import Dispatch
+                    service=Dispatch(workspace);operation=route.rsplit('/',1)[1]
+                    allowed={'prepare':{'payload','edit_id'},'confirm':{'id','confirmation_digest'},'retry':{'id'},'cancel':{'id'}}[operation]
+                    required=allowed-({'edit_id'} if operation=='prepare' else set())
+                    if not isinstance(payload,dict) or set(payload)-allowed or not required<=set(payload):raise ValueError('Review the exact dispatch action')
+                    if operation=='prepare':result=service.prepare(payload['payload'],payload.get('edit_id'))
+                    elif operation=='confirm':result=service.confirm(payload['id'],payload['confirmation_digest'])
+                    else:result=getattr(service,operation)(payload['id'])
+                    return self.respond(200,result)
+                if export_operation:
+                    if not isinstance(payload,dict) or set(payload)!={'action'} or desktop_exports is None:raise ValueError('Open the normal desktop app to choose an export folder')
+                    return self.respond(200,desktop_exports.action(workspace,payload['action']))
                 if report_operation:
                     if route.endswith('/reading'):
                         from web.report_reading import preferences as reading_preferences

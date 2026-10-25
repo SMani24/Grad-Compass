@@ -34,11 +34,21 @@ def validate_extension(workspace,root,report,retained=False):
     if not report['content']['blocks'] or not editions['reader']['content']['blocks']:raise ValueError('Supply actual detailed and concise content; empty editions cannot enable reading controls')
     assets=meta.get('assets',[])
     if not isinstance(assets,list) or len(assets)>12:raise ValueError('Use a bounded report asset list')
+    delivery=meta.get('asset_delivery')
+    if delivery is not None:
+        if not isinstance(delivery,dict) or delivery.get('state') not in ('available','unavailable','not_yet_published'):raise ValueError('Declare photo delivery as available, unavailable or not yet published')
+        if delivery['state']=='available' and not any(a.get('kind')=='photo' for a in assets if isinstance(a,dict)):raise ValueError('Available photo delivery requires a bundled photograph')
+        if delivery['state']!='available' and (not isinstance(delivery.get('reason'),str) or not delivery['reason'].strip()):raise ValueError('A missing photo needs its concrete delivery reason')
     normalized={}
     for asset in assets:
         required={'kind','relative_path','sha256','media_type','alt','caption','credit','source_url','license'}
         if not isinstance(asset,dict) or not required<=set(asset) or asset['kind'] not in ('photo','flag','locator','figure'):raise ValueError('Report visuals need kind, path, hash, alt text, caption, credit, public source and license')
         if asset['media_type'] not in ('image/png','image/jpeg') or any(not isinstance(asset[k],str) or not asset[k].strip() for k in ('alt','caption','credit','source_url','license')) or not asset['source_url'].startswith(('https://','http://')):raise ValueError('Use credited public-source PNG/JPEG visuals; missing imagery is allowed')
+        for field in ('creator','license_url'):
+            if field in asset and (not isinstance(asset[field],str) or not asset[field].strip()):raise ValueError('Asset creator and license URL must be nonempty when supplied')
+        if asset.get('license_url') and not asset['license_url'].startswith('https://'):raise ValueError('Use a public HTTPS license URL')
+        crop=asset.get('crop')
+        if crop is not None and (not isinstance(crop,dict) or set(crop)!={'x','y'} or any(type(v) not in (int,float) or not 0<=v<=1 for v in crop.values())):raise ValueError('Photo crop uses normalized x/y focal coordinates')
         body=checked_file(root,asset,20_000_000) if not retained else regular(workspace.directory/'report-cache'/report['key']/report['edition']/'assets'/asset['sha256']).read_bytes()
         if digest(body)!=asset['sha256']:raise ValueError('Asset exact bytes mismatch')
         from PIL import Image

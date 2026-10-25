@@ -144,3 +144,8 @@
 .report-retained-context>summary{cursor:pointer;padding-block:10px}
 .report-retained-context>.report-section{margin-top:16px}
 .report-retained-context h3{font-size:1rem}
+
+.canonical-header.without-photo{grid-template-columns:minmax(0,1fr) 140px}
+.canonical-header.without-photo .report-photo{min-height:70px;max-height:110px;background:#edf5f5;color:#244554}
+.canonical-header.without-photo .report-photo figcaption{color:#244554;background:transparent;font-size:.6rem}
+@media(max-width:720px){.canonical-header.without-photo{grid-template-columns:minmax(0,1fr)}.canonical-header.without-photo .report-photo{height:55px;min-height:55px}}

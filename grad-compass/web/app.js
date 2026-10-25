@@ -105,7 +105,13 @@ if (typeof document !== "undefined") {
     get("select-countries").disabled = savingCountries;
     get("country-selection-actions").hidden = !selectingCountries;
     get("country-selection-count").textContent = `${saveSelection.size} selected`;
-    get("country-selection-list-count").textContent = `${saveSelection.size} selected to save`;
+    const matches = selectionMatches();
+    const outside = [...saveSelection].filter(code => !matches.some(c => c.code === code)).length;
+    get("country-selection-list-count").textContent = `${saveSelection.size} selected${outside ? ` · ${outside} outside this filter` : ''}`;
+    get("map-select-matching").textContent = `Select all matching (${matches.length})`;
+    get("country-selection-list-all").textContent = `Select all matching (${matches.length})`;
+    get("map-selection-scope").textContent = selectingCountries ? selectionScope() : '';
+    get("research-map-selection").disabled = savingCountries || !saveSelection.size;
     for (const id of ["save-selected-countries", "clear-selected-countries"]) get(id).disabled = savingCountries || !saveSelection.size;
     get("done-selecting-countries").disabled = savingCountries;
     for (const input of get("country-selection-options").querySelectorAll("input")) {
@@ -118,7 +124,7 @@ if (typeof document !== "undefined") {
     if (savingCountries) return;
     selectingCountries = active;
     if (!active) saveSelection.clear();
-    selectionMessage(active ? "Purple: selected to save. Blue: active location." : "");
+    selectionMessage("");
     updateCountrySelection();
     renderResults();
     get(active ? "country-selection-list" : state.view === "list" ? "list-view" : "select-countries").focus({preventScroll:true});
@@ -134,6 +140,17 @@ if (typeof document !== "undefined") {
       card.setAttribute("aria-pressed", String(saveSelection.has(card.dataset.country)));
     }
   }
+  function selectionMatches() {
+    if (get("country-selection-dialog").open) return filterCountries(state.countries, get("country-selection-search").value);
+    if (state.mode !== "countries") return state.countries;
+    return filterCountries(state.countries, elements.search.value).filter(c => get("country-list-scope").value !== "watched" || window.GradCompassResearch.personal(c.code).watched);
+  }
+  function selectionScope() {
+    const list = get("country-selection-dialog").open;
+    const query = list ? get("country-selection-search").value : state.mode === "countries" ? elements.search.value : '';
+    const saved = !list && state.mode === "countries" && get("country-list-scope").value === "watched";
+    return `${saved ? 'Saved countries' : 'All countries and territories'}${query ? ` · search: ${query}` : ''}.`;
+  }
   function renderCountrySelectionList() {
     const countries = filterCountries(state.countries, get("country-selection-search").value);
     const options = get("country-selection-options"); options.replaceChildren();
@@ -147,7 +164,20 @@ if (typeof document !== "undefined") {
       options.append(label);
     }
     if (!countries.length) options.append(node("p", "empty-state", "No countries match this search."));
+    updateCountrySelection();
   }
+  function selectAllMatchingCountries() {
+    for (const country of selectionMatches()) saveSelection.add(country.code);
+    updateCountrySelection(); renderResults();
+  }
+  get("map-select-matching").addEventListener("click", selectAllMatchingCountries);
+  get("country-selection-list-all").addEventListener("click", selectAllMatchingCountries);
+  get("country-selection-list-clear").addEventListener("click", () => { saveSelection.clear(); updateCountrySelection(); renderResults(); });
+  get("research-map-selection").addEventListener("click", () => {
+    if (!saveSelection.size || savingCountries) return;
+    get("country-selection-dialog").close();
+    window.GradCompassResearch.openRequest({countries:[...saveSelection]});
+  });
   get("select-countries").addEventListener("click", () => setCountrySelection(!selectingCountries));
   get("clear-selected-countries").addEventListener("click", () => {
     saveSelection.clear(); updateCountrySelection(); renderResults(); get("country-selection-list").focus({preventScroll:true});
@@ -155,7 +185,7 @@ if (typeof document !== "undefined") {
   get("done-selecting-countries").addEventListener("click", () => setCountrySelection(false));
   get("country-selection-list").addEventListener("click", () => {
     get("country-selection-search").value = ""; renderCountrySelectionList();
-    get("country-selection-dialog").showModal(); get("country-selection-search").focus();
+    get("country-selection-dialog").showModal(); updateCountrySelection(); get("country-selection-search").focus();
   });
   for (const id of ["close-country-selection-list", "return-country-selection"]) get(id).addEventListener("click", () => get("country-selection-dialog").close());
   get("country-selection-search").addEventListener("input", renderCountrySelectionList);
@@ -532,10 +562,11 @@ if (typeof document !== "undefined") {
       const code = discoveryCountry(layer.feature).code;
       const selected = code === elements.country.value;
       const bulk = selectingCountries && saveSelection.has(code);
-      layer.setStyle({ fillColor: bulk ? "#decdf4" : selected ? "#85c2d4" : countries.has(code) ? "#cce5ee" : "#fff",
-        fillOpacity: 1, color: bulk ? "#7040a0" : selected ? "#087ba4" : "#b6cbd6", weight: bulk ? 2.5 : selected ? 1.8 : .7, dashArray: bulk ? "5 3" : null });
+      const saved = window.GradCompassResearch.personal(code).watched;
+      layer.setStyle({ fillColor: bulk ? "#decdf4" : selected ? "#85c2d4" : saved ? "#bfe4da" : countries.has(code) ? "#cce5ee" : "#fff",
+        fillOpacity: 1, color: bulk ? "#7040a0" : selected ? "#087ba4" : saved ? "#24765f" : "#b6cbd6", weight: bulk ? 2.5 : selected ? 1.8 : saved ? 1.8 : .7, dashArray: bulk ? "5 3" : saved && !selected ? "2 2" : null });
       layer.getElement()?.setAttribute("aria-pressed", String(selectingCountries ? bulk : selected));
-      layer.getElement()?.setAttribute("aria-label", (selectingCountries ? "Select to save " : "Explore ") + discoveryCountry(layer.feature).name);
+      layer.getElement()?.setAttribute("aria-label", (selectingCountries ? "Toggle selection: " : "Explore ") + discoveryCountry(layer.feature).name + (saved ? "; saved country" : "; not saved") + (bulk ? "; selected" : "") + (selected ? "; focused" : ""));
       layer.getElement()?.setAttribute("tabindex", selected ? "0" : "-1");
       if (selected || bulk) layer.bringToFront();
     });
@@ -550,7 +581,7 @@ if (typeof document !== "undefined") {
   }
   function render() {
     state.filtered = filterUniversities(state.universities, { search: state.mode === "countries" ? "" : elements.search.value, country: elements.country.value, status: state.mode === "countries" ? "" : elements.status.value });
-    renderResults(); renderMap();
+    renderResults(); if(selectingCountries)updateCountrySelection(); else renderMap();
   }
   function focusCountry(code) {
     const feature = state.geometry?.features.find(feature => discoveryCountry(feature).code === code);

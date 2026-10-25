@@ -20,6 +20,7 @@
   <script defer src="/app.js"></script>
   <script defer src="/local_ui.js"></script>
   <script defer src="/exchange.js"></script>
+  <script defer src="/dispatch.js"></script>
   <script defer src="/settings.js"></script>
   <script defer src="/panels.js"></script>
 </head>
@@ -48,10 +49,10 @@
           <input id="search" type="search" placeholder="University or city…" autocomplete="off">
           <div id="country-tools" hidden>
             <label for="country-list-scope">Explore</label><select id="country-list-scope"><option value="all">All countries and territories</option><option value="watched">Saved countries</option></select>
-            <p class="catalogue-hint">Countries and territories. Selection prepares a draft; research starts only after manual invocation.</p>
+            <p class="catalogue-hint">Countries and territories. Selection prepares a draft; research starts only after confirmation.</p>
             <div class="research-toolbar research-bulk-actions"><button id="research-select-matching" type="button">Select all matching (0)</button><button id="research-clear-selection" type="button" disabled>Clear selection</button></div>
             <p id="research-selection-summary" role="status" aria-live="polite">0 selected</p>
-            <div class="research-toolbar"><button id="research-selected" type="button" disabled>Research selected (0)</button><button id="open-research" type="button">Requests</button></div>
+            <div class="research-toolbar"><button id="research-selected" type="button" disabled>Research selected (0)</button><button id="open-research" type="button">Requests</button><button id="open-pending-requests" type="button" hidden>Pending requests</button></div>
             <p id="research-toolbar-status" role="status" aria-live="polite"></p>
           </div>
           <div class="filter-row"><div><label for="country">Location</label><select id="country"><option value="">All countries</option></select></div><div><label for="status">Stage</label><select id="status"><option value="">All stages</option><option>Researching</option><option>Applying</option><option>Submitted</option><option>Accepted</option><option>Rejected</option></select></div></div>
@@ -62,18 +63,21 @@
       </aside>
       <section class="discovery-canvas" aria-label="Geographic exploration">
         <div id="map" aria-label="World map"></div>
-        <div class="map-selection-controls" id="map-selection-controls" role="group" aria-label="Save countries from the map">
+        <div class="map-selection-controls" id="map-selection-controls" role="group" aria-label="Select countries to save or research">
           <button id="select-countries" type="button" aria-pressed="false">Select countries</button>
           <div id="country-selection-actions" hidden>
             <span id="country-selection-count" role="status" aria-live="polite">0 selected</span>
+            <button id="research-map-selection" type="button" disabled>Start research</button>
+            <button id="map-select-matching" type="button">Select all countries and territories</button>
             <button id="save-selected-countries" type="button" disabled>Save selected</button>
             <button id="clear-selected-countries" type="button" disabled>Clear</button>
             <button id="country-selection-list" type="button" aria-haspopup="dialog">Choose from list</button>
             <button id="done-selecting-countries" type="button">Done</button>
           </div>
+          <p id="map-selection-scope" class="selection-scope"></p>
           <p id="country-selection-status" role="status" aria-live="polite" hidden></p>
         </div>
-        <div class="map-key" id="map-key"><span class="key-pin"></span> Your universities <span class="key-country"></span> Saved locations</div>
+        <div class="map-key" id="map-key"><span class="key-pin"></span> Your universities <span class="key-country"></span> University locations <span class="key-saved"></span> Saved countries <span class="key-focused"></span> Focused country <span class="key-selected"></span> Current selection</div>
         <div id="map-message" class="map-message" hidden></div>
         <div id="list-container" class="list-container" hidden><div class="list-intro"><span id="list-label" class="eyebrow">YOUR SAVED UNIVERSITIES</span><h2 id="list-title">Compare your universities</h2></div><div id="university-table"></div></div>
       </section>
@@ -86,12 +90,15 @@
   </main>
   <dialog id="country-selection-dialog" aria-labelledby="country-selection-title" aria-describedby="country-selection-hint">
     <header class="exchange-header"><h2 id="country-selection-title">Select countries</h2><button id="close-country-selection-list" type="button" class="inspector-close" aria-label="Return to map selection">×</button></header>
-    <p id="country-selection-hint">Choose countries to save. Selection does not change your map location or request research.</p>
+    <p id="country-selection-hint">Choose countries to save or research. Selecting alone never starts research. Saved entries are labelled separately. Select all includes every matching country or territory, including entries outside the visible list. Teal dotted borders mean saved; solid blue means focused; dashed purple means selected.</p>
     <label for="country-selection-search">Search countries</label><input id="country-selection-search" type="search" autocomplete="off" placeholder="Country or code…">
+    <button id="country-selection-list-all" type="button">Select all matching</button><button id="country-selection-list-clear" type="button">Clear selection</button>
     <p id="country-selection-list-count" role="status" aria-live="polite"></p>
     <div id="country-selection-options" role="group" aria-label="Countries to save"></div>
     <button id="return-country-selection" type="button">Return to map</button>
   </dialog>
+  <dialog id="dispatch-confirm-dialog" aria-labelledby="dispatch-confirm-title"><header class="exchange-header"><h2 id="dispatch-confirm-title">Confirm research request</h2></header><div id="dispatch-confirm-summary"></div><p>No research starts until you confirm. The exact request is saved before dispatch. If Paperclip is unavailable, it stays pending until you explicitly retry.</p><p id="dispatch-confirm-status" role="status"></p><div class="request-actions"><button id="dispatch-confirm" type="button">Confirm and dispatch</button><button id="dispatch-confirm-cancel" type="button">Back to editing</button></div></dialog>
+  <dialog id="pending-requests-dialog" aria-labelledby="pending-requests-title"><header class="exchange-header"><h2 id="pending-requests-title">Pending requests &amp; dispatch history</h2><button id="close-pending-requests" type="button">Close</button></header><p>Saved requests never start automatically after reconnection or restart. Retry is explicit. Accepted request history is immutable.</p><div id="pending-requests-list"></div><p id="pending-requests-status" role="status"></p></dialog>
   <dialog id="request-dialog" aria-labelledby="request-title">
     <header class="exchange-header"><div><span class="eyebrow">MANUAL RESEARCH HANDOFF · SYNTHETIC PILOT</span><h2 id="request-title">Prepare a research request</h2></div><button id="close-request" type="button" class="inspector-close" aria-label="Close request form">×</button></header>
     <form id="request-form">
@@ -114,7 +121,7 @@
       <label for="request-limits">Limits for this request</label><textarea id="request-limits" maxlength="2000" rows="2" placeholder="e.g. up to five universities per country"></textarea>
       <label for="request-context">Context or feedback for this request</label><textarea id="request-context" maxlength="4000" rows="3" placeholder="This stays request-specific and never becomes a permanent restriction"></textarea>
       <p id="request-form-status" role="status" aria-live="polite"></p>
-      <div class="request-actions"><button id="request-submit" type="submit">Save request for handoff</button><button id="cancel-request" type="button" class="quiet-action">Cancel</button></div>
+      <div class="request-actions"><button id="request-submit" type="submit">Review and start research</button><button id="cancel-request" type="button" class="quiet-action">Cancel</button></div>
     </form>
   </dialog>
   <dialog id="research-dialog" aria-labelledby="research-title">
@@ -128,6 +135,7 @@
     <label for="text-size">Text size</label>
     <select id="text-size" disabled><option value="standard">Standard · 100%</option><option value="comfortable">Comfortable · 115%</option><option value="large">Large · 130%</option><option value="extra-large">Extra large · 150%</option></select>
     <section class="local-settings-section"><h3>Map panel widths</h3><p>Drag the inner edges on wide windows, or focus a handle and use arrow keys. Widths are remembered for this profile; narrow windows adapt automatically.</p><button id="reset-panel-widths" class="quiet-action" type="button">Reset panel widths</button><p id="panel-save-status" role="status" aria-live="polite"></p></section>
+    <section class="local-settings-section" id="export-settings"><h3>Exports</h3><p>Default folder · separate from internal report storage</p><output id="export-folder"></output><div class="request-actions"><button id="change-export-folder" type="button">Change…</button><button id="open-export-folder" type="button">Open folder</button><button id="reset-export-folder" type="button">Reset</button></div><p id="export-folder-status" role="status"></p></section>
     <div id="local-settings" hidden>
       <section id="local-profiles" class="local-settings-section" hidden>
         <h3>Local profiles</h3><p>Each profile has separate saved countries, preferences, research and settings. Use a separate profile for testing.</p>

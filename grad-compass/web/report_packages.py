@@ -126,6 +126,13 @@ def _cached(workspace,path):
     return report
 
 
+def _delivery_order(workspace):
+    path=regular(workspace.directory/'report-delivery-order.json')
+    order=env.loads(path.read_bytes()) if path.exists() else {}
+    if not isinstance(order,dict) or any(not re.fullmatch('[a-f0-9]{64}',key) or type(value) is not int or value<1 for key,value in order.items()):raise ValueError('Invalid private report delivery order; preserve it for recovery')
+    return order
+
+
 def _catalog(workspace,request_id=None):
     if not getattr(workspace,'operational',False):
         from web.report_projection import catalog as projections
@@ -167,7 +174,8 @@ def _catalog(workspace,request_id=None):
                 if parent is None:raise ValueError('Evidence-map sidecar is not bound to a valid received report')
                 artifacts.append({'file':str(path.relative_to(workspace.directory)),'kind':'evidence_map_sidecar','status':'validated_reference_only','report_key':parent['key'],'edition':parent['edition'],'factual_review':meta.get('factual_review',{'state':'unknown'})})
             except (OSError,ValueError,KeyError,TypeError) as error:errors.append({'file':str(path.relative_to(workspace.directory)),'error':str(error)})
-        reports.sort(key=lambda r:(r['metadata']['canonical_document']['revision_number'],r['metadata'].get('canonical_factual_review',{}).get('reviewed_at') or r['metadata'].get('canonical_factual_review',{}).get('time') or '',r['edition']),reverse=True)
+        delivery_order=_delivery_order(workspace)
+        reports.sort(key=lambda r:(r['metadata']['canonical_document']['revision_number'],r['metadata'].get('canonical_factual_review',{}).get('reviewed_at') or r['metadata'].get('canonical_factual_review',{}).get('time') or '',delivery_order.get(r['edition'],0),r['edition']),reverse=True)
         # Same canonical content can acquire an exact-bound review delivery. Keep all
         # PDF editions on disk while showing that content version once in navigation.
         versions={}
@@ -197,6 +205,9 @@ def _fingerprint(workspace):
                 if path.is_file() and not any(part.startswith('.') for part in path.relative_to(root).parts) and (name in ('reports','report-receipts') or path.suffix in ('.md','.json') or 'assets' in path.relative_to(root).parts):
                     if path.name.endswith('.manifest.json'):continue
                     stat=path.lstat();paths.append((str(path),stat.st_ino,stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
+    order=workspace.directory/'report-delivery-order.json'
+    if order.exists():
+        stat=order.lstat();paths.append((str(order),stat.st_ino,stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
     for suffix in ('','-wal','-journal'):
         path=workspace.directory/('research.sqlite'+suffix)
         if path.exists():
@@ -255,7 +266,17 @@ def receive_notice(workspace,value):
     report=validate(workspace,path,expected_metadata_sha=value['metadata_sha256']);request=report['metadata']['request']
     if (request['id'],request['revision'],request['sha256'])!=(value['request_id'],value['request_revision'],value['request_sha256']):raise ValueError('Report delivery request binding mismatch')
     retain(workspace,report)
-    immutable(workspace.directory/'report-receipts'/(report['edition']+'.json'),(env.compact(value)+'\n').encode())
+    receipt=regular(workspace.directory/'report-receipts'/(report['edition']+'.json'))
+    if not receipt.exists():
+        # App-owned receipt order selects a later metadata/asset delivery of the
+        # same immutable content. Replay never bumps it; hashes are not dates.
+        order_path=regular(workspace.directory/'report-delivery-order.json')
+        order=_delivery_order(workspace)
+        if report['edition'] not in order:
+            order[report['edition']]=max(order.values(),default=0)+1
+            from web.local import atomic_json
+            atomic_json(order_path,order)
+    immutable(receipt,(env.compact(value)+'\n').encode())
     return report['key']
 
 

@@ -111,7 +111,7 @@ def observation_dates(report):
 def source_inventory(report,tree):
     """One public URL entry, retaining distinct records/locators and ref mappings."""
     inventory={}
-    def entry(url):return inventory.setdefault(url,{'url':url,'labels':[],'refs':[],'records':[],'note_ids':[]})
+    def entry(url):return inventory.setdefault(url,{'url':url,'labels':[],'refs':[],'records':[],'note_ids':[],'publishers':[]})
     for ref,source in tree['sources'].items():
         for link in source['links']:
             item=entry(link['url'])
@@ -126,6 +126,10 @@ def source_inventory(report,tree):
         if not url:continue
         item=entry(url)
         if record not in item['records']:item['records'].append(record)
+    for item in inventory.values():
+        titles=[r.get('title') for r in item['records'] if isinstance(r.get('title'),str) and r['title'].strip()]
+        item['labels']=list(dict.fromkeys(titles+[label for label in item['labels'] if label!='Public source'])) or [item['url']]
+        item['publishers']=list(dict.fromkeys(r['publisher'] for r in item['records'] if isinstance(r.get('publisher'),str) and r['publisher'].strip()))
     # Narrative links are public supplied content too. They remain explicitly
     # unmapped unless the evidence map supplies a reference; no support is inferred.
     for block in tree['blocks'].values():
@@ -136,3 +140,14 @@ def source_inventory(report,tree):
         urls=[link['url'] for link in block.get('links',[])] or [url for url in inventory if url in block['text']]
         if urls:entry(urls[0])['note_ids'].append(block['id'])
     return list(inventory.values())
+
+
+def enrich_sources(report,tree):
+    """Labels come from supplied records; this does not create claim mappings."""
+    records=(report.get('finding') or {}).get('sources',[])
+    for source in tree['sources'].values():
+        for link in source['links']:
+            matching=[r for r in records if r.get('source_url')==link['url']]
+            titles=list(dict.fromkeys(r['title'] for r in matching if isinstance(r.get('title'),str) and r['title'].strip()))
+            if titles:link['label']='; '.join(titles)
+    tree['source_inventory']=source_inventory(report,tree)

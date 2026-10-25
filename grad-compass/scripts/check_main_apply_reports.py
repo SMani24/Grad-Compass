@@ -26,6 +26,8 @@ def main():
     parser.add_argument('--screenshots',type=Path,required=True)
     parser.add_argument('--restart',action='store_true')
     parser.add_argument('--expect-metadata',action='append',default=[],metavar='COUNTRY=SHA256')
+    parser.add_argument('--country',action='append',default=[],help='Countries to verify; defaults to DEU/CAN/BEL')
+    parser.add_argument('--require-photo',action='append',default=[],metavar='COUNTRY')
     args=parser.parse_args()
     profiles=LocalProfiles(args.local_dir);w=profiles.workspace
     state=profiles.snapshot();active=next(p for p in state['profiles'] if p['id']==state['active_id'])
@@ -33,14 +35,16 @@ def main():
     personal=('country-decisions.json','display-preferences.json','panel-widths.json','research-selection.json','report-annotations.json','report-reading.json')
     def inventory():return {n:(w.directory/n).read_bytes() if (w.directory/n).exists() else None for n in personal}
     before=inventory();research=w.research.snapshot()
+    protected={str(p.relative_to(w.directory)):(hashlib.sha256(p.read_bytes()).hexdigest(),p.stat().st_mtime_ns) for p in (w.directory/'reports').rglob('*') if p.is_file()}
     server=create_local_server(w,profiles=profiles);threading.Thread(target=server.serve_forever,daemon=True).start()
     # Establish expectations after ordinary startup receipt, not from a stale
     # pre-startup catalog. No manual import or forced report selection is used.
     expected=dict(value.split('=',1) for value in args.expect_metadata)
     until=time.monotonic()+25
     while True:
-        latest={c:next(r for r in reports.catalog(w)['reports'] if r['metadata']['country_code']==c and r['model']['kind']=='prepared_report') for c in ('DEU','CAN','BEL')}
-        if all(latest[code]['edition']==digest for code,digest in expected.items()):break
+        available=reports.catalog(w)['reports']
+        latest={c:next((r for r in available if r['metadata']['country_code']==c and r['model']['kind']=='prepared_report'),None) for c in (args.country or ('DEU','CAN','BEL'))}
+        if all(latest.values()) and all(latest.get(code,{}).get('edition')==digest for code,digest in expected.items()):break
         if time.monotonic()>until:raise AssertionError('Expected finalized packages were not received by normal startup/polling')
         time.sleep(.2)
     os.environ['QT_API']='pyqt6'
@@ -83,9 +87,11 @@ def main():
             window.events.loaded.wait(25);wait('!!window.GradCompassResearch && !!window.GradCompassWorkspace')
             # Preserve owner positions, not an alternate selection/data route.
             js("(()=>{const original=window.fetch;window.fetch=(url,options)=>String(url)==='/api/reports/reading' && options?.method==='POST'?original('/api/reports/reading',{cache:'no-store'}):original(url,options);})();void 0")
-            # Requests with no selected country also open a prepared country when
-            # one is available in that saved request; do not default to its first finding.
-            click('countries-mode');click('open-research');loaded(latest['CAN'])
+            # Requests starts with the latest saved request, which may legitimately
+            # still have only received findings. Country cards below must select
+            # the latest prepared package for their own request.
+            click('countries-mode');click('open-research');wait("!!document.querySelector('.canonical-report') && document.getElementById('reader-status')?.textContent.includes('loaded')")
+            assert js("document.querySelector('.canonical-report').dataset.canonical") in {r['key'] for r in reports.catalog(w)['reports']}
             click('close-research');wait("!document.getElementById('research-dialog').open")
             receipt={}
             for code,r in latest.items():
@@ -103,10 +109,14 @@ def main():
                 assert js("document.querySelector('.report-coverage').closest('#reader-report-details')!==null")
                 assert js("[...document.querySelectorAll('.canonical-reading>.report-section h2')].every(n=>!n.textContent.includes('Seven-topic coverage'))")
                 assert js("document.querySelectorAll('.report-source a').length===new Set([...document.querySelectorAll('.report-source a')].map(a=>a.href)).size")
+                if code in args.require_photo:
+                    wait("document.querySelector('.report-photo img')?.naturalWidth>0")
+                    assert r.get('assets',{}).get('photo'),'Delivered photograph missing'
+                    assert js("!!document.querySelector('.report-photo figcaption a')"),'Photo attribution link missing'
                 shot(code.lower()+'-prepared-overview')
                 # Country navigation must agree with the card entry point.
-                other='CAN' if code=='DEU' else 'DEU'
-                select('report-country-navigation',other);loaded(latest[other])
+                other=next((c for c in latest if c!=code),None)
+                if other:select('report-country-navigation',other);loaded(latest[other])
                 select('report-country-navigation',code);loaded(r)
                 click('reader-full-report');wait("document.querySelector('.canonical-report').dataset.readingEdition!=='reader'");shot(code.lower()+'-detailed')
                 js("document.getElementById('reader-export-options').open=true")
@@ -120,6 +130,7 @@ def main():
                 assert md.read_text().index('## Sources')<md.read_text().index('## Report details and technical appendix')
                 assert not js("!!document.querySelector('.report-locator')")
                 receipt[code]={'request_id':r['metadata']['request']['id'],'key':r['key'],'metadata_sha256':r['edition'],'canonical_revision_id':r['metadata']['canonical_document']['revision_id'],'canonical_sha256':r['metadata']['canonical_document']['sha256'],'report_version':r['metadata']['canonical_document']['revision_number'],'reader_revision':r['reader']['metadata']['revision_number'],'reader_sha256':r['reader']['metadata']['sha256'],'detailed_revision':r['detailed']['metadata']['revision_number'] if r.get('detailed') else r['metadata']['canonical_document']['revision_number'],'detailed_sha256':r['detailed']['metadata']['sha256'] if r.get('detailed') else r['metadata']['canonical_document']['sha256'],'review':r['metadata']['canonical_factual_review']['state'],'reader_review':r['reader']['metadata']['factual_review']['state'],'human':r['metadata']['human_approval']['state'],'pdf':pdf.name,'pdf_sha256':hashlib.sha256(pdf.read_bytes()).hexdigest(),'markdown':md.name,'markdown_sha256':hashlib.sha256(md.read_bytes()).hexdigest(),'annotations_readback':reports.annotations(w,r['key']),'locator_omitted':True}
+                receipt[code]['photo']=r.get('assets',{}).get('photo')
                 click('reader-show-pdf');wait("document.querySelector('.pdf-page>img')?.naturalWidth>0");shot(code.lower()+'-pdf')
                 # Explicit result history remains a findings view, with honest labels.
                 if code=='DEU':
@@ -131,10 +142,13 @@ def main():
                     assert js("!!document.getElementById('open-prepared-report') && !document.getElementById('request-dialog').open");click('open-prepared-report');loaded(r)
                 click('close-research');wait("!document.getElementById('research-dialog').open")
             assert inventory()==before,'Personal overlays changed';assert w.research.snapshot()==research,'Research history changed'
-            result={'passed':True,'profile':active,'countries':receipt,'personal_overlay_bytes_unchanged':True,'research_unchanged':True,'normal_country_card_and_selector_routes':True,'qa_position_writes_suppressed':True,'catalog_errors':reports.catalog(w)['errors']}
+            assert all((hashlib.sha256((w.directory/name).read_bytes()).hexdigest(),(w.directory/name).stat().st_mtime_ns)==value for name,value in protected.items()),'Existing producer artifact changed'
+            from web.inbox import InboxReceiver
+            replay=InboxReceiver(w).check();assert replay['received']==0 and not replay['errors'],replay
+            result={'passed':True,'profile':active,'countries':receipt,'personal_overlay_bytes_unchanged':True,'research_unchanged':True,'protected_original_files':len(protected),'protected_original_bytes_and_mtimes_unchanged':True,'replay':replay,'normal_country_card_and_selector_routes':True,'qa_position_writes_suppressed':True,'catalog_errors':reports.catalog(w)['errors']}
             assert not result['catalog_errors'],result['catalog_errors']
             atomic_json(out/('restart.local.json' if args.restart else 'normal.local.json'),result)
-            passed.append(True);print('Main-Apply card/selector/default/history/native export receipt passed for DEU/CAN/BEL.',flush=True)
+            passed.append(True);print('Main-Apply card/selector/default/history/native export receipt passed for '+','.join(latest)+'.',flush=True)
         except Exception:traceback.print_exc();capture.save('failure')
         finally:watchdog.cancel();window.confirm_close=False;window.destroy()
     try:webview.start(work,gui='qt',private_mode=True,storage_path=str(out/'browser'))

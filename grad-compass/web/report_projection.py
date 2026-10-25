@@ -56,7 +56,7 @@ def build(request,result,code):
             lines += ['Finding field: '+literal(field)+'. Finding-level references: '+('['+', '.join(refs)+']' if refs else 'none supplied')+'.','']
     evidence=['| Ref | Topic | Sources |','| --- | --- | --- |']
     for key,source in sources.items():
-        ref=source_refs[key];evidence.append('| '+ref+' | '+source.get('locator',key).replace('|','\\|').replace('\n',' ')+' | [Public source]('+source['source_url']+') · observed '+str(source.get('observed_at','unknown'))+' |')
+        ref=source_refs[key];evidence.append('| '+ref+' | '+source.get('locator',key).replace('|','\\|').replace('\n',' ')+' | ['+literal(source.get('title') or source.get('locator') or source['source_url'])+']('+source['source_url']+') · observed '+str(source.get('observed_at','unknown'))+' |')
     canonical=('\n'.join(lines)+'\n').encode();evidence=('\n'.join(evidence)+'\n').encode();docsha=digest(canonical)
     reportid=_id(request['request_id']+':'+code);revisionid=_id(result['digest']+':'+code)
     metadata={'schema_version':SCHEMA,'report_id':reportid,'country_code':code,'report_date':str(result.get('issued_at') or '')[:10] or None,
@@ -67,9 +67,15 @@ def build(request,result,code):
     content=parse_report(canonical.decode(),evidence.decode())
     metadata['passage_origins']={b['id']:{'finding_id':f['finding_id'],'finding_revision':f['finding_revision']} for b in content['blocks'].values() for entries in groups.values() for f,field,text in entries if b['text']==text}
     raw=(env.compact(metadata)+'\n').encode();key=digest((reportid+':'+revisionid+':'+docsha).encode())
-    combined={'sources':list(sources.values()),'coverage':'\n'.join(coverage_text(f.get('coverage','')) for f in findings),'finding_id':findings[0]['finding_id'],'finding_revision':findings[0]['finding_revision']}
-    return normalize({'key':key,'edition':digest(raw),'metadata':metadata,'content':parse_report(canonical.decode(),evidence.decode()),'finding':combined,'metadata_bytes':raw,'canonical_bytes':canonical,'evidence_bytes':evidence,'reader':None,'detailed':None,'editorial_editions':[],
+    combined={'sources':list(sources.values()),'coverage':'\n'.join(coverage_text(f.get('coverage','')) for f in findings),'finding_id':findings[0]['finding_id'],'finding_revision':findings[0]['finding_revision'],'coverage_topics':[f['coverage'] for f in findings if isinstance(f.get('coverage'),dict)]}
+    report=normalize({'key':key,'edition':digest(raw),'metadata':metadata,'content':parse_report(canonical.decode(),evidence.decode()),'finding':combined,'metadata_bytes':raw,'canonical_bytes':canonical,'evidence_bytes':evidence,'reader':None,'detailed':None,'editorial_editions':[],
       'delivery':{'completion':result.get('completion'),'result_revision':result['revision'],'issued_at':result.get('issued_at')},'assets':{}})
+    for key,record in sources.items():
+        source=report['content']['sources'].get(source_refs[key])
+        if source:source['source_record']=record
+    from web.report_composition import source_inventory
+    report['content']['source_inventory']=source_inventory(report,report['content'])
+    return report
 
 
 def retain(workspace,report):

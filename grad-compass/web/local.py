@@ -239,7 +239,7 @@ class LocalWorkspace(DemoWorkspace):
                 dest=target/source.name
                 fd=os.open(dest,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600);os.close(fd)
                 with closing(sqlite3.connect(source.as_uri()+'?mode=ro',uri=True)) as src,closing(sqlite3.connect(dest)) as dst:src.backup(dst)
-            for name in ('country-decisions.json','display-preferences.json','panel-widths.json','report-annotations.json','report-reading.json','research-selection.json'):
+            for name in ('country-decisions.json','display-preferences.json','panel-widths.json','report-annotations.json','report-reading.json','research-selection.json','export-preferences.json','dispatch-outbox.json','report-delivery-order.json','paperclip-connection.local.json'):
                 source=regular(self.directory/name)
                 if source.is_file():atomic_json(target/name,env.loads(source.read_bytes()))
             for name in ('research-handoff','inbox','batches','received-batches','sample-history','reports','report-cache','editorial-cache','report-projections','report-receipts'):
@@ -403,9 +403,9 @@ class LocalResearch(ResearchWorkspace):
         return {'outcomes':outcomes,'received':sum(bool(v.get('changed')) for v in outcomes),'errors':sum('error' in v for v in outcomes)}
 
 
-def create_local_server(workspace,port=0,profiles=None,clipboard=None):
+def create_local_server(workspace,port=0,profiles=None,clipboard=None,desktop_exports=None):
     from web.inbox import InboxServer
     import secrets
     from web.server import handler_for
     workspace.backup()
-    return InboxServer(('127.0.0.1',port),handler_for(workspace,session_token=secrets.token_urlsafe(24),profiles=profiles,clipboard=clipboard),workspace,profiles)
+    return InboxServer(('127.0.0.1',port),handler_for(workspace,session_token=secrets.token_urlsafe(24),profiles=profiles,clipboard=clipboard,desktop_exports=desktop_exports),workspace,profiles)

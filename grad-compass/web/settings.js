@@ -69,5 +69,13 @@
       status.textContent = error.message;
     } finally { select.disabled = false; }
   });
+  async function loadExports(){
+    try {const r=await fetch('/api/exports'),value=await r.json();if(!r.ok)throw Error(value.error);document.getElementById('export-folder').textContent=value.folder;for(const action of ['change','open','reset'])document.getElementById(action+'-export-folder').disabled=!value.native;document.getElementById('export-folder-status').textContent=value.native?'Saved per profile. Each export can choose another destination.':'Use the normal desktop app for native folder controls.';}catch(error){document.getElementById('export-folder-status').textContent=error.message;}
+  }
+  for(const action of ['change','open','reset'])document.getElementById(action+'-export-folder').addEventListener('click',async()=>{
+    const button=document.getElementById(action+'-export-folder');button.disabled=true;
+    try{const result=await window.GradCompassResearch.post('/api/exports',{action});await loadExports();document.getElementById('export-folder-status').textContent=result.cancelled?'Cancelled. Your folder is unchanged.':'Export folder ready. Existing exports were not moved.';}catch(error){document.getElementById('export-folder-status').textContent=error.message;}finally{button.disabled=false;}
+  });
+  document.getElementById('open-settings').addEventListener('click',loadExports);
   load();
 })();

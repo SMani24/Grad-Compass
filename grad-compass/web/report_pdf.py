@@ -13,7 +13,7 @@ from web.report_packages import immutable
 
 PDF_LOCK=threading.RLock()
 ASSETS=Path(__file__).parent/'assets'
-RENDERER='country-reader-12'
+RENDERER='country-reader-13'
 
 
 def styles():
@@ -83,8 +83,8 @@ def build(report):
         # A portrait inset preserves the spire and square; the old panoramic crop
         # cut through the subject. The source asset stays byte-for-byte intact.
         with Raster.open(_path(asset)) as image:
-            image=ImageOps.fit(image,(672,756),centering=(.5,.45));raster=io.BytesIO();image.save(raster,format='JPEG');raster.seek(0)
-        visual=[Image(raster,width=112,height=126),p(escape(asset['credit'])+' · '+escape(asset['license'])+'<br/><a href="'+escape(asset['source_url'])+'">Photo source</a>','small')]
+            image=ImageOps.fit(image,(672,756),centering=(asset.get('crop',{}).get('x',.5),asset.get('crop',{}).get('y',.48)));raster=io.BytesIO();image.save(raster,format='JPEG');raster.seek(0)
+        visual=[Image(raster,width=112,height=126),p(escape(asset['caption'])+'<br/>'+escape(asset.get('creator') or asset['credit'])+' · '+('<a href="'+escape(asset['license_url'])+'">'+escape(asset['license'])+'</a>' if asset.get('license_url') else escape(asset['license']))+' · cropped/resized for this layout<br/><a href="'+escape(asset['source_url'])+'">Photo source</a>','small')]
         cover=Table([[facts,visual]],colWidths=[width-132,132]);cover.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(0,0),0),('RIGHTPADDING',(0,0),(0,0),16),('LEFTPADDING',(1,0),(1,0),12),('RIGHTPADDING',(1,0),(1,0),0),('TOPPADDING',(0,0),(-1,-1),0),('BOTTOMPADDING',(0,0),(-1,-1),6)]));body.append(cover)
     else:body.extend(facts)
     used_refs=set()
@@ -124,7 +124,7 @@ def build(report):
         anchors=''.join('<a name="'+ref+'"/>' for ref in refs)
         heading=p(anchors+escape(', '.join(refs) or 'Finding-level source'),'source_title')
         label=next(iter(source['labels']),'Public source')
-        source_cells.append([heading,p('<a href="'+escape(source['url'],{'"':'&quot;'})+'" color="#08647c">'+escape(label)+'</a>','small')])
+        source_cells.append([heading,p('<a href="'+escape(source['url'],{'"':'&quot;'})+'" color="#08647c">'+escape(label)+'</a>'+(' · '+escape('; '.join(source['publishers'])) if source.get('publishers') else ''),'small')])
     for ref,source in tree['sources'].items():
         if source['links'] or (concise and ref not in used_refs):continue
         source_cells.append([p('<a name="'+ref+'"/>'+escape(ref),'source_title'),p('Editorial reference without a direct public URL. See its original mapping and qualifications in detailed Markdown.','small')])

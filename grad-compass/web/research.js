@@ -144,7 +144,7 @@
   async function openRequest(context={}) {
     try {
       await reload();
-      draft={countries:context.countries || [...selected],parent_request_id:context.parent_request_id || null,parent_request_revision:context.parent_request_revision ?? null,parent_request_digest:context.parent_request_digest || null,prior_results:context.prior_results || [],submission_key:crypto.randomUUID()};
+      draft={countries:context.countries || [...selected],parent_request_id:context.parent_request_id || null,parent_request_revision:context.parent_request_revision ?? null,parent_request_digest:context.parent_request_digest || null,prior_results:context.prior_results || [],submission_key:crypto.randomUUID(),...(context.edit_id?{edit_id:context.edit_id}:{})};
       if(!draft.countries.length) { status("Select countries or territories for the research draft first.");return; }
       get("request-form").reset();get("request-bounds").hidden=data.synthetic!==false;
       get("request-max-institutions").value=context.bounds?.institutions ?? 5;get("request-max-programs").value=context.bounds?.programs ?? 5;get("request-form").dataset.submitting="false";
@@ -160,12 +160,12 @@
       get("request-scope").querySelector('option[value="refresh"]').disabled=!draft.parent_request_id;
       get("request-lineage").hidden=!draft.parent_request_id;
       get("request-lineage").textContent="Following up on a saved request/result. Earlier snapshots remain unchanged.";
-      for(const key of preferenceFields) get("request-"+key).value=data.preferences?.[key] || "";
+      for(const key of preferenceFields) get("request-"+key).value=context.preferences?.[key] ?? data.preferences?.[key] ?? "";
       get("request-preference-summary").textContent=summary(data.preferences);
       get("request-preferences").open=!data.has_preferences;
-      get("request-context").value=context.context || "";
+      get("request-context").value=context.context || "";get("request-limits").value=context.limits || "";
       get('request-only').checked=!!context.request_only;
-      get("request-form-status").textContent="This will be saved locally for manual handoff, not sent to an agent."+get("request-countries").dataset.scopeNotice;
+      get("request-form-status").textContent=(data.synthetic===false?"Next: review the exact scope and approved profile reference before confirming dispatch. Offline requests stay pending.":"This synthetic request stays local; no real agent will be invoked.")+get("request-countries").dataset.scopeNotice;
       requestDialog.showModal();
     } catch(error) {status(error.message);}
   }
@@ -181,6 +181,10 @@
       ...(data.synthetic===false ? {bounds:{institutions:Number(get("request-max-institutions").value),programs:Number(get("request-max-programs").value)}} : {}),remember_preferences:!get("request-only").checked,limits:get("request-limits").value || null,context:get("request-context").value || null};
     get("request-form").dataset.submitting="true";get("request-submit").disabled=true;get("cancel-request").disabled=true;get("close-request").disabled=true;
     try {
+      if(data.synthetic===false && window.GradCompassDispatch){
+        const {edit_id,...confirmedPayload}=payload;
+        await window.GradCompassDispatch.prepare(confirmedPayload,edit_id);return;
+      }
       const saved=await post("/api/research/submit",payload);
       await reload();
       requestDialog.close();
@@ -188,6 +192,7 @@
     } catch(error) {get("request-form-status").textContent=error.message+" Retry confirms the same submission without duplicates.";}
     finally {get("request-form").dataset.submitting="false";get("request-submit").disabled=false;get("cancel-request").disabled=false;get("close-request").disabled=false;}
   });
+  window.addEventListener("grad-compass:dispatch-cancelled",()=>{if(draft)draft.submission_key=crypto.randomUUID();});
   function action(text,handler,id) {
     const button=node("button",text);button.type="button";if(id)button.id=id;
     button.addEventListener("click",async()=>{
@@ -226,12 +231,15 @@
     if(!items?.length){list.append(node("p","No requests saved yet."));return;}
     for(const item of items){
       const row=node("button",undefined,"request-row");row.type="button";row.dataset.request=item.request_id;row.setAttribute("aria-current",String(item.request_id===identity));
-      row.append(node("strong",scopeLabels[item.scope]),node("span",item.countries.map(countryLabel).join(", ")),node("span",stateLabel(item.state,item.completion)),node("span",dateLabel(item.created_at)));
+      row.append(node("strong",scopeLabels[item.scope]),node("span",item.countries.map(countryLabel).join(", ")),node("span",item.state==='prepared' && item.dispatch_receipt ? dispatchLabel(item.dispatch_receipt) : stateLabel(item.state,item.completion)),node("span",dateLabel(item.created_at)));
       row.addEventListener("click",()=>openRequests(item.request_id,null,null,archive));list.append(row);
     }
   }
+  function dispatchLabel(receipt) {
+    return {accepted:'Paperclip task received — research acknowledgement is separate',pending:'Pending dispatch — explicit review/retry required',uncertain:'Delivery uncertain — reconcile before another action',dispatching:'Dispatch attempt recorded — awaiting receipt',cancelled:'Cancelled dispatch — history retained',superseded:'Replaced request — history retained',draft:'Draft — not dispatched'}[receipt.status] || receipt.status;
+  }
   function stateLabel(state,completion) {
-    return {prepared:"Saved — awaiting Dave’s acknowledgement",accepted:"Acknowledged — awaiting findings",rejected:"Acknowledgement rejected",needs_clarification:"Clarification requested",results_received:completion==='partial' ? "Partial results ready — research continues" : "Results ready — review findings"}[state] || state;
+    return {prepared:"Saved — awaiting Dave’s acknowledgement",accepted:"Acknowledged — awaiting findings",rejected:"Acknowledgement rejected",needs_clarification:"Clarification requested",results_received:completion==='partial' ? "Partial results ready — research continues" : "Findings received — report preparation and delivery are separate"}[state] || state;
   }
   async function openRequests(identity=null,revision=null,finding=null,archive=false) {
     const sequence=++openSequence;
@@ -261,7 +269,8 @@
     const item=data.requests.find(item=>item.request_id===request.request_id);
     section.append(node("h3",scopeLabels[request.scope]),node("p",request.countries.map(countryLabel).join(" · ")),
       node("p",current.archive ? "Sample history · read only" : stateLabel(item?.state || "prepared",item?.completion),"request-state"));
-    if(!current.archive && request.synthetic===false)section.append(node('p',current.results.length ? 'Returned findings are saved. Review their evidence and caveats, give feedback, or prepare a follow-up. Receipt is separate from factual acceptance.' : current.acknowledgement?.state==='accepted' ? 'Dave’s response is recorded. Further findings will appear here automatically when delivered.' : current.acknowledgement ? 'Dave’s acknowledgement needs attention. Review his reported status before preparing a follow-up.' : 'This request is saved. Copy the instructions below and invoke Dave manually. His acknowledgement and findings will appear here automatically.'));
+    const dispatchReceipt=data.requests?.find(item=>item.request_id===request.request_id)?.dispatch_receipt;
+    if(!current.archive && request.synthetic===false)section.append(node('p',dispatchReceipt && !current.acknowledgement && !current.results.length ? ['cancelled','superseded'].includes(dispatchReceipt.status) ? dispatchLabel(dispatchReceipt)+'. This original request is retained for history; it will not be dispatched automatically.' : dispatchReceipt.status==='accepted' ? 'Paperclip task '+dispatchReceipt.task.identifier+' was received. Dave’s request-bound research acknowledgement has not arrived yet; responses will appear automatically. Task receipt is separate from factual acceptance.' : 'This request is saved in Pending requests. Review it there to edit, cancel or explicitly retry. Reconnecting does not start it automatically.' : current.results.length ? 'Returned findings are saved. Review their evidence and caveats, give feedback, or prepare a follow-up. Receipt is separate from factual acceptance.' : current.acknowledgement?.state==='accepted' ? 'Dave’s response is recorded. Further findings will appear here automatically when delivered.' : current.acknowledgement ? 'Dave’s acknowledgement needs attention. Review his reported status before preparing a follow-up.' : 'This request is saved. Copy the instructions below and invoke Dave manually. His acknowledgement and findings will appear here automatically.'));
     if(current.acknowledgement)section.append(node('p','Acknowledgement recorded: '+dateLabel(current.acknowledgement.acknowledged_at)));
     if(current.acknowledgement?.execution_progress)section.append(node('p','Dave reported: '+current.acknowledgement.execution_progress));
     const snapshot=node("details",undefined,"request-technical");snapshot.append(node("summary","Preference snapshot — fixed for this request"));

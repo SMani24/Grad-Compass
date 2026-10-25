@@ -116,7 +116,7 @@ def parse_report(markdown,evidence):
         for ref,source in value['sources'].items():
             if not re.fullmatch(REF_PATTERN,ref) or not isinstance(source,dict) or not isinstance(source.get('source_url'),str) or not re.match(r'^https?://',source['source_url']):raise ValueError('Invalid public report source reference')
             sources[ref]={'id':ref,'topic':source.get('locator',ref),'text':'Observed '+str(source.get('observed_at','unknown'))+' · '+str(value.get('citation_scope','precision not supplied')),
-              'links':[{'label':source.get('locator',ref),'url':source['source_url']}],'source_record':source}
+              'links':[{'label':source.get('title') or source.get('locator',ref),'url':source['source_url']}],'source_record':source}
     prepared=re.search(r'prepared(?:[:* ·—-]*)\s*(\d{1,2} \w+ \d{4})',markdown,re.I)
     try:report_date=datetime.strptime(prepared[1],'%d %B %Y').date().isoformat() if prepared else None
     except ValueError:report_date=None

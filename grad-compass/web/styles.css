@@ -958,3 +958,14 @@ html {
 @media(max-width:580px) {
   .workspace.list-view .results-panel { max-height: calc(100dvh - var(--content-top,130px) - 140px); }
 }
+
+/* Saved membership, focus and temporary selection are independent map states. */
+.key-saved,.key-focused,.key-selected{display:inline-block;width:14px;height:11px;margin-left:8px}
+.key-saved{background:#bfe4da;border:2px dotted #24765f}.key-focused{background:#85c2d4;border:2px solid #087ba4}.key-selected{background:#decdf4;border:2px dashed #7040a0}
+.map-key{flex-wrap:wrap;max-width:calc(100% - 28px)}
+.map-selection-controls{max-width:min(720px,calc(100vw - 24px))}
+#country-selection-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}#country-selection-actions[hidden]{display:none}
+.selection-scope{max-width:56ch;font-size:.72rem;line-height:1.45;margin:6px 0 0}.selection-scope:empty{display:none}
+
+#dispatch-confirm-dialog,#pending-requests-dialog{width:min(760px,calc(100vw - 24px));max-height:90dvh;padding:24px;overflow:auto;border:1px solid #c6dce2;border-radius:16px;color:#17384a}
+.pending-request{border:1px solid #c6dce2;border-radius:10px;padding:14px;margin:14px 0;overflow-wrap:anywhere}.pending-request .request-actions{flex-wrap:wrap}#dispatch-confirm-summary p{overflow-wrap:anywhere}

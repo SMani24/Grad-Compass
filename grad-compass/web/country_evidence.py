@@ -55,7 +55,7 @@ def detail(workspace, exchange, code):
         # Operational responses bind the country record revision. Historical
         # synthetic findings used a top-level source revision instead; individual
         # public sources retain their own revisions in either format.
-        result.update(revision=latest.get("record_revision",latest.get("source_revision")),
+        result.update(revision=(latest.get("record_revision") or latest.get("source_revision")) if operational else (latest.get("source_revision") or latest.get("record_revision")),
                       origin=latest["origin"],history=latest["history"],coverage="partial")
     else:
         result.update(funding_routes=None,costs=None,work_rules=None,observed_at=None,history=[])

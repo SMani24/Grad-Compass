@@ -1,5 +1,5 @@
 "use strict";
-/* Persistent local mode adapts existing panels; it never invokes a producer or agent. */
+/* Persistent local mode adapts existing panels; dispatch is explicit and handled separately from inbox polling. */
 (() => {
   const get=id=>document.getElementById(id);
   const element=(tag,text)=>{const value=document.createElement(tag);if(text!==undefined)value.textContent=text;return value;};
@@ -97,9 +97,9 @@
     get("refresh-local").hidden=false;get("open-exchange").hidden=true;get("local-settings").hidden=false;
     document.querySelector(".preview-label").textContent="Private local workspace";
     renderProfiles(workspace.profiles);
-    document.querySelector("#request-title").parentElement.querySelector(".eyebrow").textContent="MANUAL RESEARCH HANDOFF";
+    document.querySelector("#request-title").parentElement.querySelector(".eyebrow").textContent="CONFIRMED RESEARCH REQUEST";
     document.querySelector("#research-dialog .request-hint").textContent="Saved requests, reports and sources.";
-    if(!get('research-context-help')){const help=element('details');help.id='research-context-help';help.append(element('summary','How research works'),element('p','Save a bounded request, copy instructions for Dave and invoke him manually. Responses arrive automatically with their actual review status. Receipt does not imply factual acceptance.'));document.querySelector('#research-dialog .report-topbar>div').append(help);}
+    if(!get('research-context-help')){const help=element('details');help.id='research-context-help';help.append(element('summary','How research works'),element('p','Review a bounded request and explicitly confirm dispatch to Dave. Offline requests wait for your retry. Responses arrive automatically with their actual review status. Manual instructions remain available for recovery. Receipt does not imply factual acceptance.'));document.querySelector('#research-dialog .report-topbar>div').append(help);}
     pollInbox();if(!inboxTimer)inboxTimer=setInterval(pollInbox,3000);
   }
   get("refresh-local").addEventListener("click",async()=>{

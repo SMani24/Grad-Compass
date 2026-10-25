@@ -31,20 +31,51 @@ def validate_coverage(value,content):
     return value
 
 
+def supplied_coverage(report):
+    """Validate received structured statements, without inventing source bindings."""
+    values=(report.get('finding') or {}).get('coverage_topics',[])
+    output={};notes=[]
+    for value in values:
+        for code,item in value.items():
+            if code not in dict(TOPICS):continue
+            if not isinstance(item,dict) or not {'state','detail','evidence_refs','applicable_year'}<=set(item) or item.get('state') not in STATES or not isinstance(item.get('detail'),str) or not item['detail'].strip():
+                notes.append('Invalid supplied coverage structure for '+code);continue
+            refs=item.get('evidence_refs',[]);year=item.get('applicable_year')
+            if not isinstance(refs,list) or any(not isinstance(ref,str) for ref in refs) or len(set(refs))!=len(refs) or (year is not None and not isinstance(year,str)):
+                notes.append('Invalid supplied coverage references/year for '+code);continue
+            if item['state']=='supported_finding' and not refs:
+                notes.append('Supported coverage lacks supplied evidence references for '+code);continue
+            supplied={k:item.get(k) for k in ('state','detail','applicable_year')}
+            supplied['evidence_refs']=refs
+            supplied['unresolved_evidence_refs']=[ref for ref in refs if ref not in report['content']['sources']]
+            if code in output and output[code]!=supplied:
+                output[code]={'state':'unknown','detail':'Differing supplied coverage statements; inspect the original findings.','evidence_refs':[],'applicable_year':None}
+                notes.append('Conflicting supplied coverage for '+code)
+            else:output[code]=supplied
+    return output,notes
+
+
 def normalize(report):
+    from web.report_composition import enrich_sources
+    enrich_sources(report,report['content'])
+    for kind in ('reader','detailed'):
+        if report.get(kind):enrich_sources(report,report[kind]['content'])
     meta=report['metadata'];projection=meta.get('schema_version')=='grad-compass-received-report-projection-1.0'
     reader=report.get('reader');prepared=not projection
-    coverage=meta.get('coverage') or {code:{'state':'unknown','detail':'Explicit research coverage was not supplied. See the available '+('received findings' if projection else 'report text')+'; missing text does not establish that research was performed.','evidence_refs':[],'applicable_year':None} for code,_ in TOPICS}
+    supplied,coverage_notes=supplied_coverage(report) if projection else ({},[])
+    coverage=meta.get('coverage') or {code:supplied.get(code,{'state':'unknown','detail':'Explicit research coverage was not supplied. See the available '+('received findings' if projection else 'report text')+'; missing text does not establish that research was performed.','evidence_refs':[],'applicable_year':None}) for code,_ in TOPICS}
     result=report.get('delivery',{})
     report['model']={'schema_version':VERSION,'kind':'received_findings' if projection else 'prepared_report',
       'version_label':('Received findings · result r'+str(meta['producer_result']['revision'])) if projection else 'Report v'+str(meta['canonical_document']['revision_number']),
       'preparation':{'detailed':'received_findings' if projection else 'published','overview':'published' if reader else 'not_yet_published',
-        'overview_reason':None if reader else 'A producer-written concise edition has not been published for this exact version. Read the available content or prepare a follow-up for Dave.'},
+        'overview_reason':None if reader else 'A producer-written concise edition has not been published for this exact version. Read the available findings and existing request progress. Dave’s team owns preparation, review and publication; no duplicate request is needed.'},
       'delivery':result,'coverage':[{'id':code,'title':title,**coverage[code],'label':COVERAGE_LABELS.get(coverage[code]['state'],'Coverage not supplied')} for code,title in TOPICS],
       'review':{'report':meta.get('canonical_factual_review',{'state':'unknown'}),'human':meta.get('human_approval',{'state':'unknown'}),
         'findings':report.get('finding_reviews') or meta.get('finding_reviews',[]),'overview':reader['metadata']['factual_review'] if reader else None},
       'capabilities':{'overview':bool(reader),'content':bool(report['content']['blocks']),'pdf':bool(report['content']['blocks']),
         'pdf_kind':'concise_reader' if reader else 'available_findings' if projection else 'full_report','markdown':True,'annotations':not meta.get('archived',False)},
+      'delivery_checks':{'detailed_content':bool(report['content']['blocks']),'concise_content':bool(reader),'coverage_supplied':bool(meta.get('coverage')) or bool(supplied),'photo': 'available' if report.get('visuals',{}).get('photo') or report.get('assets',{}).get('photo') else meta.get('asset_delivery',{}).get('state','not_yet_published'),'photo_reason':meta.get('asset_delivery',{}).get('reason') or ('Country photograph has not been delivered' if not report.get('visuals',{}).get('photo') and not report.get('assets',{}).get('photo') else None)},
+      'coverage_notes':coverage_notes,'next_stage':None if reader and prepared else {'owner':'Dave','action':'Prepare, review and publish the bound detailed and concise report editions'},
       'source_precision':meta.get('source_citation_scope','finding'),'observation_dates':observation_dates(report),'assets':report.get('assets',{}),
       'scope':meta.get('research_scope') or (report.get('finding') or {}).get('coverage') or 'Bounded request; exhaustive country coverage is not established.'}
     return report
@@ -65,5 +96,9 @@ def research_snapshot(workspace):
     for report in prepared:
         meta=report['metadata'];summary=preparation[meta['request']['id']][meta['country_code']]
         preferred.setdefault(meta['country_code'],{**summary,'request_id':meta['request']['id'],'key':report['key'],'edition':report['edition']})
+    if getattr(workspace,'operational',False):
+        from web.dispatch import Dispatch
+        receipts={entry['request']['id']:{k:entry.get(k) for k in ('id','status','task','error')} for entry in Dispatch(workspace).read()['entries'] if entry.get('request')}
+        for request in snapshot['requests']:request['dispatch_receipt']=receipts.get(request['request_id'])
     snapshot['report_preparation']=preparation;snapshot['preferred_country_reports']=preferred
     return snapshot
