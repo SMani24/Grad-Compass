@@ -12,6 +12,11 @@ SCHEMA='grad-compass-received-report-projection-1.0'
 def _id(text):return str(uuid5(NAMESPACE_URL,'grad-compass:received-report:'+text))
 
 
+def coverage_text(value):
+    """Keep legacy text verbatim; display accepted JSON without inferring scope."""
+    return value if isinstance(value,str) else json.dumps(value,ensure_ascii=False,sort_keys=True)
+
+
 def detail(workspace,identity):
     try:return workspace.research.request(identity)
     except ValueError:
@@ -62,7 +67,7 @@ def build(request,result,code):
     content=parse_report(canonical.decode(),evidence.decode())
     metadata['passage_origins']={b['id']:{'finding_id':f['finding_id'],'finding_revision':f['finding_revision']} for b in content['blocks'].values() for entries in groups.values() for f,field,text in entries if b['text']==text}
     raw=(env.compact(metadata)+'\n').encode();key=digest((reportid+':'+revisionid+':'+docsha).encode())
-    combined={'sources':list(sources.values()),'coverage':'\n'.join(f.get('coverage','') for f in findings),'finding_id':findings[0]['finding_id'],'finding_revision':findings[0]['finding_revision']}
+    combined={'sources':list(sources.values()),'coverage':'\n'.join(coverage_text(f.get('coverage','')) for f in findings),'finding_id':findings[0]['finding_id'],'finding_revision':findings[0]['finding_revision']}
     return normalize({'key':key,'edition':digest(raw),'metadata':metadata,'content':parse_report(canonical.decode(),evidence.decode()),'finding':combined,'metadata_bytes':raw,'canonical_bytes':canonical,'evidence_bytes':evidence,'reader':None,'detailed':None,'editorial_editions':[],
       'delivery':{'completion':result.get('completion'),'result_revision':result['revision'],'issued_at':result.get('issued_at')},'assets':{}})
 
