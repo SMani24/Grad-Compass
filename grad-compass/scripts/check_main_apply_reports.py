@@ -25,6 +25,7 @@ def main():
     parser.add_argument('--local-dir',type=Path,default=APP.parent/'grad-compass-workspace/runtime/local')
     parser.add_argument('--screenshots',type=Path,required=True)
     parser.add_argument('--restart',action='store_true')
+    parser.add_argument('--expect-metadata',action='append',default=[],metavar='COUNTRY=SHA256')
     args=parser.parse_args()
     profiles=LocalProfiles(args.local_dir);w=profiles.workspace
     state=profiles.snapshot();active=next(p for p in state['profiles'] if p['id']==state['active_id'])
@@ -32,8 +33,16 @@ def main():
     personal=('country-decisions.json','display-preferences.json','panel-widths.json','research-selection.json','report-annotations.json','report-reading.json')
     def inventory():return {n:(w.directory/n).read_bytes() if (w.directory/n).exists() else None for n in personal}
     before=inventory();research=w.research.snapshot()
-    latest={c:next(r for r in reports.catalog(w)['reports'] if r['metadata']['country_code']==c and r['model']['kind']=='prepared_report') for c in ('DEU','CAN','BEL')}
     server=create_local_server(w,profiles=profiles);threading.Thread(target=server.serve_forever,daemon=True).start()
+    # Establish expectations after ordinary startup receipt, not from a stale
+    # pre-startup catalog. No manual import or forced report selection is used.
+    expected=dict(value.split('=',1) for value in args.expect_metadata)
+    until=time.monotonic()+25
+    while True:
+        latest={c:next(r for r in reports.catalog(w)['reports'] if r['metadata']['country_code']==c and r['model']['kind']=='prepared_report') for c in ('DEU','CAN','BEL')}
+        if all(latest[code]['edition']==digest for code,digest in expected.items()):break
+        if time.monotonic()>until:raise AssertionError('Expected finalized packages were not received by normal startup/polling')
+        time.sleep(.2)
     os.environ['QT_API']='pyqt6'
     os.environ['QTWEBENGINE_CHROMIUM_FLAGS']='--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows'
     import webview
