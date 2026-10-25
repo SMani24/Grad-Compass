@@ -23,6 +23,29 @@ class CountryWorkspaceTests(unittest.TestCase):
         self.assertEqual(request['completion'],'complete')
         self.assertIn('unknown',str(store.request(request['request_id'])['results'][0]['envelope']['findings'][0]['human_approval']))
 
+    def test_country_details_accept_record_revision_without_legacy_source_revision(self):
+        # Valid producer records need no top-level source_revision. Keep the
+        # actual country/finding binding and disposition instead of hiding it.
+        self.case.receive(self.case.ack())
+        result=self.case.result()
+        for finding in result['findings']:
+            finding.pop('source_revision')
+            finding['coverage']={'funding':{'state':'investigated_unresolved'}}
+        self.case.receive(result)
+        before=self.case.store.snapshot()
+        helper=object.__new__(profile_fixtures.ProfileTests);helper.profiles=self.profiles
+        response=helper.http('/api/countries/CAN')
+        self.assertEqual(response['status'],200)
+        detail=response['payload'];finding=result['findings'][0]
+        self.assertEqual(detail['revision'],finding['record_revision'])
+        self.assertEqual(detail['finding_revision'],finding['finding_revision'])
+        self.assertEqual(detail['review'],finding['review'])
+        self.assertEqual(detail['human_approval'],finding['human_approval'])
+        self.assertEqual(detail['origin']['revision'],1)
+        self.assertEqual(len(detail['findings']),2)
+        self.assertEqual(detail['university_count'],0)
+        self.assertEqual(self.case.store.snapshot(),before)
+
     def test_decision_requires_both_tokens_then_persists_without_changing_research(self):
         # Use the real managed handler with the exact headers that failed in the UI.
         helper=object.__new__(profile_fixtures.ProfileTests);helper.profiles=self.profiles

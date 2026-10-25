@@ -52,7 +52,11 @@ def detail(workspace, exchange, code):
         result.update({key:latest.get(key) for key in ("summary","sources","uncertainties","review_status","funding_routes","costs","work_rules","observed_at")})
         if "findings" in latest:result["findings"]=latest["findings"]
         result.update({key:latest[key] for key in ("country_record_id","record_revision","finding_id","finding_revision","review","human_approval","evidence_status","finding_ref") if key in latest})
-        result.update(revision=latest["source_revision"],origin=latest["origin"],history=latest["history"],coverage="partial")
+        # Operational responses bind the country record revision. Historical
+        # synthetic findings used a top-level source revision instead; individual
+        # public sources retain their own revisions in either format.
+        result.update(revision=latest.get("record_revision",latest.get("source_revision")),
+                      origin=latest["origin"],history=latest["history"],coverage="partial")
     else:
         result.update(funding_routes=None,costs=None,work_rules=None,observed_at=None,history=[])
     return result
