@@ -13,7 +13,7 @@ from web.dispatch import Dispatch,Paperclip,config
 class DispatchTests(unittest.TestCase):
     def setUp(self):
         self.f=fixtures.LocalTests();self.f.setUp();self.addCleanup(self.f.doCleanups)
-        self.w=self.f.workspace;self.tasks={};self.creates=0;self.posts=0;self.online=True;self.lose_ack=False;self.guard=threading.Lock()
+        self.w=self.f.workspace;self.tasks={};self.routes={};self.gets=[];self.creates=0;self.posts=0;self.online=True;self.lose_ack=False;self.guard=threading.Lock()
         self.company=str(uuid4());self.dave=str(uuid4());root=self.f.root/'approved';root.mkdir()
         content=b'{"invented":"no applicant data"}';(root/'profile.json').write_bytes(content);(root/'COMPLETE').write_text('complete\n')
         atomic_json(root/'receipt.json',{'profile_id':str(uuid4()),'revision_id':str(uuid4()),'sha256':hashlib.sha256(content).hexdigest(),'receipt_id':str(uuid4()),'approved_at':'2026-10-25T00:00:00Z','decision':'accepted','actor_type':'human','reliable_for_discovery':True})
@@ -23,7 +23,9 @@ class DispatchTests(unittest.TestCase):
             def reply(self,value,status=200):
                 raw=json.dumps(value).encode();self.send_response(status);self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
             def do_GET(self):
+                owner.gets.append(self.path)
                 if not owner.online:return self.reply({'error':'offline'},503)
+                if self.path in owner.routes:return self.reply(owner.routes[self.path])
                 return self.reply(list(owner.tasks.values()) if '/issues?' in self.path else {'id':owner.company})
             def do_POST(self):
                 value=json.loads(self.rfile.read(int(self.headers['Content-Length'])))

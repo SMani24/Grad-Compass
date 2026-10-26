@@ -91,6 +91,8 @@ class Dispatch:
         if value.get('schema_version')!=VERSION or not isinstance(value.get('entries'),list):raise ValueError('Invalid private dispatch outbox; preserve it for recovery')
         return value
     def write(self,state):durable(self.path,state)
+    @staticmethod
+    def event(entry,action,**details):entry.setdefault('attempt_history',[]).append({'at':env.now(),'action':action,**details})
     def settings(self):
         try:
             connection=config(self.workspace);return {'configured':connection is not None,'profile_reference':profile_reference(connection),'destination':{'company_id':connection['company_id'],'dave_id':connection['dave_id']} if connection else None,'error':None}
@@ -113,7 +115,7 @@ class Dispatch:
                 return existing
             settings=self.settings();entry={'id':payload['submission_key'],'revision':(prior['revision']+1) if prior else 1,'replaces':prior['id'] if prior else None,'payload':payload,'profile_reference':settings['profile_reference'],'destination':settings['destination'],'created_at':env.now(),'status':'draft','attempts':0,'error':settings['error'],'request':None,'task':None}
             entry['confirmation_digest']=env.fingerprint({'payload':payload,'profile_reference':entry['profile_reference'],'destination':entry['destination'],'revision':entry['revision']})
-            state['entries'].append(entry);self.write(state);return entry
+            entry['updated_at']=entry['created_at'];state['entries'].append(entry);self.write(state);return entry
     def confirm(self,identity,digest):
         with lock(self.workspace):
             state=self.read();entry=self.entry(state,identity)
@@ -124,9 +126,11 @@ class Dispatch:
                 saved=self.workspace.research.submit(entry['payload'])['request'];self.workspace.research.export(saved['request_id'])
                 entry['request']={'id':saved['request_id'],'revision':saved['revision'],'sha256':saved['digest']}
                 entry['dispatch_key']='grad-compass:'+env.fingerprint({'request':entry['request'],'profile':entry['profile_reference'],'destination':entry.get('destination')})
-                entry['status']='pending';entry['confirmed_at']=env.now()
+                entry['status']='pending';entry['confirmed_at']=env.now();entry['updated_at']=entry['confirmed_at']
+                self.event(entry,'confirmed',request=entry['request'])
                 if entry['replaces']:
-                    prior=self.entry(state,entry['replaces']);prior['status']='superseded';prior['replacement']=identity
+                    prior=self.entry(state,entry['replaces']);prior['status']='superseded';prior['replacement']=identity;prior['updated_at']=env.now()
+                    self.event(prior,'superseded',replacement=identity)
                 self.write(state)
         return self.retry(identity)
     @staticmethod
@@ -138,7 +142,7 @@ class Dispatch:
         with lock(self.workspace):
             state=self.read();entry=self.entry(state,identity)
             if entry.get('attempts') or entry['status'] not in ('draft','pending','cancelled'):raise ValueError('This task may already be accepted. Reconcile it first; accepted history cannot be cancelled locally')
-            entry['status']='cancelled';self.write(state);return entry
+            entry['status']='cancelled';entry['updated_at']=env.now();self.event(entry,'cancelled');self.write(state);return entry
     @staticmethod
     def matches(task,marker,binding):
         lines=(task.get('description') or '').splitlines()
@@ -169,7 +173,7 @@ class Dispatch:
                     if entry.get('first_attempt_at') and self.clock()-entry['first_attempt_at']>=RETENTION_SECONDS:
                         raise ValueError('Earlier delivery is uncertain beyond Paperclip’s seven-day deduplication window. Reconciliation found no task; no duplicate dispatch will be attempted')
                     export=self.workspace.research.export(current['request_id'])
-                    entry['first_attempt_at']=entry.get('first_attempt_at',self.clock());entry['attempts']+=1;entry['status']='dispatching';entry['error']=None;self.write(state)
+                    entry['first_attempt_at']=entry.get('first_attempt_at',self.clock());entry['attempts']+=1;entry['status']='dispatching';entry['error']=None;entry['updated_at']=env.now();self.event(entry,'send_attempt',attempt=entry['attempts']);self.write(state)
                     payload={'title':'Grad Compass: '+', '.join(current['countries'])+' · '+current['request_id'],
                         'description':marker+'\n'+binding_line+'\n\n'+export['prompt']+'\n\nExplicitly confirmed app dispatch. Approved profile reference (no content): '+json.dumps(reference,sort_keys=True),
                         'assigneeAgentId':connection['dave_id'],'status':'todo','priority':'medium','idempotencyKey':entry['dispatch_key'],'allowDuplicate':True}
@@ -177,10 +181,12 @@ class Dispatch:
                 if task.get('companyId')!=connection['company_id'] or task.get('assigneeAgentId')!=connection['dave_id'] or not self.matches(task,marker,binding):
                     raise ValueError('Paperclip returned a conflicting task binding; no acceptance was recorded')
                 env.identifier(task.get('id'))
-                entry['task']={k:task.get(k) for k in ('id','identifier','status')};entry['status']='accepted';entry['error']=None;entry['accepted_at']=env.now();self.write(state)
+                entry['task']={k:task.get(k) for k in ('id','identifier','status')};entry['status']='accepted';entry['error']=None;entry['accepted_at']=env.now();entry['updated_at']=entry['accepted_at'];self.event(entry,'task_receipt',task=entry['task']);self.write(state)
             except (ValueError,OSError,TimeoutError) as error:
                 # No credential, remote body or URL appears in logs/UI errors.
                 entry['status']='uncertain' if entry['attempts'] else 'pending'
                 entry['error']=str(error) if isinstance(error,ValueError) else 'Paperclip did not confirm delivery. Your request is saved; explicitly retry to reconcile without duplicates'
+                entry['updated_at']=env.now()
+                self.event(entry,entry['status'],error=entry['error'])
                 self.write(state)
             return entry

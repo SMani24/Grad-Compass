@@ -43,9 +43,10 @@
   });
   function cancel(){if(busy)return;const entry=current;get('dispatch-confirm-dialog').close();if(entry?.status==='draft')post('/api/dispatch/cancel',{id:entry.id}).then(refresh).catch(e=>get('request-form-status').textContent=e.message);window.dispatchEvent(new Event('grad-compass:dispatch-cancelled'));}
   get('dispatch-confirm-cancel').addEventListener('click',cancel);get('dispatch-confirm-dialog').addEventListener('cancel',e=>{e.preventDefault();cancel();});
-  get('open-pending-requests').addEventListener('click',async()=>{try{await refresh();get('pending-requests-dialog').showModal();}catch(error){get('research-toolbar-status').textContent=error.message;}});
+  get('open-pending-requests').addEventListener('click',async()=>{try{if(window.GradCompassRequests)return window.GradCompassRequests.open('pending');await refresh();get('pending-requests-dialog').showModal();}catch(error){get('research-toolbar-status').textContent=error.message;}});
   get('close-pending-requests').addEventListener('click',()=>get('pending-requests-dialog').close());
   window.addEventListener('grad-compass:discovery-updated',()=>refresh().catch(()=>{}));
+  window.addEventListener('grad-compass:workspace-loaded',()=>refresh().catch(()=>{}));
   window.addEventListener('load',()=>refresh().catch(()=>{}));
-  window.GradCompassDispatch=Object.freeze({prepare,refresh});
+  window.GradCompassDispatch=Object.freeze({prepare,refresh,review});
 })();

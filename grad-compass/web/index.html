@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/exchange.css">
   <link rel="stylesheet" href="/research.css">
   <link rel="stylesheet" href="/panels.css">
+  <link rel="stylesheet" href="/requests.css">
   <link rel="stylesheet" href="/country_report.css">
   <link rel="stylesheet" href="/report_reader.css">
   <script defer src="/vendor/leaflet.js"></script>
@@ -21,6 +22,7 @@
   <script defer src="/local_ui.js"></script>
   <script defer src="/exchange.js"></script>
   <script defer src="/dispatch.js"></script>
+  <script defer src="/requests.js"></script>
   <script defer src="/settings.js"></script>
   <script defer src="/panels.js"></script>
 </head>
@@ -32,6 +34,7 @@
     <button id="refresh-local" type="button" class="research-link" hidden>Refresh results</button>
     <button id="open-exchange" class="research-link" type="button">Research imports</button>
     <button id="open-settings" class="research-link" type="button">Settings</button>
+    <button id="open-requests" class="research-link" type="button" hidden>Requests</button>
     <div class="view-switch" role="group" aria-label="Discovery view"><button id="map-view" aria-pressed="true">◉ Map</button><button id="list-view" aria-pressed="false">☷ List</button></div>
     <span class="preview-label">Sample workspace</span>
   </header>
@@ -43,6 +46,7 @@
         </section>
         <div class="filter-controls">
           <p id="active-profile" class="active-profile" hidden></p>
+    <div id="requests-notification" class="requests-notification" role="status" aria-live="polite" hidden><span id="requests-notification-text"></span><button id="requests-attention" type="button">Review requests</button></div>
           <div id="inbox-indicator" hidden><button id="results-ready" type="button" class="quiet-action" hidden>Results ready</button><button id="inbox-errors-action" type="button" class="quiet-action" hidden>Review delivery errors</button><p id="inbox-workspace-status" role="status" aria-live="polite"></p></div>
           <div class="exploration-switch" role="group" aria-label="Explore countries or universities"><button id="countries-mode" type="button" aria-pressed="false">Countries</button><button id="universities-mode" type="button" aria-pressed="true">Universities</button></div>
           <label class="search-label" for="search">Search your universities</label>
@@ -52,7 +56,7 @@
             <p class="catalogue-hint">Countries and territories. Selection prepares a draft; research starts only after confirmation.</p>
             <div class="research-toolbar research-bulk-actions"><button id="research-select-matching" type="button">Select all matching (0)</button><button id="research-clear-selection" type="button" disabled>Clear selection</button></div>
             <p id="research-selection-summary" role="status" aria-live="polite">0 selected</p>
-            <div class="research-toolbar"><button id="research-selected" type="button" disabled>Research selected (0)</button><button id="open-research" type="button">Requests</button><button id="open-pending-requests" type="button" hidden>Pending requests</button></div>
+            <div class="research-toolbar"><button id="research-selected" type="button" disabled>Research selected (0)</button><button id="open-research" type="button">Reports &amp; findings</button><button id="open-pending-requests" type="button" hidden>Pending requests</button></div>
             <p id="research-toolbar-status" role="status" aria-live="polite"></p>
           </div>
           <div class="filter-row"><div><label for="country">Location</label><select id="country"><option value="">All countries</option></select></div><div><label for="status">Stage</label><select id="status"><option value="">All stages</option><option>Researching</option><option>Applying</option><option>Submitted</option><option>Accepted</option><option>Rejected</option></select></div></div>
@@ -99,6 +103,12 @@
   </dialog>
   <dialog id="dispatch-confirm-dialog" aria-labelledby="dispatch-confirm-title"><header class="exchange-header"><h2 id="dispatch-confirm-title">Confirm research request</h2></header><div id="dispatch-confirm-summary"></div><p>No research starts until you confirm. The exact request is saved before dispatch. If Paperclip is unavailable, it stays pending until you explicitly retry.</p><p id="dispatch-confirm-status" role="status"></p><div class="request-actions"><button id="dispatch-confirm" type="button">Confirm and dispatch</button><button id="dispatch-confirm-cancel" type="button">Back to editing</button></div></dialog>
   <dialog id="pending-requests-dialog" aria-labelledby="pending-requests-title"><header class="exchange-header"><h2 id="pending-requests-title">Pending requests &amp; dispatch history</h2><button id="close-pending-requests" type="button">Close</button></header><p>Saved requests never start automatically after reconnection or restart. Retry is explicit. Accepted request history is immutable.</p><div id="pending-requests-list"></div><p id="pending-requests-status" role="status"></p></dialog>
+  <dialog id="requests-dialog" aria-labelledby="requests-title" class="requests-workspace">
+    <header class="exchange-header"><div><span class="eyebrow">PRIVATE REQUEST HISTORY</span><h2 id="requests-title">Requests</h2><p id="requests-profile"></p></div><button id="close-requests" type="button">Back to map</button></header>
+    <p>All requests stay here. Refresh checks progress; it never starts research.</p>
+    <div class="requests-controls"><label for="requests-filter">Show<select id="requests-filter"><option value="all">All requests</option><option value="attention">Needs attention</option><option value="pending">Pending dispatch</option><option value="active">In progress / awaiting delivery</option><option value="finished">Reports available / closed</option></select></label><label for="requests-search">Find a request<input id="requests-search" type="search" placeholder="Country, scope or task…"></label><button id="refresh-requests" type="button">Refresh status</button></div>
+    <p id="requests-status" role="status" aria-live="polite"></p><div id="requests-list"></div>
+  </dialog>
   <dialog id="request-dialog" aria-labelledby="request-title">
     <header class="exchange-header"><div><span class="eyebrow">MANUAL RESEARCH HANDOFF · SYNTHETIC PILOT</span><h2 id="request-title">Prepare a research request</h2></div><button id="close-request" type="button" class="inspector-close" aria-label="Close request form">×</button></header>
     <form id="request-form">

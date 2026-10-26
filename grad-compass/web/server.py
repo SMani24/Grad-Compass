@@ -27,6 +27,8 @@ STATIC_FILES = {
     "/research.js": (APP_ROOT / "web" / "research.js", "text/javascript; charset=utf-8"),
     "/research.css": (APP_ROOT / "web" / "research.css", "text/css; charset=utf-8"),
     "/dispatch.js": (APP_ROOT / "web" / "dispatch.js", "text/javascript; charset=utf-8"),
+    "/requests.js": (APP_ROOT / "web" / "requests.js", "text/javascript; charset=utf-8"),
+    "/requests.css": (APP_ROOT / "web" / "requests.css", "text/css; charset=utf-8"),
     "/settings.js": (APP_ROOT / "web" / "settings.js", "text/javascript; charset=utf-8"),
     "/panels.js": (APP_ROOT / "web" / "panels.js", "text/javascript; charset=utf-8"),
     "/panels.css": (APP_ROOT / "web" / "panels.css", "text/css; charset=utf-8"),
@@ -215,6 +217,9 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                 if route == '/api/dispatch' and getattr(workspace,'operational',False):
                     from web.dispatch import Dispatch
                     return self.respond(200,Dispatch(workspace).snapshot())
+                if route == '/api/requests' and getattr(workspace,'operational',False):
+                    from web.request_tracking import RequestTracker
+                    return self.respond(200,{**RequestTracker(workspace).snapshot(),'profile':profiles.snapshot()['active_id'] if profiles else None})
                 if route == '/api/exports':
                     from web.export_preferences import preference
                     return self.respond(200,{**preference(workspace),'native':desktop_exports is not None})
@@ -323,9 +328,10 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
             preferences = route == "/api/display-preferences"
             layout = route == '/api/panel-widths'
             dispatch_operation = route in ('/api/dispatch/prepare','/api/dispatch/confirm','/api/dispatch/retry','/api/dispatch/cancel') and getattr(workspace,'operational',False)
+            request_tracking = route == '/api/requests/refresh' and getattr(workspace,'operational',False)
             export_operation = route == '/api/exports'
             report_operation = route in ('/api/reports/annotate','/api/reports/draft','/api/reports/reading')
-            if not (dispatch_operation or export_operation or report_operation or layout or preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
+            if not (request_tracking or dispatch_operation or export_operation or report_operation or layout or preferences or personal_decision or research_operation or local_operation or profile_operation) and (not exchange or action not in actions or route != "/api/exchange/" + action):
                 return self.respond(405,{"error":"This endpoint is read-only"})
             origin = f"http://127.0.0.1:{self.server.server_port}"
             if (self.headers.get("Host") != origin.removeprefix("http://")
@@ -340,6 +346,11 @@ def handler_for(workspace, exchange=None, session_token=None, profiles=None, cli
                     raise ValueError("A small JSON request is required")
                 from web.research_envelopes import loads
                 payload = loads(self.rfile.read(length))
+                if request_tracking:
+                    if not isinstance(payload,dict) or set(payload)-{'request_id'}:raise ValueError('Choose a saved request to refresh')
+                    from web.request_tracking import RequestTracker
+                    result=RequestTracker(workspace).refresh(payload.get('request_id'))
+                    return self.respond(200,result)
                 if dispatch_operation:
                     from web.dispatch import Dispatch
                     service=Dispatch(workspace);operation=route.rsplit('/',1)[1]

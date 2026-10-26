@@ -13,7 +13,7 @@ from web.local import private_directory
 class InboxReceiver:
     def __init__(self, workspace, quiet_seconds=1, clock=time.time):
         self.workspace=workspace;self.quiet_seconds=quiet_seconds;self.clock=clock
-        self.processed={};self.errors={};self.lock=threading.RLock()
+        self.processed={};self.errors={};self.error_requests={};self.lock=threading.RLock()
         self.checked_at=None;self.problem=None;self.pending=0
 
     @staticmethod
@@ -28,6 +28,7 @@ class InboxReceiver:
                 inbox=private_directory(self.workspace.directory/'inbox')
                 files={p.name:p for p in inbox.glob('*.json') if not p.name.startswith('.')}
                 self.errors={name:error for name,error in self.errors.items() if name in files}
+                self.error_requests={name:identity for name,identity in self.error_requests.items() if name in files}
                 self.processed={name:value for name,value in self.processed.items() if name in files}
                 for name,path in sorted(files.items()):
                     try:
@@ -53,6 +54,15 @@ class InboxReceiver:
                         value=env.loads(path.read_bytes())
                         outer=value
                         if isinstance(outer,dict) and isinstance(outer.get('body'),str):value=env.loads(outer['body'])
+                        # Diagnostic association only: validation below remains the
+                        # authority for acceptance. Never guess from a filename.
+                        identity=value.get('request_id') if isinstance(value,dict) else None
+                        self.error_requests.pop(path.name,None)
+                        if identity:
+                            try:
+                                self.workspace.research.request(identity)
+                                self.error_requests[path.name]=identity
+                            except ValueError:pass
                         if isinstance(value,dict) and value.get('schema_version')==packages.NOTICE:
                             if not isinstance(outer,dict) or set(outer)!={'body','sha256'} or hashlib.sha256(outer['body'].encode('utf-8')).hexdigest()!=outer['sha256']:raise ValueError('Report notices require the existing exact-byte transport')
                             if self.signature(path)!=signatures[path.name]:pending+=1;continue
@@ -77,6 +87,9 @@ class InboxReceiver:
             except (ValueError,OSError,sqlite3.Error) as error:
                 self.problem='Could not check incoming responses: '+str(error)
             self.checked_at=env.now()
+            from web.request_tracking import RequestTracker
+            try:RequestTracker(self.workspace).observe_delivery([{'file':name,'error':value,'request_id':self.error_requests[name]} for name,value in self.errors.items() if name in self.error_requests])
+            except (ValueError,OSError) as error:self.problem='Could not retain delivery diagnostics: '+str(error)
             return {**self.status(),'received':received}
 
     def status(self):
@@ -89,7 +102,7 @@ class InboxReceiver:
             version=hashlib.sha256(env.compact(rows).encode()).hexdigest()
             latest=db.execute('SELECT request_id FROM research_results ORDER BY rowid DESC LIMIT 1').fetchone()
             count=db.execute('SELECT count(DISTINCT request_id) FROM research_results').fetchone()[0]
-            errors=[{'file':name,'error':value} for name,value in sorted(self.errors.items())]
+            errors=[{'file':name,'error':value,**({'request_id':self.error_requests[name]} if name in self.error_requests else {})} for name,value in sorted(self.errors.items())]
             errors.extend(report_catalog['errors'])
             if self.problem:errors.append({'file':'Inbox','error':self.problem})
             return {'version':version,'checked_at':self.checked_at,'pending':self.pending,'errors':errors,
@@ -111,6 +124,8 @@ class InboxServer(ThreadingHTTPServer):
         self.check_inbox()
         self._inbox_thread=threading.Thread(target=self._watch_inbox,name='grad-compass-inbox',daemon=True)
         self._inbox_thread.start()
+        self._status_thread=threading.Thread(target=self._watch_requests,name='grad-compass-request-status',daemon=True)
+        self._status_thread.start()
 
     def check_inbox(self):
         with self.profiles.request_context() if self.profiles else nullcontext():
@@ -125,7 +140,20 @@ class InboxServer(ThreadingHTTPServer):
                 # Its API returns the actionable close/reopen message instead.
                 continue
 
+    def _watch_requests(self):
+        from web.request_tracking import RequestTracker
+        while not self._inbox_stop.is_set():
+            try:
+                # Capture the profile briefly. Slow network reads never hold the
+                # profile transition lock or write into a newly selected profile.
+                with self.profiles.request_context() if self.profiles else nullcontext():
+                    workspace=self.profiles.workspace if self.profiles else self.workspace
+                RequestTracker(workspace).refresh()
+            except (ValueError,OSError,sqlite3.Error):pass
+            if self._inbox_stop.wait(60):return
+
     def server_close(self):
         self._inbox_stop.set()
         if hasattr(self,'_inbox_thread'):self._inbox_thread.join(timeout=5)
+        if hasattr(self,'_status_thread'):self._status_thread.join(timeout=1)
         super().server_close()
