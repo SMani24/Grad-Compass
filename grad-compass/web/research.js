@@ -239,7 +239,7 @@
     return {accepted:'Paperclip task received — research acknowledgement is separate',pending:'Pending dispatch — explicit review/retry required',uncertain:'Delivery uncertain — reconcile before another action',dispatching:'Dispatch attempt recorded — awaiting receipt',cancelled:'Cancelled dispatch — history retained',superseded:'Replaced request — history retained',draft:'Draft — not dispatched'}[receipt.status] || receipt.status;
   }
   function stateLabel(state,completion) {
-    return {prepared:"Saved — awaiting Dave’s acknowledgement",accepted:"Acknowledged — awaiting findings",rejected:"Acknowledgement rejected",needs_clarification:"Clarification requested",results_received:completion==='partial' ? "Partial results ready — research continues" : "Findings received — report preparation and delivery are separate"}[state] || state;
+    return {prepared:"Saved — awaiting Dave’s acknowledgement",accepted:"Acknowledged — awaiting findings",rejected:"Acknowledgement rejected",needs_clarification:"Clarification requested",results_received:completion==='partial' ? "Partial findings received" : "Findings received — report preparation and delivery are separate"}[state] || state;
   }
   async function openRequests(identity=null,revision=null,finding=null,archive=false) {
     const sequence=++openSequence;
