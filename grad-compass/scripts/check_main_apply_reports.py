@@ -29,6 +29,8 @@ def main():
     parser.add_argument('--country',action='append',default=[],help='Countries to verify; defaults to DEU/CAN/BEL')
     parser.add_argument('--require-photo',action='append',default=[],metavar='COUNTRY')
     parser.add_argument('--narrow',action='store_true',help='Also inspect the reader at a 390px window, retaining the owner text size')
+    parser.add_argument('--configured-exports',action='store_true',help='Exercise the current profile’s real configured export destination without changing it')
+    parser.add_argument('--batch-request',help='Also verify this existing batch’s accessible country progress and sidebar actions')
     parser.add_argument('--allow-findings',action='store_true',help='Allow honestly labelled received findings when no prepared package is published')
     args=parser.parse_args()
     profiles=LocalProfiles(args.local_dir);w=profiles.workspace
@@ -55,10 +57,15 @@ def main():
     from desktop_downloads import DesktopDownloads
     from preview_capture import PreviewCapture
     out=private_directory(args.screenshots);downloads=private_directory(out/'downloads');names=[]
+    from web.export_preferences import preference,destination
+    export_preference=preference(w)
+    if args.configured_exports:downloads=Path(export_preference['folder'])
     window=webview.create_window('Grad Compass',f'http://127.0.0.1:{server.server_port}/',width=1440,height=1000,min_size=(390,640))
     capture=PreviewCapture(window,out,prefix='main-apply-'+('restart-' if args.restart else ''))
-    def choose(name):names.append(name);return str(downloads/name)
-    handler=DesktopDownloads(window,choose_path=choose);passed=[]
+    def choose(name):
+        target=destination(w,name) if args.configured_exports else downloads/name
+        names.append(target.name);return str(target)
+    handler=DesktopDownloads(window,choose_path=choose,workspace=lambda:w);passed=[]
     watchdog=threading.Timer(240,lambda:os._exit(1));watchdog.daemon=True;watchdog.start()
     def work():
         def js(code):return window.run_js(code)
@@ -95,6 +102,18 @@ def main():
             click('countries-mode');click('open-research');wait("!!document.querySelector('.canonical-report') && document.getElementById('reader-status')?.textContent.includes('loaded')")
             assert js("document.querySelector('.canonical-report').dataset.canonical") in {r['key'] for r in reports.catalog(w)['reports']}
             click('close-research');wait("!document.getElementById('research-dialog').open")
+            if args.batch_request:
+                click('open-requests');wait('!!document.querySelector(\'.tracked-request[data-request="'+args.batch_request+'"]\')')
+                selector='.tracked-request[data-request="'+args.batch_request+'"]'
+                js('document.querySelector('+json.dumps(selector)+').scrollIntoView({block:"start"})')
+                js('[...document.querySelectorAll('+json.dumps(selector+' details')+')].find(n=>n.dataset.details.endsWith(":reports")).open=true')
+                assert js('document.querySelectorAll('+json.dumps(selector+' .request-country-progress')+').length')==len(latest)
+                shot('batch-country-progress')
+                if args.narrow:
+                    window.resize(390,740);wait('innerWidth===390')
+                    assert js("document.getElementById('requests-dialog').scrollWidth<=document.getElementById('requests-dialog').clientWidth")
+                    shot('batch-country-progress-narrow');window.resize(1440,1000);wait('innerWidth===1440')
+                click('close-requests');wait("!document.getElementById('requests-dialog').open")
             receipt={}
             for code,r in latest.items():
                 click('countries-mode');select('country','');select('country-list-scope','all')
@@ -104,6 +123,18 @@ def main():
                 wait("!!document.getElementById('read-country-report')")
                 wait("document.querySelector('.country-report-availability').textContent.includes("+json.dumps(r['model']['version_label'])+")");shot(code.lower()+'-map-action')
                 click('read-country-report');loaded(r)
+                batch=next(q for q in w.research.snapshot()['requests'] if q['request_id']==r['metadata']['request']['id'])
+                if len(batch['countries'])>1:
+                    if js("document.getElementById('research-dialog').classList.contains('requests-collapsed')"):click('report-sidebar-toggle')
+                    assert js("document.querySelectorAll('.request-batch .request-country-row').length>0")
+                    assert js("[...document.querySelectorAll('.request-country-row')].some(n=>n.dataset.country==="+json.dumps(code)+" && n.getAttribute('aria-current')==='true')")
+                    shot(code.lower()+'-batch-sidebar')
+                    if args.batch_request:
+                        other=next(c for c in latest if c!=code)
+                        button='.request-batch:has(.request-row[data-request="'+args.batch_request+'"]) .request-country-row[data-country="'+other+'"]'
+                        js('document.querySelector('+json.dumps(button)+').click()');loaded(latest[other])
+                        button=button.replace(other,code)
+                        js('document.querySelector('+json.dumps(button)+').click()');loaded(r)
                 if r.get('reader'):assert js("document.querySelector('.canonical-report').dataset.document==="+json.dumps(r['reader']['id']))
                 assert js("document.getElementById('reader-show-report').disabled==="+json.dumps(not bool(r.get('reader')))+" && !document.querySelector('.report-package-error')")
                 selected_review=(r.get('reader') or {}).get('metadata',{}).get('factual_review',r['metadata']['canonical_factual_review'])
@@ -166,7 +197,7 @@ def main():
             assert all((hashlib.sha256((w.directory/name).read_bytes()).hexdigest(),(w.directory/name).stat().st_mtime_ns)==value for name,value in protected.items()),'Existing producer artifact changed'
             from web.inbox import InboxReceiver
             replay=InboxReceiver(w).check();assert replay['received']==0 and not replay['errors'],replay
-            result={'passed':True,'profile':active,'countries':receipt,'personal_overlay_bytes_unchanged':True,'research_unchanged':True,'protected_original_files':len(protected),'protected_original_bytes_and_mtimes_unchanged':True,'replay':replay,'normal_country_card_and_selector_routes':True,'qa_position_writes_suppressed':True,'catalog_errors':reports.catalog(w)['errors']}
+            result={'passed':True,'profile':active,'countries':receipt,'export_preference':export_preference,'actual_export_directory':str(downloads),'configured_destination_exercised':args.configured_exports,'personal_overlay_bytes_unchanged':True,'research_unchanged':True,'protected_original_files':len(protected),'protected_original_bytes_and_mtimes_unchanged':True,'replay':replay,'normal_country_card_and_selector_routes':True,'qa_position_writes_suppressed':True,'catalog_errors':reports.catalog(w)['errors']}
             assert not result['catalog_errors'],result['catalog_errors']
             atomic_json(out/('restart.local.json' if args.restart else 'normal.local.json'),result)
             passed.append(True);print('Main-Apply card/selector/default/history/native export receipt passed for '+','.join(latest)+'.',flush=True)

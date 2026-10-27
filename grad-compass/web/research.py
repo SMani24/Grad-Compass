@@ -277,6 +277,8 @@ class ResearchWorkspace:
                         "Resolve the profile through the authorized private profile store; if its approval cannot be verified, stop applicant-specific conclusions and ask Dave to resolve the access or approval gap. "
                         "Record the decision, routes/fields/language/intake, finances and eligibility, reusable evidence/gaps, and missing inputs without copying private intake into shared artifacts. "
                         "Use grad-compass-research-engine/docs/ordinary-country-reports.md for the brief, editorial and three-dimension review acceptance contract. "
+                        "Every new-country assignment includes a country-photograph stage: Ali acquires accurate offline image bytes and verifies licensing, source, credit, caption and alt text; Alex independently reviews the exact asset and editions; Marry validates and packages them; Dave owns assignment and release; Codex owns app/PDF display. "
+                        "Use the all-country checklist in discovery-country-editorial-template.md. A genuine acquisition/license failure needs attempted sources, a concrete reason, named recovery owner and next action; never silently waive this deliverable. "
                         "Follow Task sequencing in grad-compass-workspace/design/ordinary-country-workflow.md. "
                         "Preparation readiness is not factual acceptance: once exact editions are ready, Alex must not be blocked by a producer task waiting for Alex's review. "
                         "Producer corrections must not wait for reviewer-task closure. Keep parent, publication and release gates intact. "

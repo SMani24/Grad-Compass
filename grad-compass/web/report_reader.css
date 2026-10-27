@@ -5,7 +5,17 @@
 #research-dialog .report-topbar{gap:12px;margin-bottom:10px;padding-bottom:10px}
 #research-dialog .report-topbar>div{margin-right:auto}
 #research-dialog .report-topbar .request-hint{font-size:.75rem}
-#research-dialog .research-layout{grid-template-columns:190px minmax(0,1fr);gap:16px}
+#research-dialog .research-layout{grid-template-columns:clamp(230px,22vw,300px) minmax(0,1fr);gap:16px}
+#research-request-list .request-batch{border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:10px}
+#research-request-list .request-row{margin:0;padding:8px 10px;line-height:1.35;background:transparent}
+#research-request-list .request-row strong{font-size:.75rem}
+#research-request-list .request-row span{display:inline;font-size:.66rem;margin-right:8px}
+#research-request-list .request-batch-summary{font-size:.66rem;line-height:1.4;margin:6px 4px;color:#456372}
+.request-country-row{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:6px;padding:7px 10px;font:inherit;color:var(--ink);cursor:pointer}
+.request-country-row strong{display:block;font-size:.73rem}.request-country-row span{display:block;font-size:.65rem;line-height:1.4;color:#456372}
+.request-country-row:hover,.request-country-row[aria-current=true]{background:#edf6f9;border-color:#aacfd8}.request-country-row:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.request-country-progress{padding:10px 12px;margin-block:10px;border-left:3px solid #9bc4ce;background:#f4f8fa}.request-country-progress h4{margin:0}
+@media(max-width:700px){#research-dialog #research-request-list{display:block;max-height:235px;overflow:auto}#research-request-list .request-batch{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px}#research-request-list .request-row,#research-request-list .request-batch-summary{grid-column:1/-1}#research-request-list .request-row{width:100%;min-width:0}.request-country-row{padding:6px}}
 #research-dialog.requests-collapsed .research-layout{grid-template-columns:minmax(0,1fr)}
 #research-dialog.requests-collapsed .report-navigation{display:none}
 #report-sidebar-toggle{font-size:.8rem}

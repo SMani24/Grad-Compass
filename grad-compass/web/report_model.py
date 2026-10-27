@@ -101,4 +101,12 @@ def research_snapshot(workspace):
         receipts={entry['request']['id']:{k:entry.get(k) for k in ('id','status','task','error')} for entry in Dispatch(workspace).read()['entries'] if entry.get('request')}
         for request in snapshot['requests']:request['dispatch_receipt']=receipts.get(request['request_id'])
     snapshot['report_preparation']=preparation;snapshot['preferred_country_reports']=preferred
+    from web import batch_progress
+    for request in snapshot['requests']:
+        selected={}
+        for report in prepared:
+            if report['metadata']['request']['id']==request['request_id']:
+                selected.setdefault(report['metadata']['country_code'],report)
+        request['country_progress']=batch_progress.countries(request['countries'],selected,request['scope']=='country_conditions' or bool(selected))
+        request['batch_progress']=batch_progress.summary(request['country_progress'],request['completion'])
     return snapshot

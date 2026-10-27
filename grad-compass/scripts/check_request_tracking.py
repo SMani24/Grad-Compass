@@ -111,7 +111,7 @@ def main():
                     notice=next((w.directory/'inbox').glob('report-*.json'));body=env.loads(env.loads(notice.read_bytes())['body']);metadata=w.directory/body['metadata_path'];original=metadata.read_bytes();metadata.unlink()
                     from web.inbox import receiver_for
                     receiver_for(w).check();js('window.GradCompassRequests.read();void 0');wait("!!document.querySelector('.tracked-request .request-persistent-notice')");shot('delivery-error')
-                    metadata.write_bytes(original);receiver_for(w).check();fake['phase']='completed';fake['updated']=env.now();remote_refresh();wait("!!document.querySelector('.tracked-request[data-status=complete]')");shot('report-received')
+                    metadata.write_bytes(original);receiver_for(w).check();fake['phase']='completed';fake['updated']=env.now();remote_refresh();wait("!!document.querySelector('.tracked-request[data-status=partial_reports]')");shot('report-received-deliverables-outstanding')
                     assert fake['creates']==1;assert len(w.research.request(identity)['results'])==1
                     assert not receiver_for(w).check()['errors'];assert any(x.get('kind')=='delivery' for x in RequestTracker(w).read()['requests'][identity]['history'])
                 result={'passed':True,'profile':owner_id,'request_id':identity,'fake_tasks':fake['creates'],'real_agents_invoked':False,'phase':fake['phase'],'status':next(r['status'] for r in RequestTracker(w).snapshot()['requests'] if r['request_id']==identity)}

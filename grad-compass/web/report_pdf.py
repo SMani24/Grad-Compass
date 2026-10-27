@@ -13,7 +13,7 @@ from web.report_packages import immutable
 
 PDF_LOCK=threading.RLock()
 ASSETS=Path(__file__).parent/'assets'
-RENDERER='country-reader-14'
+RENDERER='country-reader-15'
 
 
 def styles():
@@ -132,7 +132,7 @@ def build(report):
     if source_rows:
         grid=Table(source_rows,colWidths=[width/2,width/2],hAlign='LEFT');grid.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(-1,-1),0),('RIGHTPADDING',(0,0),(-1,-1),12),('TOPPADDING',(0,0),(-1,-1),0),('BOTTOMPADDING',(0,0),(-1,-1),3)]));body.append(grid)
     body.append(p('Report details','source_title'))
-    body.append(p('Shared origin: canonical report v'+str(doc['revision_number'])+(' · reader edition r'+str(editorial['metadata']['revision_number']) if editorial else '')+'. Review scope: '+escape(review.get('scope') or 'Not supplied')+'. Canonical review: '+escape(meta.get('canonical_factual_review',{}).get('state','unknown').replace('_',' '))+'. Human approval: '+escape(meta.get('human_approval',{}).get('state','unknown').replace('_',' '))+'. Observations: '+escape(', '.join(observation_dates(report)) or 'See dated sources')+'. Coverage is bounded; delivery does not imply exhaustive research. The detailed Markdown includes full qualifications, exact receipts and historical context. Personal annotations are not included.','small'))
+    body.append(p('Shared origin: canonical report v'+str(doc['revision_number'])+(' · reader edition r'+str(editorial['metadata']['revision_number']) if editorial else '')+'. Reader review: '+escape(review.get('state','unknown').replace('_',' '))+'. Canonical review: '+escape(meta.get('canonical_factual_review',{}).get('state','unknown').replace('_',' '))+'. Human approval: '+escape(meta.get('human_approval',{}).get('state','unknown').replace('_',' '))+'. Observations: '+escape(', '.join(observation_dates(report)) or 'See dated sources')+'. Coverage is bounded; delivery does not imply exhaustive research. The detailed Markdown includes review scopes, full qualifications, exact receipts and historical context. Personal annotations are not included.','small'))
     provenance=json.dumps({'canonical_revision_id':doc['revision_id'],'canonical_sha256':doc['sha256'],'reader_document_sha256':editorial['metadata']['sha256'] if editorial else None},sort_keys=True)
     def document(output):return SimpleDocTemplate(output,pagesize=A4,leftMargin=48,rightMargin=48,topMargin=38,bottomMargin=46,title=tree['title'],subject=provenance,author='Grad Compass',pageCompression=1)
     first=document(io.BytesIO());first.build(deepcopy(body));total=first.page

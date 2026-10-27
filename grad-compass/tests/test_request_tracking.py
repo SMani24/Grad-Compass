@@ -69,13 +69,36 @@ class TrackingTests(unittest.TestCase):
         receiver.check();r=self.row(tracker);self.assertTrue(r['delivery_errors']);self.assertIn('could not be validated',r['notice'])
         self.assertTrue(tracker.read()['requests'][self.identity]['history'])
         metadata.write_bytes(original);self.assertFalse(receiver.check()['errors']);self.root['status']='done';self.execution['execution']['phase']='completed';tracker.refresh()
-        r=self.row(tracker);self.assertEqual(r['status'],'complete');self.assertFalse(r['delivery_errors']);self.assertEqual(r['reports'][0]['review']['human']['state'],'not_requested')
+        r=self.row(tracker);self.assertEqual(r['status'],'partial_reports');self.assertTrue(r['reports'][0]['available']);self.assertTrue(r['reports'][0]['outstanding']);self.assertFalse(r['delivery_errors']);self.assertEqual(r['reports'][0]['review']['human']['state'],'not_requested')
         self.assertEqual(receiver.check()['received'],0);self.assertEqual(len(reopened.research.request(self.identity)['results']),1);self.assertEqual(self.d.creates,1)
         self.assertEqual(reopened.research.request(self.identity)['request'],initial['request'])
     def test_wrong_binding_is_not_followed_and_other_profiles_cannot_see_or_refresh_it(self):
         self.root['description']='Different request';self.tracker.refresh();self.assertIn('does not match',self.row()['tracking']['connection_error']);self.assertEqual(self.row()['status'],'waiting')
         other=RequestTracker(LocalWorkspace(self.d.f.root/'other'));self.assertEqual(other.snapshot()['requests'],[])
         with self.assertRaises(ValueError):other.refresh(self.identity)
+
+    def test_report_publication_does_not_complete_partial_response_or_missing_deliverables(self):
+        row=self.row();row.update(results_count=1,response_completion='partial',reports=[{'available':True}],batch_progress={'outstanding_count':0})
+        self.assertEqual(self.tracker.describe(deepcopy(row))['status'],'partial_reports')
+        row['response_completion']='complete'
+        self.assertEqual(self.tracker.describe(deepcopy(row))['status'],'complete')
+        row['batch_progress']['outstanding_count']=1
+        self.assertEqual(self.tracker.describe(deepcopy(row))['status'],'partial_reports')
+        self.fail();self.tracker.refresh();row['tracking']=self.row()['tracking']
+        self.assertEqual(self.tracker.describe(deepcopy(row))['status'],'failed')
+
+    def test_failed_accepted_retry_does_not_duplicate_or_touch_another_execution(self):
+        other=self.d.prepare(countries=['DNK','GBR'],scope='country_conditions',bounds={'institutions':0,'programs':0})
+        accepted_other=self.d.confirm(other);before=deepcopy(accepted_other)
+        self.fail();self.tracker.refresh(self.identity)
+        self.assertEqual(self.row()['status'],'failed')
+        creates,posts=self.d.creates,self.d.posts
+        for _ in range(2):
+            recovered=self.d.service.retry(self.entry['id'])
+            self.assertEqual(recovered['task']['id'],self.root['id'])
+        self.assertEqual((self.d.creates,self.d.posts),(creates,posts))
+        self.assertEqual(next(e for e in self.d.service.read()['entries'] if e['id']==other['id']),before)
+        self.assertEqual(self.row()['status'],'failed')
     def test_lost_dispatch_ack_is_reconciled_only_by_explicit_existing_retry(self):
         e=self.d.prepare(countries=['CAN']);self.d.lose_ack=True;r=self.d.confirm(e);self.assertEqual(r['status'],'uncertain');before=self.d.posts
         self.tracker.refresh();self.assertEqual(self.d.posts,before)

@@ -29,6 +29,34 @@ date, source revision and qualifications are retained. The consumer owns renderi
 one grouped source inventory; writers supply references instead of another list.
 Retained original source-context documents remain available without rewriting them.
 
+## Country and batch acceptance
+
+APP-025 (27 October 2026): every country assignment includes acquisition of an
+accurate licensed photograph, attribution and offline packaging. Ali owns
+acquisition/provenance and editorial corrections; Alex reviews exact content and
+assets; Marry validates and delivers; Dave owns assignment/release; Codex owns
+screen/PDF presentation. Follow the producer editorial checklist for every
+country. A missing stage is pending, not a failed acquisition. Genuine failure
+needs attempted sources, reason, recovery owner/action and Dave's disposition.
+
+The app projects each country's published detailed/concise editions, photograph,
+coverage and actual review from validated packages. It does not derive execution
+completion from PDF existence, research uncertainty or human nonapproval.
+The batch shows the latest immutable response's `completion` independently.
+Missing package deliverables remain visible with owners/actions. Paperclip owns
+operational stages and dependencies; absent per-country execution events are not
+invented by parsing prose. Existing optional acknowledgement `execution_progress`
+is historical acknowledgement-time text, not an overwriteable progress channel.
+No new exchange, response or report-package fields are required.
+
+Final completion uses a legitimate immutable result successor after actual
+bounded delivery. Unknown future prices and individual eligibility alone do not
+keep accepted work partial. A selected report retains its historical bound result;
+the Markdown appendix labels this separately from the latest request response at
+export. Older report artifacts, annotation pins and reviewed editions remain
+unchanged. Concise exports use human-readable review labels; exact scopes and
+identifiers remain in detailed technical context.
+
 ## Task sequencing
 
 Dave owns the executable task graph; Ali owns preparation and corrections, Alex

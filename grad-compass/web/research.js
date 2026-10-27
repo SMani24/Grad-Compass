@@ -230,9 +230,20 @@
     const list=get("research-request-list");list.replaceChildren();
     if(!items?.length){list.append(node("p","No requests saved yet."));return;}
     for(const item of items){
+      const batch=node('article',undefined,'request-batch');
       const row=node("button",undefined,"request-row");row.type="button";row.dataset.request=item.request_id;row.setAttribute("aria-current",String(item.request_id===identity));
-      row.append(node("strong",scopeLabels[item.scope]),node("span",item.countries.map(countryLabel).join(", ")),node("span",item.state==='prepared' && item.dispatch_receipt ? dispatchLabel(item.dispatch_receipt) : stateLabel(item.state,item.completion)),node("span",dateLabel(item.created_at)));
-      row.addEventListener("click",()=>openRequests(item.request_id,null,null,archive));list.append(row);
+      row.append(node("strong",({country_conditions:'Country research',universities_programs:'University research',refresh:'Research follow-up'})[item.scope] || scopeLabels[item.scope]),node('span',item.countries.length===1?countryLabel(item.countries[0]):item.countries.length+'-country batch'),node('span',new Date(item.created_at).toLocaleDateString()));
+      row.addEventListener("click",()=>openRequests(item.request_id,null,null,archive));batch.append(row);
+      if(item.batch_progress)batch.append(node('p',item.batch_progress.label,'request-batch-summary'));
+      for(const code of item.countries){
+        const progress=item.country_progress?.find(p=>p.country===code);
+        const select=node('button',undefined,'request-country-row');select.type='button';select.dataset.country=code;
+        const label=progress?.available?progress.version+(progress.outstanding.length?' · delivery pending':' · published'):progress?.required===false?'View received findings':'Awaiting prepared report';
+        select.append(node('strong',countryLabel(code)),node('span',label));
+        select.setAttribute('aria-label',countryLabel(code)+': '+label);select.setAttribute('aria-current',String(item.request_id===identity && reportCountry===code));
+        select.addEventListener('click',()=>openRequests(item.request_id,null,null,archive,code));batch.append(select);
+      }
+      list.append(batch);
     }
   }
   function dispatchLabel(receipt) {
@@ -241,7 +252,8 @@
   function stateLabel(state,completion) {
     return {prepared:"Saved — awaiting Dave’s acknowledgement",accepted:"Acknowledged — awaiting findings",rejected:"Acknowledgement rejected",needs_clarification:"Clarification requested",results_received:completion==='partial' ? "Partial findings received" : "Findings received — report preparation and delivery are separate"}[state] || state;
   }
-  async function openRequests(identity=null,revision=null,finding=null,archive=false) {
+  async function openRequests(identity=null,revision=null,finding=null,archive=false,country=null) {
+    if(country)reportCountry=country;
     const sequence=++openSequence;
     if(!researchDialog.open)researchDialog.showModal();
     get("research-message").className="";get("research-message").textContent="Loading…";

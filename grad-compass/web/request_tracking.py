@@ -186,7 +186,8 @@ class RequestTracker:
         for summary in research['requests']:
             detail=self.workspace.research.request(summary['request_id']);request=detail['request'];identity=request['request_id'];entry=by_request.get(identity)
             prepared={r['metadata']['country_code']:r for r in reversed(reports) if r['metadata']['request']['id']==identity and r['model']['kind']=='prepared_report'}
-            report_states=[{'country':code,'available':code in prepared,'version':prepared[code]['model']['version_label'] if code in prepared else None,'review':prepared[code]['model']['review'] if code in prepared else None} for code in request['countries']]
+            from web import batch_progress
+            report_states=batch_progress.countries(request['countries'],prepared,request['scope']=='country_conditions' or bool(prepared))
             track=state['requests'].get(identity,{})
             row={'id':identity,'request_id':identity,'countries':request['countries'],'scope':request['scope'],'intake':request['preferences'].get('intake'),'created_at':request['created_at'],
                 'dispatch_id':entry['id'] if entry else None,'dispatch_status':entry['status'] if entry else 'manual','dispatch_updated_at':(entry.get('updated_at') or entry.get('accepted_at') or entry.get('confirmed_at') or entry['created_at']) if entry else request['created_at'],
@@ -201,6 +202,8 @@ class RequestTracker:
                     connection=config(self.workspace)
                     if connection and entry['destination']=={'company_id':connection['company_id'],'dave_id':connection['dave_id']}:row['task_url']=issue_link(connection,entry['task'])
                 except (ValueError,OSError):pass
+            row['batch_progress']=batch_progress.summary(report_states,summary.get('completion'))
+            row['execution_progress']=summary.get('execution_progress')
             rows.append(self.describe(row))
         for entry in reversed(entries):
             if entry.get('request'):continue
@@ -235,7 +238,12 @@ class RequestTracker:
                 elif not row['results_count']:state='active';label='Research in progress' if phase in ('running','executing') else 'Accepted — waiting for the next step'
             if ready:
                 label=('Reports available' if ready==total else 'Some reports available')+(' · task needs attention' if state in ('failed','blocked') else '')
-                if state not in ('failed','blocked','cancelled'):state='complete' if ready==total else 'partial_reports'
+                if state not in ('failed','blocked','cancelled','retry_scheduled'):
+                    bounded=row.get('response_completion')=='complete'
+                    outstanding=row.get('batch_progress',{}).get('outstanding_count',0)
+                    state='complete' if ready==total and bounded and not outstanding else 'partial_reports'
+                    if ready==total and not bounded:label+=' · response '+('partial' if row.get('response_completion')=='partial' else 'not complete')
+                    if outstanding:label+=' · deliverables outstanding'
         activity=execution.get('lastConfirmedActivityAt') or latest.get('step',{}).get('updatedAt') or row['created_at'];stamp=seconds(activity)
         delayed=state in ('active','waiting','findings','awaiting_delivery','retry_scheduled') and stamp is not None and self.clock()-stamp>STALE_SECONDS
         if delayed and not notice:notice='No recent progress has been reported. Refresh status or open the task; this is not a confirmed failure.'
@@ -244,6 +252,6 @@ class RequestTracker:
         offline=row['tracking'].get('connection_error')
         row.update(status=state,label=label,stage=stage,notice=notice,delayed=delayed,needs_attention=bool(notice or offline),updated_at=max(latest.get('step',{}).get('updatedAt') or row['created_at'],row.get('local_updated_at') or row['created_at'],row.get('dispatch_updated_at') or row['created_at']),last_activity_at=activity,
             work_saved=(str(row['results_count'])+' received result revision(s); '+str(ready)+' prepared country report(s). Earlier versions and annotations are preserved.') if row['results_count'] or ready else 'No findings or prepared reports have been received for this request. Its request and acknowledgement history are saved.',
-            next_action='Open the existing step’s recovery card in Paperclip. A board operator must review the recorded failure, repair any runtime issue and explicitly resume the original owner within the same scope. The app will not submit another task.' if state in ('failed','blocked') else 'Refresh status to check progress; responses are received automatically.',
+            next_action='Open the existing step’s recovery card in Paperclip. A board operator must review the recorded failure, repair any runtime issue and explicitly resume the original owner within the same scope. The app will not submit another task.' if state=='failed' else 'Open the existing task to see its assigned owner and unresolved dependency. A blocked stage is separate from a confirmed execution failure; do not submit another request.' if state=='blocked' else 'Refresh status to check progress; responses are received automatically.',
             task_url=latest.get('task_url') or row.get('task_url'),recovery_url=latest.get('recovery_url'),last_checked_at=row['tracking'].get('last_attempt_at'),last_success_at=row['tracking'].get('last_success_at'))
         return row

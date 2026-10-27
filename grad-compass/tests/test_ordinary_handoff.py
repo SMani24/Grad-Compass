@@ -15,6 +15,26 @@ from web.report_pdf import ensure_pdf,page_data
 class OrdinaryHandoffTests(unittest.TestCase):
     def setUp(self):
         self.f=fixtures.LocalTests();self.f.setUp();self.addCleanup(self.f.doCleanups)
+    def test_future_assignments_include_the_all_country_photo_stage_and_owners(self):
+        prompt=self.f.store.export(self.f.request['request_id'])['prompt']
+        for expected in ('Every new-country assignment','Ali acquires','Alex independently reviews','Marry validates','Dave owns assignment','Codex owns app/PDF display','named recovery owner'):
+            self.assertIn(expected,prompt)
+    def test_export_separates_historical_partial_binding_from_final_request_response(self):
+        from web import research_envelopes as env
+        from web.inbox import InboxReceiver
+        result=receive_country(self.f,completion='partial');root,meta=package(self.f,result)
+        publish(self.f.workspace,root);InboxReceiver(self.f.workspace,quiet_seconds=0).check()
+        report=next(r for r in reports.catalog(self.f.workspace)['reports'] if r['model']['kind']=='prepared_report')
+        original=report['metadata_bytes']
+        final=env.loads(result['_transport']['body']);final.update(result_revision=2,previous_result_revision=1,previous_result_digest=result['digest'],completion='complete')
+        self.f.receive(final)
+        text=markdown(self.f.workspace,report).decode()
+        self.assertIn('"bound_result_delivery": {',text);self.assertIn('"latest_request_response_at_export": {',text)
+        provenance=json.loads(text.split('### Exact version and review receipts',1)[1].split('```json\n',1)[1].split('```',1)[0])
+        self.assertEqual(provenance['bound_result_delivery']['completion'],'partial')
+        self.assertEqual(provenance['latest_request_response_at_export']['completion'],'complete')
+        self.assertEqual(provenance['latest_request_response_at_export']['revision'],2)
+        self.assertEqual(reports.get(self.f.workspace,report['key'])['metadata_bytes'],original)
     def test_received_coverage_and_titles_survive_cache_restart_without_inferred_mapping(self):
         self.f.receive(self.f.ack());value=self.f.result();finding=value['findings'][0]
         finding['sources']=[{'source_id':str(uuid4()),'source_revision':'invented-r1','source_url':'https://example.invalid/costs','title':'Invented national cost guide','publisher':'Invented public authority','locator':'Cost section','observed_at':'2026-10-25T00:00:00Z'}]

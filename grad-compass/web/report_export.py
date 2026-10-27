@@ -116,9 +116,15 @@ def markdown(workspace,report,include_annotations=False):
     provenance={'report_id':meta['report_id'],'canonical_document':public_ref(doc),'evidence_map_sha256':meta['evidence_map']['sha256'],
       'request':meta['request'],'producer_result':meta.get('producer_result'),'canonical_factual_review':meta.get('canonical_factual_review',{'state':'unknown'}),
       'human_approval':meta.get('human_approval',{'state':'unknown'}),'source_artifact':meta.get('source_artifact'),
-      'source_citation_scope':meta.get('source_citation_scope'),'scope':model.get('scope'),'delivery':model.get('delivery'),
+      'source_citation_scope':meta.get('source_citation_scope'),'scope':model.get('scope'),'bound_result_delivery':model.get('delivery'),
       'preparation':model.get('preparation'),'editorial_editions':{kind:{'metadata_sha256':report[kind]['id'],**public_ref(report[kind]['metadata'])} for kind in ('reader','detailed') if report.get(kind)}}
-    lines+=['### Exact version and review receipts','', '```json',json.dumps(provenance,ensure_ascii=False,indent=2),'```','']
+    latest=[] if meta.get('archived') else workspace.research.request(meta['request']['id'])['results']
+    if latest:
+        value=latest[-1]['envelope']
+        provenance['latest_request_response_at_export']={k:value.get(k) for k in ('result_id','revision','digest','issued_at','completion')}
+    lines+=['### Exact version and review receipts','',
+      'Bound-result delivery records the historical response used by this immutable package. The latest request response below is a separate delivery snapshot at export; neither implies exhaustive research or human approval.','',
+      '```json',json.dumps(provenance,ensure_ascii=False,indent=2),'```','']
     if include_annotations:
         from web.report_packages import annotations
         lines+=['## Personal annotations (explicitly included)','',

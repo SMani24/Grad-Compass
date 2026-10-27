@@ -47,7 +47,8 @@
       const heading=node('div',undefined,'tracked-request-heading');heading.append(node('h3',row.countries.map(country).join(', ')),node('span',row.label,'tracked-request-state'));card.append(heading);
       card.append(node('p',scope(row.scope)+' · Intake: '+(row.intake || 'Not specified'),'tracked-request-summary'));
       card.append(node('p','Created '+date(row.created_at)+' · Updated '+date(row.updated_at),'tracked-request-dates'));
-      card.append(node('p','Current step: '+row.stage.replace(/^([A-Z]{3}):/,(_,code)=>country(code)+':')));
+      const stage=row.stage.startsWith('Grad Compass:')?'Country report coordination':row.stage.replace(/^([A-Z]{3}):/,(_,code)=>country(code)+':');
+      card.append(node('p','Current step: '+stage));
       if(row.notice)card.append(node('p',row.notice,'request-persistent-notice'));
       if(row.tracking.connection_error)card.append(node('p',row.tracking.connection_error+' Last successful status check: '+date(row.last_success_at)+'. This is not a new confirmed research failure.','request-connection-notice'));
       card.append(node('p',row.work_saved));
@@ -62,10 +63,22 @@
       }
       for(const error of row.delivery_errors)card.append(node('p','Delivery problem: '+error.error,'request-persistent-notice'));
       if(row.reports.length){
-        const details=node('details');details.dataset.details=row.id+':reports';details.open=opened.has(details.dataset.details);details.append(node('summary','Report availability and review'));
+        const details=node('details');details.dataset.details=row.id+':reports';details.open=opened.has(details.dataset.details);details.append(node('summary',row.batch_progress?.label || 'Country progress and review'));
+        if(row.batch_progress)details.append(node('p',row.batch_progress.qualification));
         for(const report of row.reports){
-          details.append(node('p',country(report.country)+': '+(report.available?report.version+' available. Report review: '+(report.review?.report?.state || 'unknown')+'; overview review: '+(report.review?.overview?.state || 'not published')+'; human approval: '+(report.review?.human?.state || 'unknown')+'.':'No prepared report published for this request.')));
+          const section=node('section',undefined,'request-country-progress');section.dataset.country=report.country;
+          section.append(node('h4',country(report.country)),node('p',report.available?report.version+' published · Overview '+(report.overview==='published'?'published':'not published')+' · Photograph '+report.photo.replaceAll('_',' '):'No prepared report published for this request.'));
+          if(report.review)section.append(node('p','Report review: '+(report.review.report?.state || 'unknown').replaceAll('_',' ')+' · Overview review: '+(report.review.overview?.state || 'not published').replaceAll('_',' ')+' · Human approval: '+(report.review.human?.state || 'unknown').replaceAll('_',' ')));
+          for(const pending of report.outstanding || []){
+            section.append(node('p',pending.item+' — '+pending.owner+': '+pending.action,'request-next-action'));
+            if(pending.reason){const recorded=node('details');recorded.append(node('summary','Recorded delivery note'),node('p',pending.reason));section.append(recorded);}
+          }
+          const uncertainties=(report.coverage || []).filter(c=>c.state==='investigated_unresolved');
+          if(uncertainties.length){const more=node('details');more.append(node('summary','Research uncertainties (separate from delivery)'));for(const c of uncertainties)more.append(node('p',c.title+': '+c.detail));section.append(more);}
+          action(section,report.available?'Read '+country(report.country)+' report':'View '+country(report.country)+' findings',()=>{dialog.close();window.GradCompassResearch.openRequests(row.request_id,null,null,false,report.country);});
+          details.append(section);
         }
+        if(row.execution_progress)details.append(node('p','Producer’s acknowledgement progress (historical): '+row.execution_progress));
         card.append(details);
       }
       const actions=node('div',undefined,'tracked-request-actions');
