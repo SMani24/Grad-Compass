@@ -29,6 +29,42 @@ date, source revision and qualifications are retained. The consumer owns renderi
 one grouped source inventory; writers supply references instead of another list.
 Retained original source-context documents remain available without rewriting them.
 
+## Task sequencing
+
+Dave owns the executable task graph; Ali owns preparation and corrections, Alex
+owns independent exact-edition review, and Marry owns compatible transport.
+Artifact readiness, factual acceptance, transport receipt and final release are
+different milestones. A producer task may be preparation-complete once its exact
+immutable editions and bindings are ready, even while review remains pending.
+This never marks the research accepted or permits final publication.
+
+Do not make Alex wait for closure of a producer task that is itself waiting for
+Alex's review. Either complete that preparation stage when the artifacts are
+ready, or keep the producer's correction ownership open while removing only the
+obsolete blocking dependency from the ready review task. Keep the explicit
+version-bound input handoff and the parent/delivery/release gates. A relationship
+recording ownership need not be an execution-blocking dependency.
+
+When review requires changes, Ali must be able to prepare new immutable versions
+without waiting for reviewer-task closure. Alex re-reviews the delivered hashes;
+old dispositions do not transfer. Return any agent-directed correction question
+through the existing handoff, never a new applicant research request. Do not turn
+routine agent coordination into a human approval requirement.
+
+On a rejected task/dependency change, read its actual error and current task,
+run and version state. Resolve the stated conflict through supported controls;
+do not repeat the same failed mutation or merely post that it is fixed. Read back
+the saved dependency graph and confirm the intended assignee can check out the
+ready task. If still blocked, Dave records the exact next action and owner and
+escalates a concrete operator-only limitation. No blind retries, quota bypass,
+automatic new research, factual acceptance or release is authorized by this rule.
+
+Results may be received independently of a prepared report's final release.
+Marry retains the exact request/result revision chain and genuine receipt checks;
+an offline validation proxy is not receipt. Final packages still require the
+actual review dispositions and Dave's release. No transport/schema change or
+automatic agent execution is introduced by this sequencing guidance.
+
 ## Ordinary photographic asset
 
 Use existing `assets[]` entries: kind `photo`, relative_path, exact byte sha256,
