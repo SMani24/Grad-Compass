@@ -283,8 +283,24 @@ if (typeof document !== "undefined") {
     }
     elements.country.value = code; closeInspector(false, false);
     if (state.mode === "countries") showCountry(code);
+    if (state.mode === "countries") revealCountryCard(code);
     if (record) updateUrl();
     if (frame) focusCountry(code);
+  }
+  function revealCountryCard(code) {
+    const card = [...elements.results.querySelectorAll(".country-card")].find(item => item.dataset.country === code);
+    if (!card) return;
+    // Scroll only the exploration panel, leaving the map and page in place.
+    for (const container of [elements.results, elements.results.closest(".results-panel")]) {
+      if (!container.clientWidth || !container.clientHeight) continue;
+      const bounds = container.getBoundingClientRect();
+      const target = card.parentElement.getBoundingClientRect();
+      const left = bounds.left + container.clientLeft, top = bounds.top + container.clientTop;
+      const nearest = (start, end, low, high) => start < low ? start - low
+        : end > high ? Math.min(end - high, start - low) : 0;
+      container.scrollTop += nearest(target.top, target.bottom, top, top + container.clientHeight);
+      container.scrollLeft += nearest(target.left, target.right, left, left + container.clientWidth);
+    }
   }
   function closeInspector(restoreFocus = true, record = true) {
     state.detailSequence++;
@@ -485,13 +501,15 @@ if (typeof document !== "undefined") {
     }
   }
   function renderCountries() {
+    const positions = [elements.results, elements.results.closest(".results-panel")].map(container =>
+      ({ container, top: container.scrollTop, left: container.scrollLeft }));
     const countries = filterCountries(state.countries, elements.search.value).filter(country => get("country-list-scope").value !== "watched" || window.GradCompassResearch.personal(country.code).watched);
     window.GradCompassResearch.setMatching(countries);
-    elements.results.replaceChildren();
+    const cards = document.createDocumentFragment();
     get("result-count").textContent = countries.length;
     get("mapped-count").textContent = "Saved university counts describe coverage, not suitability";
     const emptyCountryText = get("country-list-scope").value === "watched" && !elements.search.value ? "No saved countries yet. Use Save country in country details or Select countries on the map." : "No countries match this search.";
-    if (!countries.length) elements.results.append(node("p", "empty-state", state.geometry ? emptyCountryText : "Loading countries…"));
+    if (!countries.length) cards.append(node("p", "empty-state", state.geometry ? emptyCountryText : "Loading countries…"));
     const table = node("table"); const head = node("thead"); const headings = node("tr");
     for (const title of ["Country", "Saved universities", "Personal decision", "Saved countries"]) { const cell = node("th", "", title); cell.scope = "col"; headings.append(cell); }
     head.append(headings); table.append(head); const body = node("tbody");
@@ -504,7 +522,7 @@ if (typeof document !== "undefined") {
       const progress=window.GradCompassResearch.countryStatus(country.code,count);
       card.append(node("span", "country-tag", /^[A-Z]{3}$/.test(country.code) ? country.code : "Country / territory"), node("span", "university-name", country.flag + " " + country.name), node("span", "coverage-hint", progress.report),node('span','coverage-hint',progress.review),node('span','coverage-hint',progress.discovery), node("span", "decision-badge", state.decisions[country.code] || "No personal decision"));
       card.addEventListener("click", () => activateCountry(country.code));
-      const entry = node("div", "country-entry"); entry.append(card,window.GradCompassResearch.cardControls(country.code)); elements.results.append(entry);
+      const entry = node("div", "country-entry"); entry.append(card,window.GradCompassResearch.cardControls(country.code)); cards.append(entry);
       const row = node("tr", selected ? "selected" : ""); row.dataset.country = country.code;
       const name = node("td"); const button = node("button", "", country.flag + " " + country.name);
       button.addEventListener("click", () => activateCountry(country.code)); name.append(button);
@@ -514,6 +532,10 @@ if (typeof document !== "undefined") {
     }
     table.append(body);
     get("university-table").replaceChildren(countries.length ? table : node("p", "empty-state", emptyCountryText));
+    elements.results.replaceChildren(cards);
+    for (const { container, top, left } of positions) {
+      container.scrollTop = top; container.scrollLeft = left;
+    }
   }
   function universityEmptyMessage() {
     const noSavedHere = elements.country.value && !state.universities.some(university => university.country_code === elements.country.value);
