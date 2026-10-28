@@ -9,6 +9,7 @@ from copy import deepcopy
 from web import research_envelopes as env
 from web.local import regular
 from web.dispatch import Dispatch,Paperclip,config,durable
+from web.execution_status import active_recovery,closed_cancellation,assess,older
 
 VERSION='grad-compass-request-tracking-1'
 STALE_SECONDS=1800
@@ -59,7 +60,7 @@ def inspect(client,entry,connection):
     observations=[];unavailable_steps=[];diagnostic_notes=[]
     for identity,summary in candidates.items():
         # Finished siblings do not imply completion of the research request.
-        if identity!=root['id'] and summary.get('status') in ('done','cancelled'):continue
+        if identity!=root['id'] and summary.get('status') in ('done','cancelled') and not active_recovery(summary.get('activeRecoveryAction')) and not summary.get('scheduledRetry'):continue
         try:
             issue=root if identity==root['id'] else client.issue(identity)
             if not isinstance(issue,dict) or issue.get('companyId')!=connection['company_id'] or issue.get('id')!=identity:raise ValueError('Task dependency identity does not match')
@@ -76,7 +77,8 @@ def inspect(client,entry,connection):
         observations.append((issue,projection,execution,recovery))
     def rank(item):
         issue,projection,execution,recovery=item
-        return (execution.get('phase') in ('failed','recovery_needed'),bool(recovery),issue.get('status')=='blocked',execution.get('phase') in ('running','executing'),issue['id']!=root['id'])
+        stopped=execution.get('phase') in ('failed','recovery_needed') and not closed_cancellation({**issue,'blockedBy':[]},execution,recovery)
+        return (stopped,active_recovery(recovery),issue.get('status')=='blocked',execution.get('phase') in ('running','executing'),issue['id']!=root['id'])
     issue,projection,execution,recovery=max(observations,key=rank)
     run_id=projection.get('runId');run={};failure=None;run_history=[]
     if run_id:
@@ -112,11 +114,19 @@ def inspect(client,entry,connection):
     safe_execution={k:execution.get(k) for k in ('phase','label','cause','lastConfirmedActivityAt','retryAt','attempt','maxAttempts','permittedActions','predecessorRunId','successorRunId')}
     safe_run={k:run.get(k) for k in ('runId','status','startedAt','finishedAt','errorCode','retryExhaustedReason','retryOfRunId')}
     safe_recovery={k:recovery.get(k) for k in ('id','kind','status','ownerType','cause','nextAction')} if recovery else None
-    return {'task':{k:root.get(k) for k in ('id','identifier','status','updatedAt')},
-        'step':{k:issue.get(k) for k in ('id','identifier','title','status','updatedAt')},
+    work=assess(issue,execution,recovery,run,matching if run_id else [])
+    # Issue and attempt endpoints are separate reads. Reject a mixed transition
+    # instead of briefly presenting an old failure as the new task's state.
+    def stamp(value):
+        if not isinstance(value,dict):raise ValueError('Paperclip task readback has an unsupported shape; the last known state is retained.')
+        return [value.get(k) for k in ('id','statusVersion','status','updatedAt','assigneeAgentId','activeRecoveryAction')]+[value.get('blockedBy',[])]
+    if stamp(client.issue(root['id']))!=stamp(root) or issue['id']!=root['id'] and stamp(client.issue(issue['id']))!=stamp(issue):
+        raise ValueError('Paperclip changed during the status check. The last known state is retained; refresh again.')
+    return {'task':{k:root.get(k) for k in ('id','identifier','status','updatedAt','completedAt','statusVersion')},
+        'step':{k:issue.get(k) for k in ('id','identifier','title','status','updatedAt','completedAt','statusVersion')},
         'task_url':issue_link(connection,root),'recovery_url':issue_link(connection,issue),
         'run':safe_run,'run_history':run_history,'execution':safe_execution,'recovery':safe_recovery,'failure':failure,
-        'scheduled_retry':bool(issue.get('scheduledRetry')),'unavailable_steps':unavailable_steps,'diagnostic_notes':diagnostic_notes,'observed_at':env.now()}
+        'current_work':work,'scheduled_retry':bool(issue.get('scheduledRetry')),'unavailable_steps':unavailable_steps,'diagnostic_notes':diagnostic_notes,'observed_at':env.now()}
 
 
 class RequestTracker:
@@ -167,6 +177,9 @@ class RequestTracker:
                     row['last_attempt_at']=attempted;row['connection_error']=problem
                     if observation and row.get('latest',{}).get('step',{}).get('id') in observation.get('unavailable_steps',[]):
                         row['connection_error']='The previously observed step cannot currently be refreshed. Its last known state is retained.';observation=None
+                    if observation and older(observation,row.get('latest')):
+                        row['refresh_note']='An older Paperclip update was ignored; the latest confirmed state is retained.';observation=None
+                    elif observation:row.pop('refresh_note',None)
                     if observation is not None:
                         signature=env.fingerprint({k:v for k,v in observation.items() if k!='observed_at'})
                         if row.get('signature')!=signature:
@@ -212,6 +225,7 @@ class RequestTracker:
         return {'requests':rows,'attention_count':sum(r['needs_attention'] for r in rows),'unassociated_delivery_errors':[e for e in errors if not e.get('request_id')],'checked_at':env.now()}
     def describe(self,row):
         latest=row['tracking'].get('latest',{});execution=latest.get('execution',{});phase=execution.get('phase');dispatch=row['dispatch_status']
+        work=latest.get('current_work',{});resolved=work.get('state')=='resolved'
         state='waiting';label='Saved — waiting for acknowledgement';stage='Manual handoff';notice=None
         ready=sum(r['available'] for r in row['reports']);total=len(row['countries'])
         if dispatch in ('draft','pending','uncertain','dispatching','cancelled','superseded'):
@@ -227,11 +241,14 @@ class RequestTracker:
                 task_status=latest['task']['status']
                 if latest.get('scheduled_retry'):
                     state='retry_scheduled';label='Paperclip retry scheduled';notice='Paperclip has a scheduled retry. No additional retry will be started by the app.'
-                elif phase in ('failed','recovery_needed'):
+                elif (phase in ('failed','recovery_needed') and not resolved) or work.get('state')=='unresolved':
                     state='failed';label='Research step failed' if phase=='failed' else 'Recovery required'
-                    notice='A research step stopped. Existing saved work is preserved.'
+                    step=latest.get('step',{});name=step.get('title') or 'Research execution'
+                    if name.startswith('Grad Compass:'):name='Country report coordination'
+                    notice=name+' ('+(step.get('identifier') or 'linked task')+') stopped. Existing findings and reports are preserved.'
+                    if work.get('reason')=='post_completion_failure':notice+=' Paperclip has not reconciled this attempt with its completed task; the recorded recovery must be checked.'
                     if latest.get('failure') and 'not trusted' in latest['failure']:
-                        notice='The researcher could not start because its working folder was not trusted. The runtime setup must be repaired before an explicit retry.'
+                        notice+=' The assigned runtime could not start because its working folder was not trusted; its setup needs repair before an explicit retry.'
                 elif task_status=='cancelled':state='cancelled';label='Paperclip task cancelled';notice='The accepted task was cancelled in Paperclip. Its request and any saved work remain.'
                 elif task_status=='blocked':state='blocked';label='Waiting on a blocked step';notice='The assigned work needs attention in Paperclip. No automatic restart is requested.'
                 elif task_status=='done':state='awaiting_delivery';label='Execution finished — waiting for report delivery'
@@ -241,7 +258,9 @@ class RequestTracker:
                 if state not in ('failed','blocked','cancelled','retry_scheduled'):
                     bounded=row.get('response_completion')=='complete'
                     outstanding=row.get('batch_progress',{}).get('outstanding_count',0)
-                    state='complete' if ready==total and bounded and not outstanding else 'partial_reports'
+                    execution_done=not latest or resolved or work.get('state')=='complete' or latest.get('task',{}).get('status')=='done'
+                    state='complete' if ready==total and bounded and not outstanding and execution_done else 'partial_reports'
+                    if state=='complete':label+=' · request complete'
                     if ready==total and not bounded:label+=' · response '+('partial' if row.get('response_completion')=='partial' else 'not complete')
                     if outstanding:label+=' · deliverables outstanding'
         activity=execution.get('lastConfirmedActivityAt') or latest.get('step',{}).get('updatedAt') or row['created_at'];stamp=seconds(activity)
@@ -250,8 +269,18 @@ class RequestTracker:
         elif delayed and state=='retry_scheduled':notice+=' No recent progress has been reported; refresh or inspect the existing retry in Paperclip.'
         if row['delivery_errors']:notice='An incoming response could not be validated or recorded. Earlier findings and reports are preserved.'
         offline=row['tracking'].get('connection_error')
+        next_action='Refresh status to check progress; responses are received automatically.'
+        if state=='complete':next_action='No recovery action is needed. Reports are ready for inspection; factual review and human approval remain separate.'
+        elif state=='failed':
+            recovery=latest.get('recovery') or {}
+            action=recovery.get('nextAction') if active_recovery(recovery) else None
+            if latest.get('failure') and 'not trusted' in latest['failure']:action='Repair the assigned runtime’s trusted working-folder configuration, then explicitly resume this existing step.'
+            elif latest.get('failure') and 'usage or rate limit' in latest['failure']:action='Wait for the provider limit to clear, then review the existing step’s supported recovery action.'
+            next_action=(action[:1000] if isinstance(action,str) and action.strip() else 'Dave must reconcile the stopped attempt and any unfinished deliverable in the linked task before resuming only the necessary step.')+' Completed research must be reused; do not submit another request.'
+        elif state=='blocked':next_action='Open the existing task to see its assigned owner and unresolved dependency. A blocked stage is separate from a confirmed execution failure; do not submit another request.'
+        if row['delivery_errors']:next_action='Inspect the recorded incoming-response error and repair or redeliver that exact response through recovery. Do not repeat successful research.'
         row.update(status=state,label=label,stage=stage,notice=notice,delayed=delayed,needs_attention=bool(notice or offline),updated_at=max(latest.get('step',{}).get('updatedAt') or row['created_at'],row.get('local_updated_at') or row['created_at'],row.get('dispatch_updated_at') or row['created_at']),last_activity_at=activity,
             work_saved=(str(row['results_count'])+' received result revision(s); '+str(ready)+' prepared country report(s). Earlier versions and annotations are preserved.') if row['results_count'] or ready else 'No findings or prepared reports have been received for this request. Its request and acknowledgement history are saved.',
-            next_action='Open the existing step’s recovery card in Paperclip. A board operator must review the recorded failure, repair any runtime issue and explicitly resume the original owner within the same scope. The app will not submit another task.' if state=='failed' else 'Open the existing task to see its assigned owner and unresolved dependency. A blocked stage is separate from a confirmed execution failure; do not submit another request.' if state=='blocked' else 'Refresh status to check progress; responses are received automatically.',
+            execution_health=work.get('state') or ('unresolved' if state=='failed' else 'unknown'),execution_resolution=work if resolved else None,next_action=next_action,
             task_url=latest.get('task_url') or row.get('task_url'),recovery_url=latest.get('recovery_url'),last_checked_at=row['tracking'].get('last_attempt_at'),last_success_at=row['tracking'].get('last_success_at'))
         return row

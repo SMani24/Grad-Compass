@@ -31,6 +31,7 @@ def main():
     parser.add_argument('--narrow',action='store_true',help='Also inspect the reader at a 390px window, retaining the owner text size')
     parser.add_argument('--configured-exports',action='store_true',help='Exercise the current profile’s real configured export destination without changing it')
     parser.add_argument('--batch-request',help='Also verify this existing batch’s accessible country progress and sidebar actions')
+    parser.add_argument('--expect-request-complete',action='store_true',help='With --batch-request, verify no active recovery notice and exclusion from Needs attention')
     parser.add_argument('--allow-findings',action='store_true',help='Allow honestly labelled received findings when no prepared package is published')
     args=parser.parse_args()
     profiles=LocalProfiles(args.local_dir);w=profiles.workspace
@@ -105,6 +106,12 @@ def main():
             if args.batch_request:
                 click('open-requests');wait('!!document.querySelector(\'.tracked-request[data-request="'+args.batch_request+'"]\')')
                 selector='.tracked-request[data-request="'+args.batch_request+'"]'
+                if args.expect_request_complete:
+                    wait('document.querySelector('+json.dumps(selector)+').dataset.status==="complete"')
+                    assert js('document.querySelector('+json.dumps(selector)+').textContent.includes("No recovery action is needed")')
+                    assert js('!document.querySelector('+json.dumps(selector+' .request-persistent-notice')+')')
+                    select('requests-filter','attention');wait('!document.querySelector('+json.dumps(selector)+')')
+                    shot('batch-absent-from-attention');select('requests-filter','all');wait('!!document.querySelector('+json.dumps(selector)+')')
                 js('document.querySelector('+json.dumps(selector)+').scrollIntoView({block:"start"})')
                 js('[...document.querySelectorAll('+json.dumps(selector+' details')+')].find(n=>n.dataset.details.endsWith(":reports")).open=true')
                 assert js('document.querySelectorAll('+json.dumps(selector+' .request-country-progress')+').length')==len(latest)
@@ -197,7 +204,10 @@ def main():
             assert all((hashlib.sha256((w.directory/name).read_bytes()).hexdigest(),(w.directory/name).stat().st_mtime_ns)==value for name,value in protected.items()),'Existing producer artifact changed'
             from web.inbox import InboxReceiver
             replay=InboxReceiver(w).check();assert replay['received']==0 and not replay['errors'],replay
-            result={'passed':True,'profile':active,'countries':receipt,'export_preference':export_preference,'actual_export_directory':str(downloads),'configured_destination_exercised':args.configured_exports,'personal_overlay_bytes_unchanged':True,'research_unchanged':True,'protected_original_files':len(protected),'protected_original_bytes_and_mtimes_unchanged':True,'replay':replay,'normal_country_card_and_selector_routes':True,'qa_position_writes_suppressed':True,'catalog_errors':reports.catalog(w)['errors']}
+            from web.request_tracking import RequestTracker
+            request_status=next((r for r in RequestTracker(w).snapshot()['requests'] if r['request_id']==args.batch_request),None) if args.batch_request else None
+            if args.expect_request_complete:assert request_status['status']=='complete' and not request_status['needs_attention']
+            result={'passed':True,'profile':active,'countries':receipt,'request_status':request_status,'export_preference':export_preference,'actual_export_directory':str(downloads),'configured_destination_exercised':args.configured_exports,'personal_overlay_bytes_unchanged':True,'research_unchanged':True,'protected_original_files':len(protected),'protected_original_bytes_and_mtimes_unchanged':True,'replay':replay,'normal_country_card_and_selector_routes':True,'qa_position_writes_suppressed':True,'catalog_errors':reports.catalog(w)['errors']}
             assert not result['catalog_errors'],result['catalog_errors']
             atomic_json(out/('restart.local.json' if args.restart else 'normal.local.json'),result)
             passed.append(True);print('Main-Apply card/selector/default/history/native export receipt passed for '+','.join(latest)+'.',flush=True)

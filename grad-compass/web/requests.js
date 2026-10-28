@@ -6,8 +6,8 @@
   const country=code=>typeof BY_CODE!=='undefined'?BY_CODE[code]?.name || code:code;
   const date=value=>value?new Date(value).toLocaleString():'Not checked yet';
   const scope=code=>({country_conditions:'Country conditions',universities_programs:'Universities and programs',refresh:'Follow-up / refresh'}[code] || code);
-  let data=null,busy=false,timer=null,signature='';
-  async function read(){const r=await fetch('/api/requests',{cache:'no-store'});const value=await r.json();if(!r.ok)throw Error(value.error || 'Could not load request history');data=value;render();return value;}
+  let data=null,busy=false,timer=null,signature='',readSequence=0;
+  async function read(){const sequence=++readSequence,r=await fetch('/api/requests',{cache:'no-store'});const value=await r.json();if(sequence!==readSequence)return data;if(!r.ok)throw Error(value.error || 'Could not load request history');data=value;render();return value;}
   function action(target,label,fn){const b=node('button',label);b.type='button';b.addEventListener('click',async()=>{b.disabled=true;try{await fn();}catch(e){get('requests-status').textContent=e.message;}finally{b.disabled=false;}});target.append(b);return b;}
   function link(target,label,url){if(!url)return;const a=node('a',label,'request-link');a.href=url;a.target='_blank';a.rel='noopener noreferrer';target.append(a);}
   function matches(row){
@@ -54,11 +54,12 @@
       card.append(node('p',row.work_saved));
       card.append(node('p','Last status check: '+date(row.last_checked_at)+' · Last reported activity: '+date(row.last_activity_at),'tracked-request-dates'));
       if(row.task)card.append(node('p','Paperclip task '+row.task.identifier+' · same confirmed request retained.','tracked-request-dates'));
-      if(row.status==='failed' || row.status==='blocked')card.append(node('p',row.next_action,'request-next-action'));
+      if(['failed','blocked','complete'].includes(row.status))card.append(node('p',row.next_action,row.status==='complete'?'request-resolution':'request-next-action'));
+      if(row.execution_resolution){const history=node('details');history.dataset.details=row.id+':resolution';history.open=opened.has(history.dataset.details);history.append(node('summary','Resolved execution event'),node('p',row.execution_resolution.message));card.append(history);}
       if(row.status==='failed'){
         const recovery=node('details');recovery.dataset.details=row.id+':recovery';recovery.open=opened.has(recovery.dataset.details);recovery.append(node('summary','How to recover this request'));
         const steps=node('ol');
-        for(const text of ['Open “Resume / recover in Paperclip” below. It opens the existing failed step, not a new request.',row.tracking.latest?.failure?.includes('not trusted')?'A Paperclip board operator must repair the researcher’s working-folder setup using the existing authorized Grad Compass repository. Keep the trust checks enabled.':'Review the recorded problem and any provider limits. Complete any required operator repair or human decision before retrying.','Use Paperclip’s supported recovery card to explicitly resume the original assigned owner, preserving the confirmed scope. Do not submit another research task.','Return here and refresh status. Saved findings, earlier reports and annotations remain available.'])steps.append(node('li',text));
+        for(const text of ['Open the linked Paperclip step and inspect its current recovery record.',row.next_action,'Refresh status afterward. Saved findings, earlier reports and annotations remain available.'])steps.append(node('li',text));
         recovery.append(steps,node('p','Dave coordinates execution recovery; Marry supports runtime and delivery diagnosis. In-app restart is unavailable until a safe conditional retry capability is verified.'));card.append(recovery);
       }
       for(const error of row.delivery_errors)card.append(node('p','Delivery problem: '+error.error,'request-persistent-notice'));

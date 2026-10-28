@@ -23,19 +23,32 @@ class TrackingTests(unittest.TestCase):
         self.routes(self.root,self.execution)
     def routes(self,issue,execution):
         prefix='/api/issues/'+issue['id'];self.d.routes.update({prefix:issue,prefix+'/execution':execution,prefix+'/runs':[{'runId':execution['runId'],'agentId':execution['agentId'],'contextIssueId':issue['id'],'status':execution['execution']['phase']}],prefix+'/comments':[]})
+    def published(self):
+        """Receive an invented complete response and a photographed CAN package."""
+        from report_fixtures import package
+        from web.report_delivery import publish
+        from PIL import Image
+        self.d.f.receive(self.d.f.ack());result=self.d.f.result();finding=self.d.f.country()
+        finding['sources']=[{'source_id':str(uuid4()),'source_revision':'fixture-r1','source_url':'https://example.invalid/source','locator':'Invented source','observed_at':env.now()}]
+        result['findings']=[finding];self.d.f.receive(result)
+        saved=self.w.research.request(self.identity)['results'][0]['envelope'];root,meta=package(self.d.f,saved,code='CAN')
+        image=root/'image.jpg';Image.new('RGB',(100,80),(10,70,90)).save(image)
+        meta['assets']=[{'kind':'photo','relative_path':'image.jpg','sha256':report_packages.digest(image.read_bytes()),'media_type':'image/jpeg','alt':'Invented fixture','caption':'Invented fixture','credit':'Fixture','source_url':'https://example.invalid/photo','license':'Invented permission'}]
+        atomic_json(root/'metadata.local.json',meta);publish(self.w,root)
+        receiver=InboxReceiver(self.w,quiet_seconds=0);self.w.inbox_receiver=receiver;self.assertFalse(receiver.check()['errors'])
     def row(self,service=None):return next(r for r in (service or self.tracker).snapshot()['requests'] if r['request_id']==self.identity)
-    def fail(self):
+    def stop_execution(self):
         self.root['status']='blocked';self.execution['execution'].update(phase='failed',cause='adapter_failed',attempt=3,maxAttempts=3,successorRunId=None)
         self.execution['recoveryAction']={'id':str(uuid4()),'kind':'stranded_assigned_issue','status':'active','ownerType':'board','nextAction':'Repair runtime, then explicitly recover the existing task.'}
         self.d.routes['/api/issues/'+self.root['id']+'/comments']=[{'authorType':'system','metadata':{'sourceRunId':self.run,'sections':[{'rows':[{'label':'Failure summary','value':'Not inside a trusted directory and --skip-git-repo-check was not specified.'}]}]}}]
     def test_accepted_then_failed_request_and_notice_survive_restart_without_changing_history(self):
         self.d.f.receive(self.d.f.ack());before=self.w.research.request(self.identity)
         self.tracker.refresh();self.assertEqual(self.row()['status'],'active')
-        self.fail();self.tracker.refresh();r=self.row();self.assertEqual(r['status'],'failed');self.assertIn('not trusted',r['notice']);self.assertTrue(r['needs_attention'])
+        self.stop_execution();self.tracker.refresh();r=self.row();self.assertEqual(r['status'],'failed');self.assertIn('not trusted',r['notice']);self.assertTrue(r['needs_attention'])
         reopened=RequestTracker(LocalWorkspace(self.w.directory));self.assertEqual(self.row(reopened)['status'],'failed');self.assertEqual(len(self.row(reopened)['tracking']['history']),2)
         self.assertEqual(self.w.research.request(self.identity),before);self.assertEqual(self.d.creates,1);self.assertEqual(self.d.posts,1)
     def test_unavailable_retains_last_known_failure_and_does_not_claim_a_new_failure(self):
-        self.fail();self.tracker.refresh();first=self.row();self.d.online=False;self.tracker.refresh();r=self.row()
+        self.stop_execution();self.tracker.refresh();first=self.row();self.d.online=False;self.tracker.refresh();r=self.row()
         self.assertEqual(r['status'],'failed');self.assertTrue(r['tracking']['connection_error']);self.assertEqual(r['last_success_at'],first['last_success_at']);self.assertEqual(r['tracking']['history'],first['tracking']['history'])
         self.d.online=True;self.execution['execution']['phase']='running';self.root['status']='in_progress';self.execution['recoveryAction']=None;self.tracker.refresh();self.d.online=False;self.tracker.refresh()
         self.assertEqual(self.row()['status'],'active');self.assertNotIn('failed',self.row()['label'].lower())
@@ -84,13 +97,90 @@ class TrackingTests(unittest.TestCase):
         self.assertEqual(self.tracker.describe(deepcopy(row))['status'],'complete')
         row['batch_progress']['outstanding_count']=1
         self.assertEqual(self.tracker.describe(deepcopy(row))['status'],'partial_reports')
-        self.fail();self.tracker.refresh();row['tracking']=self.row()['tracking']
+        self.stop_execution();self.tracker.refresh();row['tracking']=self.row()['tracking']
         self.assertEqual(self.tracker.describe(deepcopy(row))['status'],'failed')
+
+    def test_failure_then_successful_recovery_restart_and_refresh_keep_old_event_only_in_history(self):
+        self.published();self.root.update(statusVersion=1,updatedAt='2026-10-28T01:00:00Z');self.stop_execution();self.tracker.refresh();old=self.tracker.read()['requests'][self.identity]['history'][0]
+        self.root.update(status='done',updatedAt='2026-10-28T02:00:00Z',completedAt='2026-10-28T02:00:00Z',statusVersion=2)
+        self.execution['recoveryAction']=None;self.execution['execution'].update(phase='completed',cause=None);self.execution['runId']=str(uuid4())
+        self.routes(self.root,self.execution);self.tracker.refresh();row=self.row()
+        self.assertEqual(row['status'],'complete');self.assertFalse(row['needs_attention']);self.assertIn('No recovery action',row['next_action'])
+        state=self.tracker.read();self.assertEqual(state['requests'][self.identity]['history'][0],old)
+        reopened=RequestTracker(LocalWorkspace(self.w.directory))
+        for _ in range(2):reopened.refresh()
+        self.assertEqual(self.row(reopened)['status'],'complete');self.assertFalse(self.row(reopened)['needs_attention'])
+        self.assertEqual(reopened.read()['requests'][self.identity]['history'],state['requests'][self.identity]['history']);self.assertEqual(self.d.posts,1)
+
+    def test_completed_task_cancelled_continuation_is_historical_but_active_recovery_is_not(self):
+        self.published();self.root.update(status='done',completedAt='2026-10-28T01:00:00Z')
+        self.execution['execution'].update(phase='failed',label='Cancelled',cause='continuation_task_ownership_changed')
+        self.d.routes['/api/issues/'+self.root['id']+'/runs'][0].update(status='cancelled',errorCode='continuation_task_ownership_changed',startedAt='2026-10-28T01:00:01Z',finishedAt='2026-10-28T01:00:02Z')
+        self.tracker.refresh();row=self.row();self.assertEqual(row['status'],'complete');self.assertFalse(row['needs_attention'])
+        self.assertEqual(row['execution_resolution']['reason'],'closed_task_continuation_cancelled')
+        self.assertEqual(row['tracking']['latest']['execution']['phase'],'failed')
+        self.assertEqual(row['tracking']['latest']['run']['status'],'cancelled')
+        self.execution['recoveryAction']={'id':str(uuid4()),'status':'active','nextAction':'Reconcile the missing delivery receipt only.'}
+        self.tracker.refresh();row=self.row();self.assertEqual(row['status'],'failed');self.assertTrue(row['needs_attention']);self.assertIn('missing delivery receipt',row['next_action'])
+
+    def test_genuine_failure_after_all_reports_published_still_needs_attention(self):
+        self.published();self.stop_execution();self.tracker.refresh();row=self.row()
+        self.assertTrue(all(r['available'] for r in row['reports']));self.assertEqual(row['response_completion'],'complete')
+        self.assertEqual(row['status'],'failed');self.assertTrue(row['needs_attention']);self.assertIn('trusted working-folder',row['next_action'])
+        # An unexplained failure AFTER closure is not dismissed from PDF existence.
+        self.execution['recoveryAction']=None;self.root.update(status='done',completedAt='2026-10-28T01:00:00Z')
+        self.d.routes['/api/issues/'+self.root['id']+'/runs'][0].update(status='failed',finishedAt='2026-10-28T01:01:00Z')
+        self.tracker.refresh();self.assertEqual(self.row()['status'],'failed');self.assertEqual(self.row()['tracking']['latest']['current_work']['reason'],'post_completion_failure')
+
+    def test_failed_country_delivery_is_visible_even_when_parent_is_done_and_other_country_published(self):
+        self.entry=self.d.prepare(countries=['CAN','DNK'],scope='country_conditions',bounds={'institutions':0,'programs':0})
+        accepted=self.d.confirm(self.entry);self.identity=accepted['request']['id'];self.root=next(t for t in self.d.tasks.values() if t['id']==accepted['task']['id'])
+        self.d.f.request=self.w.research.request(self.identity)['request'];self.root.update(status='done',updatedAt=env.now());self.routes(self.root,self.execution);self.published()
+        child={'id':str(uuid4()),'companyId':self.d.company,'identifier':'TEST-CHILD','title':'DNK: publish reviewed package','status':'blocked','updatedAt':env.now()}
+        execution={'runId':str(uuid4()),'agentId':str(uuid4()),'execution':{'phase':'failed','cause':'delivery_failed'},'recoveryAction':{'id':str(uuid4()),'status':'active','nextAction':'Resume only the Denmark package delivery; reuse finished research.'}}
+        self.root['blockedBy']=[child];self.execution['execution']['phase']='completed';self.routes(child,execution);self.tracker.refresh()
+        row=self.row();self.assertEqual(row['status'],'failed');self.assertIn('DNK: publish',row['notice']);self.assertIn('only the Denmark',row['next_action'])
+        self.assertTrue(row['reports'][0]['available']);self.assertFalse(row['reports'][1]['available']);self.assertEqual(self.d.posts,2)
+
+    def test_stale_task_and_attempt_updates_do_not_restore_resolved_warning(self):
+        self.published();self.stop_execution();self.root['statusVersion']=1;self.tracker.refresh()
+        stale_issue=deepcopy(self.root);stale_execution=deepcopy(self.execution)
+        self.root.update(status='done',statusVersion=2,updatedAt='2026-10-28T02:00:00Z',completedAt='2026-10-28T02:00:00Z')
+        self.execution['recoveryAction']=None;self.execution['runId']=str(uuid4());self.execution['execution']['phase']='completed';self.routes(self.root,self.execution)
+        self.d.routes['/api/issues/'+self.root['id']+'/runs'][0].update(status='succeeded',startedAt='2026-10-28T01:59:00Z',finishedAt='2026-10-28T02:00:01Z')
+        self.tracker.refresh();fresh=self.tracker.read()['requests'][self.identity]
+        self.routes(stale_issue,stale_execution)
+        for _ in range(2):self.tracker.refresh()
+        row=self.row();self.assertEqual(row['status'],'complete');self.assertFalse(row['needs_attention']);self.assertIn('older',row['tracking']['refresh_note'])
+        self.assertEqual(row['tracking']['history'],fresh['history']);self.assertEqual(row['tracking']['latest'],fresh['latest'])
+        self.d.online=False;self.tracker.refresh();row=self.row();self.assertEqual(row['status'],'complete');self.assertTrue(row['tracking']['connection_error']);self.assertIsNone(row['notice'])
+        self.assertEqual(row['tracking']['latest'],fresh['latest']);self.assertEqual(self.d.posts,1)
+
+    def test_task_transition_during_multi_endpoint_read_keeps_last_confirmed_state(self):
+        from web.request_tracking import StatusClient
+        self.tracker.refresh();before=deepcopy(self.row()['tracking']['latest'])
+        class TransitionClient(StatusClient):
+            reads=0
+            def issue(client,identity):
+                value=super().issue(identity);client.reads+=1
+                if client.reads==2:value['statusVersion']=99
+                return value
+        RequestTracker(self.w,client_factory=TransitionClient).refresh()
+        row=self.row();self.assertEqual(row['tracking']['latest'],before)
+        self.assertIn('changed during',row['tracking']['connection_error']);self.assertNotEqual(row['status'],'failed')
+
+    def test_done_dependency_with_an_active_recovery_is_not_skipped(self):
+        recovery={'id':str(uuid4()),'status':'active','nextAction':'Repair the incomplete publication receipt only.'}
+        child={'id':str(uuid4()),'companyId':self.d.company,'identifier':'TEST-2','title':'CAN: delivery receipt','status':'done','updatedAt':env.now(),'activeRecoveryAction':recovery}
+        execution={'runId':str(uuid4()),'agentId':str(uuid4()),'execution':{'phase':'completed'},'recoveryAction':recovery}
+        self.root.update(status='done',blockedBy=[child]);self.execution['execution']['phase']='completed';self.routes(child,execution)
+        self.tracker.refresh();row=self.row();self.assertEqual(row['status'],'failed');self.assertIn('publication receipt',row['next_action'])
+        self.assertEqual(row['tracking']['latest']['step']['id'],child['id'])
 
     def test_failed_accepted_retry_does_not_duplicate_or_touch_another_execution(self):
         other=self.d.prepare(countries=['DNK','GBR'],scope='country_conditions',bounds={'institutions':0,'programs':0})
         accepted_other=self.d.confirm(other);before=deepcopy(accepted_other)
-        self.fail();self.tracker.refresh(self.identity)
+        self.stop_execution();self.tracker.refresh(self.identity)
         self.assertEqual(self.row()['status'],'failed')
         creates,posts=self.d.creates,self.d.posts
         for _ in range(2):
@@ -111,7 +201,7 @@ class TrackingTests(unittest.TestCase):
         import test_profiles as profile_fixture
         from web.profiles import LocalProfiles
         from web.recovery import restore_backup
-        self.fail();self.tracker.refresh()
+        self.stop_execution();self.tracker.refresh()
         helper=object.__new__(profile_fixture.ProfileTests);helper.profiles=LocalProfiles(self.w.directory)
         self.assertEqual(helper.http('/api/requests')['status'],200)
         self.assertEqual(helper.http('/api/requests/refresh',{'request_id':self.identity},**{'X-Grad-Compass-Workspace':''})['status'],403)
@@ -120,7 +210,7 @@ class TrackingTests(unittest.TestCase):
         self.assertEqual(RequestTracker(restored).read(),self.tracker.read())
 
     def test_wrong_agent_or_context_runs_and_unbound_failure_messages_are_ignored(self):
-        self.fail();prefix='/api/issues/'+self.root['id']
+        self.stop_execution();prefix='/api/issues/'+self.root['id']
         self.d.routes[prefix+'/runs']=[{'runId':self.run,'contextIssueId':self.root['id'],'agentId':str(uuid4()),'status':'succeeded'}]
         self.d.routes[prefix+'/comments'].insert(0,{'authorType':'system','metadata':{'sourceRunId':str(uuid4()),'sections':[{'rows':[{'label':'Failure summary','value':'A different run failed'}]}]}})
         self.tracker.refresh();latest=self.row()['tracking']['latest'];self.assertIsNone(latest['run']['status']);self.assertEqual(latest['run_history'],[])
@@ -135,10 +225,10 @@ class TrackingTests(unittest.TestCase):
         class LimitedDetails(StatusClient):
             def runs(self,identity):raise PermissionError('Invented private run history')
             def comments(self,identity):raise PermissionError('Invented privileged failure detail')
-        self.fail();service=RequestTracker(self.w,client_factory=LimitedDetails);service.refresh();r=self.row(service)
+        self.stop_execution();service=RequestTracker(self.w,client_factory=LimitedDetails);service.refresh();r=self.row(service)
         self.assertEqual(r['status'],'failed');self.assertTrue(r['needs_attention']);self.assertFalse(r['tracking']['connection_error']);self.assertEqual(len(r['tracking']['latest']['diagnostic_notes']),2)
     def test_scheduled_retry_is_distinct_from_exhausted_terminal_failure(self):
-        self.fail();self.root['scheduledRetry']={'runId':self.run,'status':'scheduled'};self.tracker.refresh();r=self.row()
+        self.stop_execution();self.root['scheduledRetry']={'runId':self.run,'status':'scheduled'};self.tracker.refresh();r=self.row()
         self.assertEqual(r['status'],'retry_scheduled');self.assertEqual(self.d.creates,1)
         self.root['scheduledRetry']=None;self.tracker.refresh();self.assertEqual(self.row()['status'],'failed');self.assertEqual(self.d.posts,1)
 

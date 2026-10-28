@@ -57,6 +57,32 @@ export. Older report artifacts, annotation pins and reviewed editions remain
 unchanged. Concise exports use human-readable review labels; exact scopes and
 identifiers remain in detailed technical context.
 
+## Execution attention and historical attempts
+
+APP-026 (28 October 2026): Codex owns reconciliation in
+`web/execution_status.py` and `web/request_tracking.py`; Paperclip/Dave owns
+authoritative task completion, relevant dependencies and recovery records. Marry
+owns publication/receipt evidence. Report availability, response completion,
+execution health, factual review and human approval remain independent.
+
+An attempt outcome is retained verbatim. A completed task without unresolved
+dependencies or active recovery can supersede a stopped attempt when a later
+successful run, an explicit later completion, or a verified administrative
+continuation cancellation establishes resolution. A cancelled continuation uses
+both the matched run's cancelled status/error code and the projection's known
+administrative cause. It is not a failed country delivery. Unexplained failures
+after closure, unfinished child steps and active recovery still need attention,
+even when all PDFs exist. Unknown records are not fabricated into completion.
+
+Poll issue/attempt records using GET only. Read back task identity/version/status
+after the multi-endpoint check; preserve the last state on a concurrent change or
+unavailable endpoint. Ignore older task versions and delayed old attempts without
+overwriting accepted progress. Browser refreshes also ignore out-of-order replies.
+Current attention is a derived view; old attempts and observations stay in private
+history. Do not edit task success, erase diagnostics or invoke research to remove
+a warning. When a real failure remains, show the affected step and recorded
+recovery action. A fulfilled request explicitly says no recovery is needed.
+
 ## Task sequencing
 
 Dave owns the executable task graph; Ali owns preparation and corrections, Alex
