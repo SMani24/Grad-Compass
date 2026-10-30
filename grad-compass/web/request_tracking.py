@@ -49,13 +49,14 @@ def inspect(client,entry,connection):
     if (not isinstance(root,dict) or root.get('id')!=entry['task']['id'] or root.get('companyId')!=connection['company_id'] or root.get('assigneeAgentId')!=entry['destination']['dave_id']
         or not Dispatch.matches(root,'Grad-Compass dispatch '+entry['dispatch_key'],binding)):
         raise ValueError('Linked Paperclip task does not match the saved request. No recovery is allowed')
-    candidates={root['id']:root}
+    candidates={root['id']:root};depth={root['id']:0}
     if not isinstance(root.get('blockedBy',[]),list):raise ValueError('Paperclip task dependencies have an unsupported shape')
     for blocker in root.get('blockedBy',[]):
         if not isinstance(blocker,dict) or not isinstance(blocker.get('terminalBlockers',[]),list):raise ValueError('Paperclip task dependencies have an unsupported shape')
         for item in [blocker,*blocker.get('terminalBlockers',[])]:
             if not isinstance(item,dict):raise ValueError('Paperclip task dependency identity is missing')
             env.identifier(item.get('id'));candidates.setdefault(item['id'],item)
+            depth[item['id']]=max(depth.get(item['id'],0),1 if item is blocker else 2)
     if len(candidates)>16:raise ValueError('Task dependency graph needs review in Paperclip')
     observations=[];unavailable_steps=[];diagnostic_notes=[]
     for identity,summary in candidates.items():
@@ -78,7 +79,7 @@ def inspect(client,entry,connection):
     def rank(item):
         issue,projection,execution,recovery=item
         stopped=execution.get('phase') in ('failed','recovery_needed') and not closed_cancellation({**issue,'blockedBy':[]},execution,recovery)
-        return (stopped,active_recovery(recovery),issue.get('status')=='blocked',execution.get('phase') in ('running','executing'),issue['id']!=root['id'])
+        return (stopped,active_recovery(recovery),issue.get('status')=='blocked',execution.get('phase') in ('running','executing'),depth[issue['id']])
     issue,projection,execution,recovery=max(observations,key=rank)
     run_id=projection.get('runId');run={};failure=None;run_history=[]
     if run_id:
@@ -115,6 +116,8 @@ def inspect(client,entry,connection):
     safe_run={k:run.get(k) for k in ('runId','status','startedAt','finishedAt','errorCode','retryExhaustedReason','retryOfRunId')}
     safe_recovery={k:recovery.get(k) for k in ('id','kind','status','ownerType','cause','nextAction')} if recovery else None
     work=assess(issue,execution,recovery,run,matching if run_id else [])
+    descriptor=issue.get('unblockDescriptor')
+    blocker={k:descriptor.get(k) for k in ('owner','action')} if isinstance(descriptor,dict) else None
     # Issue and attempt endpoints are separate reads. Reject a mixed transition
     # instead of briefly presenting an old failure as the new task's state.
     def stamp(value):
@@ -126,7 +129,7 @@ def inspect(client,entry,connection):
         'step':{k:issue.get(k) for k in ('id','identifier','title','status','updatedAt','completedAt','statusVersion')},
         'task_url':issue_link(connection,root),'recovery_url':issue_link(connection,issue),
         'run':safe_run,'run_history':run_history,'execution':safe_execution,'recovery':safe_recovery,'failure':failure,
-        'current_work':work,'scheduled_retry':bool(issue.get('scheduledRetry')),'unavailable_steps':unavailable_steps,'diagnostic_notes':diagnostic_notes,'observed_at':env.now()}
+        'current_work':work,'blocker':blocker,'scheduled_retry':bool(issue.get('scheduledRetry')),'unavailable_steps':unavailable_steps,'diagnostic_notes':diagnostic_notes,'observed_at':env.now()}
 
 
 class RequestTracker:
@@ -250,11 +253,15 @@ class RequestTracker:
                     if latest.get('failure') and 'not trusted' in latest['failure']:
                         notice+=' The assigned runtime could not start because its working folder was not trusted; its setup needs repair before an explicit retry.'
                 elif task_status=='cancelled':state='cancelled';label='Paperclip task cancelled';notice='The accepted task was cancelled in Paperclip. Its request and any saved work remain.'
-                elif task_status=='blocked':state='blocked';label='Waiting on a blocked step';notice='The assigned work needs attention in Paperclip. No automatic restart is requested.'
+                elif task_status=='blocked':
+                    state='blocked';label='Waiting on a blocked step'
+                    name=latest.get('step',{}).get('title') or 'The assigned step'
+                    if name.startswith('Grad Compass:'):name='Country report coordination'
+                    notice=name+' is waiting. Existing reports and research remain available; this is separate from an execution failure.'
                 elif task_status=='done':state='awaiting_delivery';label='Execution finished — waiting for report delivery'
                 elif not row['results_count']:state='active';label='Research in progress' if phase in ('running','executing') else 'Accepted — waiting for the next step'
             if ready:
-                label=('Reports available' if ready==total else 'Some reports available')+(' · task needs attention' if state in ('failed','blocked') else '')
+                label=('Reports available' if ready==total else 'Some reports available')+(' · task needs attention' if state=='failed' else ' · step waiting' if state=='blocked' else '')
                 if state not in ('failed','blocked','cancelled','retry_scheduled'):
                     bounded=row.get('response_completion')=='complete'
                     outstanding=row.get('batch_progress',{}).get('outstanding_count',0)
@@ -277,7 +284,9 @@ class RequestTracker:
             if latest.get('failure') and 'not trusted' in latest['failure']:action='Repair the assigned runtime’s trusted working-folder configuration, then explicitly resume this existing step.'
             elif latest.get('failure') and 'usage or rate limit' in latest['failure']:action='Wait for the provider limit to clear, then review the existing step’s supported recovery action.'
             next_action=(action[:1000] if isinstance(action,str) and action.strip() else 'Dave must reconcile the stopped attempt and any unfinished deliverable in the linked task before resuming only the necessary step.')+' Completed research must be reused; do not submit another request.'
-        elif state=='blocked':next_action='Open the existing task to see its assigned owner and unresolved dependency. A blocked stage is separate from a confirmed execution failure; do not submit another request.'
+        elif state=='blocked':
+            action=(latest.get('blocker') or {}).get('action')
+            next_action=(action[:1000] if isinstance(action,str) and action.strip() else 'Open the linked step to see its assigned owner and unresolved dependency.')+' Reuse the existing request and completed work; no replacement request is needed.'
         if row['delivery_errors']:next_action='Inspect the recorded incoming-response error and repair or redeliver that exact response through recovery. Do not repeat successful research.'
         row.update(status=state,label=label,stage=stage,notice=notice,delayed=delayed,needs_attention=bool(notice or offline),updated_at=max(latest.get('step',{}).get('updatedAt') or row['created_at'],row.get('local_updated_at') or row['created_at'],row.get('dispatch_updated_at') or row['created_at']),last_activity_at=activity,
             work_saved=(str(row['results_count'])+' received result revision(s); '+str(ready)+' prepared country report(s). Earlier versions and annotations are preserved.') if row['results_count'] or ready else 'No findings or prepared reports have been received for this request. Its request and acknowledgement history are saved.',

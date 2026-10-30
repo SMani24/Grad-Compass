@@ -67,11 +67,11 @@ def main():
         target=destination(w,name) if args.configured_exports else downloads/name
         names.append(target.name);return str(target)
     handler=DesktopDownloads(window,choose_path=choose,workspace=lambda:w);passed=[]
-    watchdog=threading.Timer(240,lambda:os._exit(1));watchdog.daemon=True;watchdog.start()
+    watchdog=threading.Timer(360,lambda:os._exit(1));watchdog.daemon=True;watchdog.start()
     def work():
         def js(code):return window.run_js(code)
         def wait(code):
-            until=time.monotonic()+30
+            until=time.monotonic()+60
             while time.monotonic()<until:
                 value=js(code)
                 if value:return value
@@ -83,11 +83,13 @@ def main():
             capture.save(name)
         def select(name,value):js('document.getElementById('+json.dumps(name)+').value='+json.dumps(value)+';document.getElementById('+json.dumps(name)+').dispatchEvent(new Event("change"))')
         def download(name):
-            old=len(names);click(name);until=time.monotonic()+30
+            # A first PDF may need font loading and image processing. Thirty
+            # seconds produced a false failure on an otherwise working desktop.
+            old=len(names);click(name);until=time.monotonic()+60
             while time.monotonic()<until:
                 if len(names)>old and (downloads/names[-1]).is_file():return downloads/names[-1]
                 time.sleep(.1)
-            raise AssertionError('Native download did not finish')
+            raise AssertionError('Native download did not finish: '+name+'; received filenames: '+', '.join(names[old:]))
         def loaded(report):
             wait("document.querySelector('.canonical-report')?.dataset.canonical==="+json.dumps(report['key'])+" && document.getElementById('reader-status')?.textContent.includes('loaded')")
             assert js("document.querySelector('.canonical-report').dataset.request==="+json.dumps(report['metadata']['request']['id']))

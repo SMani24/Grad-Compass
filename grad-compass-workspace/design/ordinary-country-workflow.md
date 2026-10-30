@@ -83,6 +83,33 @@ history. Do not edit task success, erase diagnostics or invoke research to remov
 a warning. When a real failure remains, show the affected step and recorded
 recovery action. A fulfilled request explicitly says no recovery is needed.
 
+## Routine delivery and targeted desktop verification
+
+APP-027 (30 October 2026): an ordinary data-only country request finishes after
+its required detailed/concise editions, evidence, photograph provenance and
+independent content/readability review, exact release, compatible publication and
+genuine consumer receipt/replay checks. It does not acquire a new mandatory
+developer desktop-test or access-provisioning dependency for every country when
+the app code is unchanged. Do not make a routine request wait for this manual
+Codex chat or treat an idle coordination mailbox as failed country research.
+
+Native screen/PDF/export verification remains required for app rendering,
+launcher/export changes or a concrete display/export defect, and whenever a
+specific existing task explicitly requires it. Assign that bounded engineering
+check to an app team with demonstrated rendering and authorized write access to
+the existing configured export destination. Adapter identity, X availability or
+GLX advertisement alone proves neither capability. Preserve the user's export
+preference and sandbox boundaries. Take a preservation baseline before launch;
+return exact-version evidence privately. Never claim an unperformed native pass.
+
+Codex owns the app, generated handoff and desktop harness. Marry owns producer
+compatibility/publication and coordinator guidance. Dave owns task routing and
+final disposition; Alex owns exact independent content/asset review. Reuse the
+existing request, report and review. Genuine technical blockers retain their
+owner/action; do not create duplicate or circular capability tasks or require
+repeat successful research. Routine fulfilment, optional additional engineering
+QA, factual acceptance and human approval remain separate records.
+
 ## Task sequencing
 
 Dave owns the executable task graph; Ali owns preparation and corrections, Alex

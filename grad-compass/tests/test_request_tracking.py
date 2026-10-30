@@ -177,6 +177,17 @@ class TrackingTests(unittest.TestCase):
         self.tracker.refresh();row=self.row();self.assertEqual(row['status'],'failed');self.assertIn('publication receipt',row['next_action'])
         self.assertEqual(row['tracking']['latest']['step']['id'],child['id'])
 
+    def test_nested_blocker_shows_actual_terminal_step_and_recorded_action(self):
+        leaf={'id':str(uuid4()),'companyId':self.d.company,'identifier':'TEST-3','title':'CAN: collect desktop verification','status':'blocked','updatedAt':env.now(),
+            'unblockDescriptor':{'owner':{'agentId':self.d.dave},'action':'App team supplies exact-version desktop evidence; no research rerun.'}}
+        middle={'id':str(uuid4()),'companyId':self.d.company,'identifier':'TEST-2','title':'CAN: transport and validation','status':'blocked','updatedAt':env.now(),'terminalBlockers':[leaf]}
+        self.root.update(status='blocked',blockedBy=[middle]);self.execution['execution']['phase']='completed'
+        for issue in (middle,leaf):self.routes(issue,{'runId':str(uuid4()),'agentId':self.d.dave,'execution':{'phase':'completed'}})
+        self.tracker.refresh();row=self.row()
+        self.assertEqual(row['tracking']['latest']['step']['id'],leaf['id'])
+        self.assertIn('desktop verification',row['notice']);self.assertIn('App team supplies',row['next_action'])
+        self.assertEqual(row['status'],'blocked');self.assertNotIn('stopped',row['notice'])
+
     def test_failed_accepted_retry_does_not_duplicate_or_touch_another_execution(self):
         other=self.d.prepare(countries=['DNK','GBR'],scope='country_conditions',bounds={'institutions':0,'programs':0})
         accepted_other=self.d.confirm(other);before=deepcopy(accepted_other)
