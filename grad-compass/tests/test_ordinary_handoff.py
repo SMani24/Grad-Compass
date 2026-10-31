@@ -30,6 +30,12 @@ class OrdinaryHandoffTests(unittest.TestCase):
                          'reuse acquired bytes and completed text reviews','independent asset review before release',
                          'No sandbox changes','automatic retry loop'):
             self.assertIn(expected,prompt)
+    def test_release_coordination_does_not_wait_for_its_own_dependent_publication(self):
+        prompt=self.f.store.export(self.f.request['request_id'])['prompt']
+        for expected in ('agent-addressed release question for Dave','resolve that existing interaction',
+                         'publication that needs this release','honor current execution restrictions',
+                         'instead of clearing dependencies'):
+            self.assertIn(expected,prompt)
     def test_export_separates_historical_partial_binding_from_final_request_response(self):
         from web import research_envelopes as env
         from web.inbox import InboxReceiver

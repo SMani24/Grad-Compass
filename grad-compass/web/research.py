@@ -288,6 +288,7 @@ class ResearchWorkspace:
                         "Preparation readiness is not factual acceptance: once exact editions are ready, Alex must not be blocked by a producer task waiting for Alex's review. "
                         "Producer corrections must not wait for reviewer-task closure. Keep parent, publication and release gates intact. "
                         "After a control-plane conflict, reconcile current task/run state and verify the persisted dependency and successful checkout before reporting recovery. "
+                        "When Marry supplies a validated exact candidate and an agent-addressed release question for Dave, resolve that existing interaction through the supported coordination route; do not keep waiting for the already supplied candidate or for publication that needs this release. A blocked parent does not itself answer or waive the release question; honor current execution restrictions and escalate a concrete interaction error instead of clearing dependencies. "
                         "For every country-conditions report, also deliver the complete detailed Markdown, separately written concise edition, "
                         "explicit seven-topic coverage and exact-source/review bindings under private report package 0.2. "
                         "Follow grad-compass-workspace/design/country-report-contract.md. After actual review/release disposition, publish the finalized directory "

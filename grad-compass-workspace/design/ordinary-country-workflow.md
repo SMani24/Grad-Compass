@@ -192,6 +192,20 @@ create a replacement request to repair acquisition. A recovery event must name
 the newly available input and route only its necessary downstream steps. These
 instructions are routing policy, not an installed scheduler/network guarantee.
 
+### Route the exact release decision
+
+After Marry supplies the validated immutable candidate and addresses an exact
+release interaction to Dave, that existing interaction is the next coordination
+input. Dave must not wait for publication that requires his own release, or keep
+asking for a candidate already present. Reconcile current candidate/interaction
+identities and respond through the supported agent-interaction route under the
+current execution scope. Keep release, factual review and human approval separate.
+Do not clear dependencies, close the request, claim unperformed checks or override
+triage-only execution restrictions to force publication. If the interaction cannot
+be handled, report its actual error and named recovery owner. A routing comment
+is not a release decision. The existing interaction's continuation wakes Marry for
+authorized validation/publication; it creates no new research request or task.
+
 ## Explicit confirmed dispatch
 
 Confirmation shows exact countries, stage, intake, resource/scope limits and the
