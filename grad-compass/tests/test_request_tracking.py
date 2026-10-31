@@ -188,6 +188,26 @@ class TrackingTests(unittest.TestCase):
         self.assertIn('desktop verification',row['notice']);self.assertIn('App team supplies',row['next_action'])
         self.assertEqual(row['status'],'blocked');self.assertNotIn('stopped',row['notice'])
 
+    def test_asset_blocker_survives_restart_then_resolves_without_resubmission(self):
+        self.d.f.receive(self.d.f.ack());self.d.f.receive(self.d.f.result())
+        leaf={'id':str(uuid4()),'companyId':self.d.company,'identifier':'TEST-3',
+              'title':'CAN: acquire licensed photograph','status':'blocked','updatedAt':env.now(),
+              'unblockDescriptor':{'owner':{'agentId':self.d.dave},
+                                   'action':'Dave routes the existing asset to authorized retrieval support.'}}
+        self.root.update(status='blocked',blockedBy=[leaf]);self.execution['execution']['phase']='completed'
+        self.routes(leaf,{'runId':str(uuid4()),'agentId':self.d.dave,'execution':{'phase':'completed'}})
+        saved=self.w.research.request(self.identity);self.tracker.refresh();row=self.row()
+        self.assertEqual(row['status'],'blocked');self.assertIn('photograph',row['stage'])
+        self.assertIn('authorized retrieval support',row['next_action']);self.assertTrue(row['needs_attention'])
+        reopened=RequestTracker(LocalWorkspace(self.w.directory));self.assertEqual(self.row(reopened)['notice'],row['notice'])
+        before=deepcopy(self.tracker.read()['requests'][self.identity]['history'])
+        leaf['status']='done';self.root.update(status='done',blockedBy=[leaf])
+        self.tracker.refresh();self.tracker.refresh();row=self.row()
+        self.assertEqual(row['status'],'awaiting_delivery');self.assertIsNone(row['notice'])
+        self.assertEqual(self.tracker.read()['requests'][self.identity]['history'][:len(before)],before)
+        self.assertEqual(self.w.research.request(self.identity),saved)
+        self.assertEqual((self.d.creates,self.d.posts),(1,1))
+
     def test_failed_accepted_retry_does_not_duplicate_or_touch_another_execution(self):
         other=self.d.prepare(countries=['DNK','GBR'],scope='country_conditions',bounds={'institutions':0,'programs':0})
         accepted_other=self.d.confirm(other);before=deepcopy(accepted_other)

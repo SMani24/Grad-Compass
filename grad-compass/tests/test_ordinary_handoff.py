@@ -23,6 +23,13 @@ class OrdinaryHandoffTests(unittest.TestCase):
         prompt=self.f.store.export(self.f.request['request_id'])['prompt']
         for expected in ('Do not add a fresh mandatory developer desktop-test','genuine consumer receipts/replay','required reviewed detailed/concise content and assets','declared capable app team','never claim it ran when it did not'):
             self.assertIn(expected,prompt)
+    def test_asset_failure_routes_existing_work_to_authorized_capability(self):
+        prompt=self.f.store.export(self.f.request['request_id'])['prompt']
+        for expected in ('Check permitted retrieval capability','host rate limits and web-cache failures',
+                         'existing asset step once','declared authorized retrieval support',
+                         'reuse acquired bytes and completed text reviews','independent asset review before release',
+                         'No sandbox changes','automatic retry loop'):
+            self.assertIn(expected,prompt)
     def test_export_separates_historical_partial_binding_from_final_request_response(self):
         from web import research_envelopes as env
         from web.inbox import InboxReceiver

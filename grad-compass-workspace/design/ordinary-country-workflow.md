@@ -166,6 +166,32 @@ Discovery sources accurate, legally reusable material; Marry validates its exact
 membership and publishes a new immutable package notice, preserving prior versions
 and annotations. Codex handles safe decode, local retention, rendering and export.
 
+## Bounded asset recovery
+
+APP-028 (31 October 2026): establish permitted retrieval capability before routing
+an asset assignment. A restricted runtime's network-unreachable error, a source's
+rate limit and a web cache miss are different failures. None alone proves every
+supported retrieval capability is unavailable. Preserve the exact error, attempted
+URLs, time and existing request binding; do not repeatedly retry a denied source.
+
+After a bounded failure, Dave routes the **existing** asset step once to declared
+authorized retrieval support, supplying the public source/license URLs and existing
+owner-private destination. Obtain actual bytes/hash and a saved handoff event, or
+return a specific remaining capability blocker and responsible owner. Do not wait
+indefinitely for spontaneous network restoration or cycle coordination comments.
+This uses supported authorized execution, without changing runtime permissions,
+bypassing access controls or quotas, or installing automatic retries. If no
+permitted capability exists, the requirement stays visibly unresolved.
+
+Ali owns provenance, identification, caption/alt and license verification even
+when another authorized capability retrieves the original. Alex reviews those
+exact bytes, reusing unchanged completed edition assessments. Marry validates
+immutable integration and receipt; Dave retains exact-version release. Never
+repeat successful research, silently waive the photograph, infer approval or
+create a replacement request to repair acquisition. A recovery event must name
+the newly available input and route only its necessary downstream steps. These
+instructions are routing policy, not an installed scheduler/network guarantee.
+
 ## Explicit confirmed dispatch
 
 Confirmation shows exact countries, stage, intake, resource/scope limits and the
