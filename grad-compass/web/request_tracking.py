@@ -79,7 +79,9 @@ def inspect(client,entry,connection):
     def rank(item):
         issue,projection,execution,recovery=item
         stopped=execution.get('phase') in ('failed','recovery_needed') and not closed_cancellation({**issue,'blockedBy':[]},execution,recovery)
-        return (stopped,active_recovery(recovery),issue.get('status')=='blocked',execution.get('phase') in ('running','executing'),depth[issue['id']])
+        # A parent awaiting its children is not the current work stage. Follow
+        # the terminal dependency even while it runs, retaining failure priority.
+        return (stopped,active_recovery(recovery),depth[issue['id']],issue.get('status')=='blocked',execution.get('phase') in ('working','running','executing'))
     issue,projection,execution,recovery=max(observations,key=rank)
     run_id=projection.get('runId');run={};failure=None;run_history=[]
     if run_id:
@@ -253,6 +255,8 @@ class RequestTracker:
                     if latest.get('failure') and 'not trusted' in latest['failure']:
                         notice+=' The assigned runtime could not start because its working folder was not trusted; its setup needs repair before an explicit retry.'
                 elif task_status=='cancelled':state='cancelled';label='Paperclip task cancelled';notice='The accepted task was cancelled in Paperclip. Its request and any saved work remain.'
+                elif task_status=='blocked' and latest.get('step',{}).get('status')=='in_progress':
+                    state='active';label='Assigned step in progress'
                 elif task_status=='blocked':
                     state='blocked';label='Waiting on a blocked step'
                     name=latest.get('step',{}).get('title') or 'The assigned step'

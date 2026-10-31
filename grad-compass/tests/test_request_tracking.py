@@ -208,6 +208,25 @@ class TrackingTests(unittest.TestCase):
         self.assertEqual(self.w.research.request(self.identity),saved)
         self.assertEqual((self.d.creates,self.d.posts),(1,1))
 
+    def test_running_terminal_review_is_not_hidden_by_waiting_delivery_parent(self):
+        leaf={'id':str(uuid4()),'companyId':self.d.company,'identifier':'TEST-3',
+              'title':'CAN: independent asset review','status':'in_progress','updatedAt':env.now()}
+        middle={'id':str(uuid4()),'companyId':self.d.company,'identifier':'TEST-2',
+                'title':'CAN: validation and delivery','status':'blocked','updatedAt':env.now(),'terminalBlockers':[leaf]}
+        self.root.update(status='blocked',blockedBy=[middle]);self.execution['execution']['phase']='completed'
+        for issue,phase in ((middle,'completed'),(leaf,'working')):
+            self.routes(issue,{'runId':str(uuid4()),'agentId':self.d.dave,
+                               'execution':{'phase':phase,'lastConfirmedActivityAt':env.now()}})
+        self.tracker.refresh();row=self.row()
+        self.assertEqual(row['tracking']['latest']['step']['id'],leaf['id'])
+        self.assertEqual(row['status'],'active');self.assertIsNone(row['notice']);self.assertFalse(row['needs_attention'])
+        self.assertEqual(self.row(RequestTracker(LocalWorkspace(self.w.directory)))['stage'],leaf['title'])
+        # A genuinely blocked review still needs attention, even after results.
+        leaf['status']='blocked';leaf['unblockDescriptor']={'action':'Alex needs the exact missing license record.'}
+        self.tracker.refresh();row=self.row()
+        self.assertEqual(row['status'],'blocked');self.assertTrue(row['needs_attention'])
+        self.assertIn('missing license record',row['next_action']);self.assertEqual(self.d.creates,1)
+
     def test_failed_accepted_retry_does_not_duplicate_or_touch_another_execution(self):
         other=self.d.prepare(countries=['DNK','GBR'],scope='country_conditions',bounds={'institutions':0,'programs':0})
         accepted_other=self.d.confirm(other);before=deepcopy(accepted_other)
