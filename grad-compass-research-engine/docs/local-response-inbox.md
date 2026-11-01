@@ -21,3 +21,7 @@ Finalize any referenced public exchange batch under the same profile's `batches/
 ## Operational limit
 
 Dave must still be manually invoked and must execute this publication step for every processed response. There is no background research executor or remote delivery service. The owner-private paths must be accessible to Dave's actual execution environment; copying instructions alone does not verify that access or trigger delivery. If Dave cannot access that path, pause the execution handoff and resolve the access boundary with the owner without copying private material into a shared channel.
+
+## Asset jobs are a separate queue
+
+Use [Request-bound country asset jobs](request-bound-asset-jobs.md) for the ordinary public-original acquisition path on confirmed requests. Asset-job packets go only to that saved request profile's `asset-jobs/requests/`, never this response inbox. Authorized partial results retain the existing response schema and predecessor lineage while photo is pending; their receipt implies neither photo acceptance nor release.

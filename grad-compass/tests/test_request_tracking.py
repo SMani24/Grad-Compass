@@ -282,5 +282,15 @@ class TrackingTests(unittest.TestCase):
         self.assertEqual(r['status'],'retry_scheduled');self.assertEqual(self.d.creates,1)
         self.root['scheduledRetry']=None;self.tracker.refresh();self.assertEqual(self.row()['status'],'failed');self.assertEqual(self.d.posts,1)
 
+    def test_provider_quota_is_explicit_paused_work_not_lost_research_or_setup_failure(self):
+        self.stop_execution();self.execution['execution']['cause']='provider_quota'
+        self.d.routes['/api/issues/'+self.root['id']+'/comments']=[]
+        self.tracker.refresh();row=self.row()
+        self.assertEqual(row['status'],'blocked');self.assertIn('provider usage limit',row['label'])
+        self.assertIn('completed work remain intact',row['notice']);self.assertIn('once the provider permits',row['next_action'])
+        self.assertTrue(row['needs_attention']);self.assertNotIn('working-folder',row['next_action'])
+        reopened=RequestTracker(LocalWorkspace(self.w.directory));self.assertEqual(self.row(reopened)['label'],row['label'])
+        self.assertEqual((self.d.creates,self.d.posts),(1,1))
+
 
 if __name__=='__main__':unittest.main()

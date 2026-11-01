@@ -242,10 +242,11 @@ class LocalWorkspace(DemoWorkspace):
             for name in ('country-decisions.json','display-preferences.json','panel-widths.json','report-annotations.json','report-reading.json','research-selection.json','export-preferences.json','dispatch-outbox.json','request-tracking.json','report-delivery-order.json','paperclip-connection.local.json'):
                 source=regular(self.directory/name)
                 if source.is_file():atomic_json(target/name,env.loads(source.read_bytes()))
-            for name in ('research-handoff','inbox','batches','received-batches','sample-history','reports','report-cache','editorial-cache','report-projections','report-receipts'):
+            for name in ('research-handoff','inbox','batches','received-batches','sample-history','reports','report-cache','editorial-cache','report-projections','report-receipts','asset-jobs'):
                 source=self.directory/name
                 if source.exists():
                     for path in source.rglob('*'):
+                        if name=='asset-jobs' and path.name.startswith('.'):continue
                         if path.is_symlink():raise ValueError('Backup storage cannot use links')
                         if path.is_file():
                             regular(path);relative=path.relative_to(self.directory);dest=target/relative

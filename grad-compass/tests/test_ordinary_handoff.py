@@ -25,9 +25,9 @@ class OrdinaryHandoffTests(unittest.TestCase):
             self.assertIn(expected,prompt)
     def test_asset_failure_routes_existing_work_to_authorized_capability(self):
         prompt=self.f.store.export(self.f.request['request_id'])['prompt']
-        for expected in ('Check permitted retrieval capability','host rate limits and web-cache failures',
-                         'existing asset step once','declared authorized retrieval support',
-                         'reuse acquired bytes and completed text reviews','independent asset review before release',
+        for expected in ('managed asset service','host rate limits and web-cache failures',
+                         'enqueue_country_asset.py','--assignee-agent','Pending jobs recover on app reopen',
+                         'Reuse acquired bytes and completed text reviews','independent asset review before release',
                          'No sandbox changes','automatic retry loop'):
             self.assertIn(expected,prompt)
     def test_release_coordination_does_not_wait_for_its_own_dependent_publication(self):

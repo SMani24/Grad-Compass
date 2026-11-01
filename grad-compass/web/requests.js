@@ -63,6 +63,10 @@
         recovery.append(steps,node('p','Dave coordinates execution recovery; Marry supports runtime and delivery diagnosis. In-app restart is unavailable until a safe conditional retry capability is verified.'));card.append(recovery);
       }
       for(const error of row.delivery_errors)card.append(node('p','Delivery problem: '+error.error,'request-persistent-notice'));
+      for(const asset of row.asset_jobs || []){
+        const labels={queued:'Queued in the app',fetching:'Downloading original',downloaded:'Original received; provenance/review remain separate',failed:'Retrieval needs recovery'};
+        card.append(node('p',country(asset.country_code)+' photograph: '+(labels[asset.status] || asset.status)+(asset.waiting?' · '+asset.waiting:''),'tracked-request-dates'));
+      }
       if(row.reports.length){
         const details=node('details');details.dataset.details=row.id+':reports';details.open=opened.has(details.dataset.details);details.append(node('summary',row.batch_progress?.label || 'Country progress and review'));
         if(row.batch_progress)details.append(node('p',row.batch_progress.qualification));
@@ -105,7 +109,7 @@
         }
       }
       card.append(actions);
-      const technical=node('details');technical.dataset.details=row.id+':technical';technical.open=opened.has(technical.dataset.details);technical.append(node('summary','Task, attempts and technical details'),node('pre',JSON.stringify({request_id:row.request_id,dispatch_id:row.dispatch_id,dispatch_status:row.dispatch_status,dispatch_attempts:row.dispatch_history,execution:row.tracking.latest,observations:row.tracking.history,delivery_errors:row.delivery_errors},null,2)));card.append(technical);
+      const technical=node('details');technical.dataset.details=row.id+':technical';technical.open=opened.has(technical.dataset.details);technical.append(node('summary','Task, attempts and technical details'),node('pre',JSON.stringify({request_id:row.request_id,dispatch_id:row.dispatch_id,dispatch_status:row.dispatch_status,dispatch_attempts:row.dispatch_history,execution:row.tracking.latest,observations:row.tracking.history,delivery_errors:row.delivery_errors,asset_jobs:row.asset_jobs},null,2)));card.append(technical);
       fragment.append(card);
     }
     if(!rows.length)fragment.append(node('p','No requests match this filter. All requests includes dispatched and completed work.'));

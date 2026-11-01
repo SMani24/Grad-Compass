@@ -126,6 +126,8 @@ class InboxServer(ThreadingHTTPServer):
         self._inbox_thread.start()
         self._status_thread=threading.Thread(target=self._watch_requests,name='grad-compass-request-status',daemon=True)
         self._status_thread.start()
+        self._asset_thread=threading.Thread(target=self._watch_assets,name='grad-compass-public-assets',daemon=True)
+        self._asset_thread.start()
 
     def check_inbox(self):
         with self.profiles.request_context() if self.profiles else nullcontext():
@@ -152,8 +154,19 @@ class InboxServer(ThreadingHTTPServer):
             except (ValueError,OSError,sqlite3.Error):pass
             if self._inbox_stop.wait(60):return
 
+    def _watch_assets(self):
+        from web.asset_jobs import AssetJobs
+        while not self._inbox_stop.is_set():
+            try:
+                with self.profiles.request_context() if self.profiles else nullcontext():
+                    workspace=self.profiles.workspace if self.profiles else self.workspace
+                if getattr(workspace,'operational',False):AssetJobs(workspace).check()
+            except (ValueError,OSError,sqlite3.Error):pass
+            if self._inbox_stop.wait(self.interval):return
+
     def server_close(self):
         self._inbox_stop.set()
         if hasattr(self,'_inbox_thread'):self._inbox_thread.join(timeout=5)
         if hasattr(self,'_status_thread'):self._status_thread.join(timeout=1)
+        if hasattr(self,'_asset_thread'):self._asset_thread.join(timeout=1)
         super().server_close()

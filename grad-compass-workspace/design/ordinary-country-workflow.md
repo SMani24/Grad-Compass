@@ -5,6 +5,12 @@ research/editorial/photograph provenance: Discovery; exact content review: Alex.
 Public exchange 1.0.0 stays unchanged. Existing private package 0.2, evidence map
 0.2, editorial 0.1 and finalized notices remain compatible.
 
+APP-029 now implements the normal app-owned public-original retrieval capability.
+Use [Request execution protocol](request-execution-protocol.md) and the producer's
+request-bound asset helper for ordinary acquisition. This replaces APP-028's manual
+support limitation; known producer egress restrictions no longer require an owner
+download/connection-discovery handoff. Independent review/release gates remain.
+
 ## Research and report readiness
 
 A result's `completion` describes response delivery, not report readiness.

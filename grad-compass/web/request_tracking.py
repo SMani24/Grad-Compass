@@ -201,6 +201,8 @@ class RequestTracker:
         receiver=getattr(self.workspace,'inbox_receiver',None)
         errors=receiver.status()['errors'] if receiver else []
         rows=[];by_request={e['request']['id']:e for e in entries if e.get('request')}
+        from web.asset_jobs import summaries
+        assets=summaries(self.workspace)
         for summary in research['requests']:
             detail=self.workspace.research.request(summary['request_id']);request=detail['request'];identity=request['request_id'];entry=by_request.get(identity)
             prepared={r['metadata']['country_code']:r for r in reversed(reports) if r['metadata']['request']['id']==identity and r['model']['kind']=='prepared_report'}
@@ -212,6 +214,7 @@ class RequestTracker:
                 'task':entry.get('task') if entry else None,'tracking':track,'acknowledgement':summary['state'],'response_completion':summary.get('completion'),
                 'dispatch_history':entry.get('attempt_history',[]) if entry else [],
                 'results_count':len(detail['results']),'reports':report_states,'delivery_errors':[e for e in errors if e.get('request_id')==identity] if receiver else track.get('delivery_errors',[])}
+            row['asset_jobs']=[a for a in assets if a['request_id']==identity]
             dates=[request['created_at'],*[x['envelope'].get('issued_at') or x['envelope'].get('created_at') or request['created_at'] for x in detail['results']]]
             if detail.get('acknowledgement'):dates.append(detail['acknowledgement'].get('acknowledged_at') or request['created_at'])
             row['local_updated_at']=max(dates)
@@ -227,7 +230,8 @@ class RequestTracker:
             if entry.get('request'):continue
             rows.append(self.describe({'id':'draft:'+entry['id'],'request_id':None,'dispatch_id':entry['id'],'dispatch_status':entry['status'],'dispatch_updated_at':entry.get('updated_at') or entry['created_at'],'countries':entry['payload']['countries'],'scope':entry['payload']['scope'],'intake':entry['payload']['preferences'].get('intake'),'created_at':entry['created_at'],'task':None,'tracking':{},'reports':[],'results_count':0,'delivery_errors':[]}))
         rows.sort(key=lambda r:r['created_at'],reverse=True)
-        return {'requests':rows,'attention_count':sum(r['needs_attention'] for r in rows),'unassociated_delivery_errors':[e for e in errors if not e.get('request_id')],'checked_at':env.now()}
+        asset_errors=[{'file':'Asset job '+a.get('file','unknown'),'error':a['error']['message']} for a in assets if not a.get('request_id') and a.get('error')]
+        return {'requests':rows,'attention_count':sum(r['needs_attention'] for r in rows),'unassociated_delivery_errors':[e for e in errors if not e.get('request_id')]+asset_errors,'checked_at':env.now()}
     def describe(self,row):
         latest=row['tracking'].get('latest',{});execution=latest.get('execution',{});phase=execution.get('phase');dispatch=row['dispatch_status']
         work=latest.get('current_work',{});resolved=work.get('state')=='resolved'
@@ -254,6 +258,9 @@ class RequestTracker:
                     if work.get('reason')=='post_completion_failure':notice+=' Paperclip has not reconciled this attempt with its completed task; the recorded recovery must be checked.'
                     if latest.get('failure') and 'not trusted' in latest['failure']:
                         notice+=' The assigned runtime could not start because its working folder was not trusted; its setup needs repair before an explicit retry.'
+                    if execution.get('cause')=='provider_quota':
+                        state='blocked';label='Paused — provider usage limit'
+                        notice=name+' reached the research provider’s usage limit. The saved request, received originals and completed work remain intact; this is not a new request or lost research.'
                 elif task_status=='cancelled':state='cancelled';label='Paperclip task cancelled';notice='The accepted task was cancelled in Paperclip. Its request and any saved work remain.'
                 elif task_status=='blocked' and latest.get('step',{}).get('status')=='in_progress':
                     state='active';label='Assigned step in progress'
@@ -266,6 +273,7 @@ class RequestTracker:
                 elif not row['results_count']:state='active';label='Research in progress' if phase in ('running','executing') else 'Accepted — waiting for the next step'
             if ready:
                 label=('Reports available' if ready==total else 'Some reports available')+(' · task needs attention' if state=='failed' else ' · step waiting' if state=='blocked' else '')
+                if state=='blocked' and execution.get('cause')=='provider_quota':label=('Reports available' if ready==total else 'Some reports available')+' · provider usage limit'
                 if state not in ('failed','blocked','cancelled','retry_scheduled'):
                     bounded=row.get('response_completion')=='complete'
                     outstanding=row.get('batch_progress',{}).get('outstanding_count',0)
@@ -291,7 +299,23 @@ class RequestTracker:
         elif state=='blocked':
             action=(latest.get('blocker') or {}).get('action')
             next_action=(action[:1000] if isinstance(action,str) and action.strip() else 'Open the linked step to see its assigned owner and unresolved dependency.')+' Reuse the existing request and completed work; no replacement request is needed.'
+            if execution.get('cause')=='provider_quota':
+                next_action='Dave must resume only the existing interrupted step once the provider permits execution. Do not repeat completed downloads or submit the request again; no quota bypass or immediate retry loop.'
         if row['delivery_errors']:next_action='Inspect the recorded incoming-response error and repair or redeliver that exact response through recovery. Do not repeat successful research.'
+        asset_failures=[a for a in row.get('asset_jobs',[]) if a['status']=='failed']
+        # A later successful candidate supersedes the earlier acquisition failure,
+        # whose immutable receipt remains in technical history.
+        recovered={a['country_code'] for a in row.get('asset_jobs',[]) if a['status']=='downloaded'}
+        asset_failures=[a for a in asset_failures if a['country_code'] not in recovered]
+        if asset_failures:
+            notice='Country photograph retrieval needs recovery: '+asset_failures[0]['error']['message']
+            next_action=asset_failures[0]['error']['action']
+            if state!='failed':
+                state='blocked';label='Reports available · photograph needs recovery' if ready else 'Photograph needs recovery'
+        event_wait=any(a.get('event_status')=='pending' for a in row.get('asset_jobs',[]))
+        if event_wait and not notice:
+            invalid_event=next((a for a in row.get('asset_jobs',[]) if a.get('event_status')=='pending' and a.get('event_error_kind')=='validation'),None)
+            notice=('The photograph outcome needs delivery repair: '+invalid_event['event_message']) if invalid_event else 'The photograph outcome is saved; Paperclip notification is waiting for reconnect. No research will be restarted.'
         row.update(status=state,label=label,stage=stage,notice=notice,delayed=delayed,needs_attention=bool(notice or offline),updated_at=max(latest.get('step',{}).get('updatedAt') or row['created_at'],row.get('local_updated_at') or row['created_at'],row.get('dispatch_updated_at') or row['created_at']),last_activity_at=activity,
             work_saved=(str(row['results_count'])+' received result revision(s); '+str(ready)+' prepared country report(s). Earlier versions and annotations are preserved.') if row['results_count'] or ready else 'No findings or prepared reports have been received for this request. Its request and acknowledgement history are saved.',
             execution_health=work.get('state') or ('unresolved' if state=='failed' else 'unknown'),execution_resolution=work if resolved else None,next_action=next_action,
