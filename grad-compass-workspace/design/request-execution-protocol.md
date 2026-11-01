@@ -62,6 +62,12 @@ Use a supported scheduled retry only when real provider policy/reset information
 permits it. Never invent a reset time, bypass quotas, rotate accounts or run an
 immediate retry loop. The app persistently names this condition after restart.
 
+A pending interaction explicitly addressed to an agent with an agent-permitted
+resolver policy is ordinary team progress, not a demand for owner supervision.
+Requests distinguishes that wait from human-only gates, unreadable/unknown gates,
+actual execution failures and prolonged lack of progress. This changes no review,
+human approval, release or execution permission; only the displayed work state.
+
 ## Private files and exact bindings
 
 `web/asset_jobs.py` defines `grad-compass-asset-job-1`. The helper finalizes

@@ -120,6 +120,16 @@ def inspect(client,entry,connection):
     work=assess(issue,execution,recovery,run,matching if run_id else [])
     descriptor=issue.get('unblockDescriptor')
     blocker={k:descriptor.get(k) for k in ('owner','action')} if isinstance(descriptor,dict) else None
+    agent_decision=None
+    if issue.get('status')=='in_review':
+        try:
+            interactions=client.call('/issues/'+issue['id']+'/interactions')
+            if isinstance(interactions,list):
+                pending=next((v for v in interactions if isinstance(v,dict) and v.get('status')=='pending'
+                    and v.get('companyId')==connection['company_id'] and v.get('issueId')==issue['id']
+                    and v.get('addresseeAgentId') and v.get('effectiveResolverPolicy')=='anyone'),None)
+                if pending:agent_decision={k:pending.get(k) for k in ('id','addresseeAgentId','createdAt')}
+        except (ValueError,OSError):pass  # An unreadable/unsupported interaction never implies approval.
     # Issue and attempt endpoints are separate reads. Reject a mixed transition
     # instead of briefly presenting an old failure as the new task's state.
     def stamp(value):
@@ -131,7 +141,7 @@ def inspect(client,entry,connection):
         'step':{k:issue.get(k) for k in ('id','identifier','title','status','updatedAt','completedAt','statusVersion')},
         'task_url':issue_link(connection,root),'recovery_url':issue_link(connection,issue),
         'run':safe_run,'run_history':run_history,'execution':safe_execution,'recovery':safe_recovery,'failure':failure,
-        'current_work':work,'blocker':blocker,'scheduled_retry':bool(issue.get('scheduledRetry')),'unavailable_steps':unavailable_steps,'diagnostic_notes':diagnostic_notes,'observed_at':env.now()}
+        'current_work':work,'blocker':blocker,'agent_decision':agent_decision,'scheduled_retry':bool(issue.get('scheduledRetry')),'unavailable_steps':unavailable_steps,'diagnostic_notes':diagnostic_notes,'observed_at':env.now()}
 
 
 class RequestTracker:
@@ -262,6 +272,8 @@ class RequestTracker:
                         state='blocked';label='Paused — provider usage limit'
                         notice=name+' reached the research provider’s usage limit. The saved request, received originals and completed work remain intact; this is not a new request or lost research.'
                 elif task_status=='cancelled':state='cancelled';label='Paperclip task cancelled';notice='The accepted task was cancelled in Paperclip. Its request and any saved work remain.'
+                elif task_status=='blocked' and latest.get('agent_decision'):
+                    state='active';label='Awaiting a research-team decision'
                 elif task_status=='blocked' and latest.get('step',{}).get('status')=='in_progress':
                     state='active';label='Assigned step in progress'
                 elif task_status=='blocked':
@@ -283,6 +295,8 @@ class RequestTracker:
                     if ready==total and not bounded:label+=' · response '+('partial' if row.get('response_completion')=='partial' else 'not complete')
                     if outstanding:label+=' · deliverables outstanding'
         activity=execution.get('lastConfirmedActivityAt') or latest.get('step',{}).get('updatedAt') or row['created_at'];stamp=seconds(activity)
+        decision_at=(latest.get('agent_decision') or {}).get('createdAt');decision_stamp=seconds(decision_at)
+        if decision_stamp is not None and (stamp is None or decision_stamp>stamp):activity=decision_at;stamp=decision_stamp
         delayed=state in ('active','waiting','findings','awaiting_delivery','retry_scheduled') and stamp is not None and self.clock()-stamp>STALE_SECONDS
         if delayed and not notice:notice='No recent progress has been reported. Refresh status or open the task; this is not a confirmed failure.'
         elif delayed and state=='retry_scheduled':notice+=' No recent progress has been reported; refresh or inspect the existing retry in Paperclip.'

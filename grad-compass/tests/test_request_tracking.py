@@ -292,5 +292,20 @@ class TrackingTests(unittest.TestCase):
         reopened=RequestTracker(LocalWorkspace(self.w.directory));self.assertEqual(self.row(reopened)['label'],row['label'])
         self.assertEqual((self.d.creates,self.d.posts),(1,1))
 
+    def test_agent_release_wait_is_progress_but_human_gate_remains_attention(self):
+        child={'id':str(uuid4()),'companyId':self.d.company,'identifier':'TEST-2',
+               'title':'CAN: exact package release','status':'in_review','updatedAt':env.now()}
+        self.root.update(status='blocked',blockedBy=[child]);self.execution['execution']['phase']='completed'
+        self.routes(child,{'runId':str(uuid4()),'agentId':self.d.dave,'execution':{'phase':'waiting_for_answer'}})
+        question={'id':str(uuid4()),'companyId':self.d.company,'issueId':child['id'],'status':'pending',
+                  'addresseeAgentId':self.d.dave,'effectiveResolverPolicy':'anyone','createdAt':env.now()}
+        self.d.routes['/api/issues/'+child['id']+'/interactions']=[question]
+        self.tracker.refresh();row=self.row()
+        self.assertEqual(row['status'],'active');self.assertEqual(row['label'],'Awaiting a research-team decision')
+        self.assertFalse(row['needs_attention']);self.assertIsNone(row['notice'])
+        question['effectiveResolverPolicy']='human_only';self.tracker.refresh();row=self.row()
+        self.assertEqual(row['status'],'blocked');self.assertTrue(row['needs_attention'])
+        self.assertIsNone(row['tracking']['latest']['agent_decision']);self.assertEqual(self.d.creates,1)
+
 
 if __name__=='__main__':unittest.main()
