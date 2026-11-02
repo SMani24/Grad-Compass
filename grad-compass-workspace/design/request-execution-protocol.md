@@ -125,6 +125,9 @@ owner failures, unknown/live attempts, active recovery and pending human/unknown
 gates reject this reconciliation. The raw cancelled run remains in history;
 outstanding task/review/approval states still govern progress and completion.
 Closed-task cancellation rules cannot bypass current-owner verification.
+Reconciliation of that notification never marks an open request root complete,
+even when reports are already available; tracked fulfilment still requires the
+root's actual completed state.
 
 ## Private files and exact bindings
 

@@ -327,7 +327,9 @@ class RequestTracker:
                 if state not in ('failed','blocked','cancelled','retry_scheduled'):
                     bounded=row.get('response_completion')=='complete'
                     outstanding=row.get('batch_progress',{}).get('outstanding_count',0)
-                    execution_done=not latest or resolved or work.get('state')=='complete' or latest.get('task',{}).get('status')=='done'
+                    # Reconciling an individual notification is not fulfilment
+                    # of an open request root or its remaining release gates.
+                    execution_done=not latest or latest.get('task',{}).get('status')=='done'
                     state='complete' if ready==total and bounded and not outstanding and execution_done else 'partial_reports'
                     if state=='complete':label+=' · request complete'
                     if ready==total and not bounded:label+=' · response '+('partial' if row.get('response_completion')=='partial' else 'not complete')
