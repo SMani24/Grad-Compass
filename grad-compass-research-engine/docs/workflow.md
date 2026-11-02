@@ -112,3 +112,39 @@ python3 -m unittest discover -s grad-compass-research-engine/tests -v
 ```
 
 Tests require `PAPERCLIP_RUN_SCRATCH_DIR` (or `PAPERCLIP_SCRATCH_DIR`) and use isolated synthetic subdirectories cleaned after each test. They never read real applicant files or invoke the live approval API. Real profile approval remains a T3 human gate.
+
+## Routine readiness and recovery
+
+Ordinary generated reviews/evidence should use the private writer described in
+[privacy.md](privacy.md#ordinary-generated-review-and-evidence-output). Other
+tool-generated outputs require explicit `umask 0077` plus destination checks.
+Existing canonical producer validation remains required; app read-only storage
+preflight reports readiness but does not replace it or authorize guard bypass.
+
+A ready assigned request starts preparation immediately within its approved
+scope. A dependency-blocked request records the actual dependency issue; when it
+completes, the dependency-resolved wake resumes the owner. Human review uses a
+saved exact-version interaction and `in_review`; its resolution is the trigger.
+Do not use repeated waiting comments or an idle coordination mailbox as a retry
+loop. An idle mailbox is not failed research.
+
+On unsafe output, stop that write, preserve existing artifacts and report only
+sanitized status. The producer owner inventories the affected destination locally
+and identifies the exact authorized repair action; Dave routes permission or
+security decisions to the proper reviewer. Use a first-class blocker issue or an
+allowed self-owned unblock descriptor with the concrete action. Resume only on
+the repair/dependency event, rerun canonical checks, and replay the intended
+write immutably. Never chmod/ACL-repair automatically or fabricate approvals.
+
+This prevention pass creates no recurring country/release gate. The original
+China defect was owner-repaired and GRA-176 verification passed; do not repeat
+successful research. Singapore preparation, review and delivery continue under
+the existing approved scope independently of this documentation. APP-030 mailbox
+coordination carries only compatibility/proposal/readiness and scoped synthetic
+evidence; private content stays in the established local channel.
+
+Dispatch profile binding is separate from the original request: its
+`profile_reference`/context may legitimately be null. Verify the exact approved
+reference from the Grad-Compass binding line/outbox and task block against the
+canonical producer state. Never rewrite the old request or infer an embedded
+binding. This check does not create a country release gate.
