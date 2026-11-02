@@ -106,6 +106,16 @@ retain priority. A normal team wait is not a new failure; prior attempts remain
 in history. Verify automatic receipt and the next claimed stage, then final
 publication and request completion before claiming end-to-end recovery.
 
+APP-033: when multiple steps are stopped, an actual execution failure (including
+provider quota) takes display priority over an administrative assignment-change
+cancellation on another step. The cancellation remains available in history and
+still needs reconciliation if it is not superseded; it is never automatically
+treated as successful delivery. Stage priority changes no native task/run state,
+review, approval or retry permission. A transient SQLite read lock is separately
+rechecked through a bounded read-only receipt lookup before claiming receipt is
+missing. Existing finalized packets must never be republished or imported directly
+merely because the first receipt query was busy.
+
 ## Private files and exact bindings
 
 `web/asset_jobs.py` defines `grad-compass-asset-job-1`. The helper finalizes

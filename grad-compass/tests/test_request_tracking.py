@@ -265,6 +265,23 @@ class TrackingTests(unittest.TestCase):
         self.assertEqual(row['status'],'blocked');self.assertTrue(row['needs_attention'])
         self.assertIn('missing license record',row['next_action']);self.assertEqual(self.d.creates,1)
 
+    def test_quota_failure_outranks_another_steps_assignment_cancellation(self):
+        coordinator={'id':str(uuid4()),'identifier':'TEST-2','companyId':self.d.company,'parentId':self.root['id'],'title':'Coordinate delivery','status':'in_review','updatedAt':env.now()}
+        researcher={'id':str(uuid4()),'identifier':'TEST-3','companyId':self.d.company,'parentId':self.root['id'],'title':'Prepare research','status':'in_progress','updatedAt':env.now()}
+        self.root.update(status='blocked',blockedBy=[coordinator]);self.execution['execution']['phase']='completed'
+        self.d.routes['/api/companies/'+self.d.company+'/issues?descendantOf='+self.root['id']+'&limit=17']=[coordinator,researcher]
+        self.routes(coordinator,{'runId':str(uuid4()),'agentId':self.d.dave,'execution':{'phase':'failed','label':'Cancelled','cause':'issue_assignee_changed'}})
+        self.routes(researcher,{'runId':str(uuid4()),'agentId':str(uuid4()),'execution':{'phase':'working'}})
+        self.tracker.refresh();before=deepcopy(self.tracker.read()['requests'][self.identity]['history'])
+        self.assertEqual(self.row()['tracking']['latest']['step']['id'],coordinator['id'])
+        self.routes(researcher,{'runId':str(uuid4()),'agentId':str(uuid4()),'execution':{'phase':'failed','cause':'provider_quota'}})
+        self.tracker.refresh();row=self.row()
+        self.assertEqual(row['tracking']['latest']['step']['id'],researcher['id'])
+        self.assertEqual(row['label'],'Paused — provider usage limit');self.assertTrue(row['needs_attention'])
+        self.assertEqual(self.row(RequestTracker(LocalWorkspace(self.w.directory)))['label'],row['label'])
+        self.assertEqual(self.tracker.read()['requests'][self.identity]['history'][:len(before)],before)
+        self.assertEqual((self.d.creates,self.d.posts),(1,1))
+
     def test_active_coordinator_is_selected_after_preparer_hands_back(self):
         coordinator={'id':str(uuid4()),'identifier':'TEST-2','companyId':self.d.company,'parentId':self.root['id'],'title':'Validate and deliver','status':'in_progress','updatedAt':env.now()}
         preparer={'id':str(uuid4()),'identifier':'TEST-3','companyId':self.d.company,'parentId':coordinator['id'],'title':'Prepared inputs awaiting receipt','status':'blocked','updatedAt':env.now()}

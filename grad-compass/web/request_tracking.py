@@ -9,7 +9,7 @@ from copy import deepcopy
 from web import research_envelopes as env
 from web.local import regular
 from web.dispatch import Dispatch,Paperclip,config,durable
-from web.execution_status import active_recovery,closed_cancellation,assess,older
+from web.execution_status import ADMINISTRATIVE_CANCELLATIONS,active_recovery,closed_cancellation,assess,older
 
 VERSION='grad-compass-request-tracking-1'
 STALE_SECONDS=1800
@@ -105,7 +105,8 @@ def inspect(client,entry,connection):
         # After preparation hands back to delivery, the deeper preparer can be
         # idle while its coordinator actively validates. Keep actual stops and
         # decision gates first, then select real work before an idle deeper wait.
-        return (stopped,active_recovery(recovery),execution.get('phase')=='waiting_for_answer',
+        substantive_stop=stopped and execution.get('cause') not in ADMINISTRATIVE_CANCELLATIONS
+        return (substantive_stop,stopped,active_recovery(recovery),execution.get('phase')=='waiting_for_answer',
                 execution.get('phase') in ('working','running','executing'),depth[issue['id']],issue.get('status')=='blocked')
     issue,projection,execution,recovery=max(observations,key=rank)
     run_id=projection.get('runId');run={};failure=None;run_history=[]
