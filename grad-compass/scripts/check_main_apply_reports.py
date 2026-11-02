@@ -169,6 +169,7 @@ def main():
                 click('reader-full-report');wait("document.querySelector('.canonical-report').dataset.readingEdition!=='reader'");shot(code.lower()+'-detailed')
                 js("document.getElementById('reader-export-options').open=true")
                 md=download('reader-download-markdown');pdf=download('reader-download-pdf')
+                js("document.getElementById('reader-export-options').open=false")
                 assert r['metadata']['canonical_document']['sha256'] in md.read_text()
                 from web.report_composition import markdown_sections,source_inventory
                 detail=r.get('detailed');tree=detail['content'] if detail else r['content']

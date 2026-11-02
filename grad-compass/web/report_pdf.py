@@ -13,7 +13,7 @@ from web.report_packages import immutable
 
 PDF_LOCK=threading.RLock()
 ASSETS=Path(__file__).parent/'assets'
-RENDERER='country-reader-15'
+RENDERER='country-reader-17'
 
 
 def styles():
@@ -42,6 +42,17 @@ def _path(asset):
     return path
 
 
+def _photo_image(asset):
+    from PIL import Image,ImageOps
+    with Image.open(_path(asset)) as source:
+        # Browsers apply EXIF orientation; the print rendition must do the same
+        # before cropping and encoding a copy without the source's EXIF tag.
+        image=ImageOps.exif_transpose(source)
+        image=ImageOps.fit(image,(672,756),centering=(asset.get('crop',{}).get('x',.5),asset.get('crop',{}).get('y',.48)))
+        raster=io.BytesIO();image.save(raster,format='JPEG');raster.seek(0)
+        return raster
+
+
 def _flag_image(asset):
     path=_path(asset)
     if path.suffix.lower()!='.svg':return path
@@ -59,7 +70,6 @@ def build(report):
     from reportlab.platypus import SimpleDocTemplate,Paragraph,Spacer,Image,LongTable,Table,TableStyle,PageBreak,Flowable,CondPageBreak
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.colors import HexColor
-    from PIL import Image as Raster,ImageOps
     s=styles();meta=report['metadata'];doc=meta['canonical_document'];editorial=report.get('reader')
     from web.report_composition import sections as composed_sections,review as selected_review,source_inventory,observation_dates
     tree=editorial['content'] if editorial else report['content'];review=selected_review(report,editorial)
@@ -82,16 +92,29 @@ def build(report):
     if asset:
         # A portrait inset preserves the spire and square; the old panoramic crop
         # cut through the subject. The source asset stays byte-for-byte intact.
-        with Raster.open(_path(asset)) as image:
-            image=ImageOps.fit(image,(672,756),centering=(asset.get('crop',{}).get('x',.5),asset.get('crop',{}).get('y',.48)));raster=io.BytesIO();image.save(raster,format='JPEG');raster.seek(0)
+        raster=_photo_image(asset)
         cover=Table([[facts,Image(raster,width=96,height=108)]],colWidths=[width-116,116]);cover.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(0,0),0),('RIGHTPADDING',(0,0),(0,0),16),('LEFTPADDING',(1,0),(1,0),12),('RIGHTPADDING',(1,0),(1,0),0),('TOPPADDING',(0,0),(-1,-1),0),('BOTTOMPADDING',(0,0),(-1,-1),6)]));body.append(cover)
         body.append(p(escape(asset.get('caption') or asset['alt'])+' · '+escape(asset.get('creator') or asset['credit'])+' · '+('<a href="'+escape(asset['license_url'])+'">'+escape(asset['license'])+'</a>' if asset.get('license_url') else escape(asset['license']))+' · cropped/resized for this layout · <a href="'+escape(asset['source_url'])+'">Photo source</a>','small'))
     else:body.extend(facts)
     used_refs=set()
     def linked(block):
-        def replace(match):
-            return re.sub(r'(?:[A-Z]{2,8}-\d{2,3}|E\d{2})',lambda m:'<link href="#'+m[0]+'" color="#08647c">'+m[0]+'</link>' if m[0] in tree['sources'] else m[0],match[0])
-        return re.sub(r'\[((?:[A-Z]{2,8}-\d{2,3}|E\d{2})[^\]]*)\]',replace,block['pdf'])
+        from web.report_content import REF_PATTERN
+        def reference(match):
+            return '<link href="#'+match[0]+'" color="#08647c">'+match[0]+'</link>' if match[0] in block['refs'] and match[0] in tree['sources'] else match[0]
+        chunks=[];inside_link=False
+        for part in re.split(r'(<[^>]*>)',block['pdf']):
+            if part.startswith('<'):
+                if re.match(r'<(?:a|link)\b',part):inside_link=True
+                elif re.match(r'</(?:a|link)>',part):inside_link=False
+                chunks.append(part)
+            elif inside_link:chunks.append(part)
+            else:
+                # Do not rewrite public URLs or nest a link inside a supplied one.
+                for token in re.split(r'(https?://\S+|\[[^\]]+\])',part):
+                    if token.startswith(('https://','http://')):chunks.append(token);continue
+                    pattern=REF_PATTERN if token.startswith('[') else r'(?<![\w/-])'+REF_PATTERN+r'(?![\w/-]|\.[A-Za-z])'
+                    chunks.append(re.sub(pattern,reference,token))
+        return ''.join(chunks)
     for section in sections:
         section_heading=p(escape(section['title']),'heading');body.append(section_heading)
         for item in section['items']:

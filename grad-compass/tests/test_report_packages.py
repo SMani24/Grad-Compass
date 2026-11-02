@@ -104,6 +104,21 @@ class ReportPackageTests(unittest.TestCase):
         self.assertTrue(any('page' in l and 0<=l['page']<page['pages'] for l in links),'Internal evidence destinations must survive page numbering')
         self.assertEqual(ensure_pdf(self.workspace,self.report)['sha256'],pdf['sha256'])
 
+    def test_bare_and_range_references_retain_pdf_sources_and_clickable_destinations(self):
+        self.root=self.root.parent/'revision-0002';self.root.mkdir()
+        text='# Invented report\n\n## Overview\n\nSupplied observation. E01 E02. Range [E01-E02]. [Already linked E02](https://example.org/second).\n'
+        evidence=self.evidence+'| E02 | Another supplied source | [Second](https://example.org/second) |\n'
+        (self.root/'report.md').write_text(text);(self.root/'map.md').write_text(evidence)
+        self.meta['canonical_document'].update(revision_id=str(uuid4()),revision_number=2,sha256=reports.digest(text.encode()))
+        self.meta['evidence_map']['sha256']=reports.digest(evidence.encode());self.write()
+        report=reports.catalog(self.workspace)['reports'][0]
+        first=page_data(self.workspace,report,0);links=[];text=''
+        for page in range(first['pages']):
+            data=page_data(self.workspace,report,page);links.extend(data['links']);text+=data['text']
+        self.assertIn('E02',text)
+        self.assertTrue(any(link.get('url')=='https://example.org/second' for link in links))
+        self.assertGreaterEqual(sum('page' in link for link in links),4)
+
     def test_pdf_annotation_binds_exact_page_digest_and_passage(self):
         data=page_data(self.workspace,self.report,0);word=next(w for w in data['words'] if len(w['text'])>3)
         selector={'view':'pdf','edition':self.report['edition'],'pdf_sha256':data['pdf_sha256'],'page':0,'start':word['start'],'end':word['end'],'quote':data['text'][word['start']:word['end']]}

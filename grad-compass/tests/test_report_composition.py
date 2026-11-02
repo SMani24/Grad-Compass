@@ -17,6 +17,16 @@ from web import report_packages as reports
 
 
 class CompositionTests(unittest.TestCase):
+    def test_bare_references_require_a_received_mapping_and_keep_passage_identity(self):
+        text='# Invented\n\n## Overview\n\nA supplied observation. XYZ-01 XYZ-02 XYZ-99. https://example.invalid/?ref=XYZ-03\n'
+        evidence=json.dumps({'schema_version':'grad-compass-private-report-evidence-map-0.2','sources':{
+            key:{'source_url':'https://example.invalid/'+key} for key in ['XYZ-01','XYZ-02','XYZ-03']}})
+        before=parse_report(text,'');after=parse_report(text,evidence)
+        a=next(iter(before['blocks'].values()));b=next(iter(after['blocks'].values()))
+        self.assertEqual((a['id'],a['text']),(b['id'],b['text']))
+        self.assertEqual(b['refs'],['XYZ-01','XYZ-02'])
+        self.assertNotIn('XYZ-99',after['sources'])
+
     def test_observation_dates_retain_older_and_newer_sources_separately(self):
         report={'metadata':{'source_artifact':{'observed_on':'2026-10-23'}},'finding':{'sources':[{'observed_at':'2026-10-19T10:00:00Z'},{'observed_at':'2026-10-23T11:00:00Z'}]}}
         self.assertEqual(observation_dates(report),['2026-10-19','2026-10-23'])
