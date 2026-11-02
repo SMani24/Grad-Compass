@@ -265,6 +265,26 @@ class TrackingTests(unittest.TestCase):
         self.assertEqual(row['status'],'blocked');self.assertTrue(row['needs_attention'])
         self.assertIn('missing license record',row['next_action']);self.assertEqual(self.d.creates,1)
 
+    def test_unstarted_foreign_wake_does_not_report_current_owner_failed(self):
+        owner=str(uuid4());recipient=str(uuid4());identity=str(uuid4());cancel=str(uuid4())
+        child={'id':identity,'identifier':'TEST-2','companyId':self.d.company,'assigneeAgentId':owner,'status':'in_review','updatedAt':env.now(),'title':'Coordinate receipt'}
+        self.root.update(status='blocked',blockedBy=[child]);self.execution['execution']['phase']='completed'
+        projection={'runId':cancel,'agentId':recipient,'execution':{'phase':'failed','cause':'issue_assignee_changed','label':'Cancelled'}}
+        self.routes(child,projection)
+        runs=[{'runId':cancel,'contextIssueId':identity,'agentId':recipient,'status':'cancelled','errorCode':'issue_assignee_changed','startedAt':None,'finishedAt':'2026-11-02T20:36:38.790Z'},
+              {'runId':str(uuid4()),'contextIssueId':identity,'agentId':owner,'status':'succeeded','startedAt':'2026-11-02T20:35:18Z','finishedAt':'2026-11-02T20:36:38.448Z'}]
+        self.d.routes['/api/issues/'+identity+'/runs']=runs
+        question={'id':str(uuid4()),'status':'pending','companyId':self.d.company,'issueId':identity,'addresseeAgentId':recipient,'effectiveResolverPolicy':'anyone'}
+        self.d.routes['/api/issues/'+identity+'/interactions']=[question]
+        self.tracker.refresh();row=self.row()
+        self.assertEqual(row['status'],'active');self.assertFalse(row['needs_attention'])
+        self.assertEqual(row['tracking']['latest']['current_work']['reason'],'unstarted_non_assignee_wake')
+        self.assertEqual(row['tracking']['latest']['run']['status'],'cancelled')
+        self.assertEqual(self.row(RequestTracker(LocalWorkspace(self.w.directory)))['status'],'active')
+        runs.append({**runs[1],'runId':str(uuid4()),'status':'failed','errorCode':'provider_quota','finishedAt':'2026-11-02T20:37:00Z'})
+        self.tracker.refresh();self.assertTrue(self.row()['needs_attention']);self.assertEqual(self.row()['status'],'failed')
+        self.assertEqual((self.d.creates,self.d.posts),(1,1))
+
     def test_quota_failure_outranks_another_steps_assignment_cancellation(self):
         coordinator={'id':str(uuid4()),'identifier':'TEST-2','companyId':self.d.company,'parentId':self.root['id'],'title':'Coordinate delivery','status':'in_review','updatedAt':env.now()}
         researcher={'id':str(uuid4()),'identifier':'TEST-3','companyId':self.d.company,'parentId':self.root['id'],'title':'Prepare research','status':'in_progress','updatedAt':env.now()}

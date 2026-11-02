@@ -9,7 +9,7 @@ from copy import deepcopy
 from web import research_envelopes as env
 from web.local import regular
 from web.dispatch import Dispatch,Paperclip,config,durable
-from web.execution_status import ADMINISTRATIVE_CANCELLATIONS,active_recovery,closed_cancellation,assess,older
+from web.execution_status import ADMINISTRATIVE_CANCELLATIONS,active_recovery,closed_cancellation,foreign_wake_resolution,assess,older
 
 VERSION='grad-compass-request-tracking-1'
 STALE_SECONDS=1800
@@ -98,21 +98,28 @@ def inspect(client,entry,connection):
         if projection.get('runId') is not None:env.identifier(projection['runId'])
         recovery=projection.get('recoveryAction') or issue.get('activeRecoveryAction')
         if recovery is not None and not isinstance(recovery,dict):raise ValueError('Paperclip recovery status has an unsupported shape')
-        observations.append((issue,projection,execution,recovery))
+        reconciled=None;attempts=None
+        if execution.get('cause')=='issue_assignee_changed' and execution.get('phase') in ('failed','recovery_needed'):
+            try:
+                attempts=client.runs(identity)
+                interactions=client.call('/issues/'+identity+'/interactions')
+                reconciled=foreign_wake_resolution(issue,projection,recovery,attempts,interactions)
+            except (OSError,ValueError,KeyError,TypeError):pass  # Unverified cancellation stays unresolved.
+        observations.append((issue,projection,execution,recovery,reconciled,attempts))
     def rank(item):
-        issue,projection,execution,recovery=item
-        stopped=execution.get('phase') in ('failed','recovery_needed') and not closed_cancellation({**issue,'blockedBy':[]},execution,recovery)
+        issue,projection,execution,recovery,reconciled,attempts=item
+        stopped=execution.get('phase') in ('failed','recovery_needed') and not reconciled and not closed_cancellation({**issue,'blockedBy':[]},execution,recovery)
         # After preparation hands back to delivery, the deeper preparer can be
         # idle while its coordinator actively validates. Keep actual stops and
         # decision gates first, then select real work before an idle deeper wait.
         substantive_stop=stopped and execution.get('cause') not in ADMINISTRATIVE_CANCELLATIONS
         return (substantive_stop,stopped,active_recovery(recovery),execution.get('phase')=='waiting_for_answer',
                 execution.get('phase') in ('working','running','executing'),depth[issue['id']],issue.get('status')=='blocked')
-    issue,projection,execution,recovery=max(observations,key=rank)
+    issue,projection,execution,recovery,reconciled,attempts=max(observations,key=rank)
     run_id=projection.get('runId');run={};failure=None;run_history=[]
     if run_id:
         try:
-            values=client.runs(issue['id'])
+            values=attempts if attempts is not None else client.runs(issue['id'])
             if not isinstance(values,list) or any(not isinstance(r,dict) for r in values):raise ValueError()
         except (OSError,ValueError,TypeError):values=[];diagnostic_notes.append('Attempt details could not be read; the execution projection remains authoritative.')
         matching=[r for r in values if r.get('contextIssueId')==issue['id'] and r.get('agentId')==projection.get('agentId')]
@@ -143,7 +150,7 @@ def inspect(client,entry,connection):
     safe_execution={k:execution.get(k) for k in ('phase','label','cause','lastConfirmedActivityAt','retryAt','attempt','maxAttempts','permittedActions','predecessorRunId','successorRunId')}
     safe_run={k:run.get(k) for k in ('runId','status','startedAt','finishedAt','errorCode','retryExhaustedReason','retryOfRunId')}
     safe_recovery={k:recovery.get(k) for k in ('id','kind','status','ownerType','cause','nextAction')} if recovery else None
-    work=assess(issue,execution,recovery,run,matching if run_id else [])
+    work=reconciled or assess(issue,execution,recovery,run,matching if run_id else [])
     descriptor=issue.get('unblockDescriptor')
     blocker={k:descriptor.get(k) for k in ('owner','action')} if isinstance(descriptor,dict) else None
     agent_decision=None

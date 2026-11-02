@@ -116,6 +116,16 @@ rechecked through a bounded read-only receipt lookup before claiming receipt is
 missing. Existing finalized packets must never be republished or imported directly
 merely because the first receipt query was busy.
 
+Paperclip can also select an unstarted `issue_assignee_changed` notification run
+addressed to another agent after the actual owner's successful run. The consumer
+reconciles that cancellation only from exact same-task/run/agent identities,
+explicit `startedAt: null`, matching cancelled status/error, the current owner's
+latest completed successful run and readable interaction records. Real newer
+owner failures, unknown/live attempts, active recovery and pending human/unknown
+gates reject this reconciliation. The raw cancelled run remains in history;
+outstanding task/review/approval states still govern progress and completion.
+Closed-task cancellation rules cannot bypass current-owner verification.
+
 ## Private files and exact bindings
 
 `web/asset_jobs.py` defines `grad-compass-asset-job-1`. The helper finalizes

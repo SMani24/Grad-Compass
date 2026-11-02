@@ -25,8 +25,44 @@ def closed_cancellation(issue,execution,recovery):
         and execution.get('label','').lower()=='cancelled')
 
 
+def foreign_wake_resolution(issue,projection,recovery,runs,interactions):
+    """Reconcile only an unstarted wrong-assignee wake, never failed research."""
+    execution=projection.get('execution') or {};owner=issue.get('assigneeAgentId')
+    if (execution.get('phase') not in ('failed','recovery_needed')
+        or execution.get('cause')!='issue_assignee_changed'
+        or execution.get('label','').lower()!='cancelled'
+        or active_recovery(recovery) or not owner or not projection.get('agentId')
+        or not projection.get('runId') or owner==projection.get('agentId')):return None
+    if not isinstance(runs,list) or any(not isinstance(r,dict) for r in runs):return None
+    stopped=next((r for r in runs if r.get('runId')==projection.get('runId')
+        and r.get('contextIssueId')==issue['id'] and r.get('agentId')==projection.get('agentId')),None)
+    if (not stopped or 'startedAt' not in stopped or stopped['startedAt'] is not None
+        or stopped.get('status')!='cancelled' or stopped.get('errorCode')!='issue_assignee_changed'
+        or timestamp(stopped.get('finishedAt')) is None):return None
+    owned=[r for r in runs if r.get('contextIssueId')==issue['id'] and r.get('agentId')==owner]
+    # Unknown/live/newer failed owner attempts must not be dismissed from an
+    # earlier success. /runs also includes related tasks: bind both identities.
+    if not owned or any(r.get('status') not in ('succeeded','failed','cancelled','interrupted','timed_out')
+        or timestamp(r.get('finishedAt')) is None for r in owned):return None
+    latest=max(owned,key=lambda r:timestamp(r['finishedAt']))
+    if latest.get('status')!='succeeded' or timestamp(latest.get('startedAt')) is None:return None
+    if not isinstance(interactions,list) or any(not isinstance(q,dict) for q in interactions):return None
+    if any(q.get('status')=='pending' and (q.get('companyId')!=issue.get('companyId')
+        or q.get('issueId')!=issue['id'] or not q.get('addresseeAgentId')
+        or q.get('effectiveResolverPolicy')!='anyone') for q in interactions):return None
+    return {'state':'resolved','reason':'unstarted_non_assignee_wake','owner_run_id':latest['runId'],
+        'message':'An unstarted follow-up for another agent was cancelled on this task. The current owner has a successful run on the same task; outstanding task, review and approval requirements remain unchanged.'}
+
+
 def assess(issue,execution,recovery,run,runs):
     phase=execution.get('phase');failed=phase in ('failed','recovery_needed')
+    if (failed and run.get('errorCode')=='issue_assignee_changed' and run.get('agentId')
+        and issue.get('assigneeAgentId') and run['agentId']!=issue['assigneeAgentId']
+        and 'startedAt' in run and run['startedAt'] is None):
+        # Closed-task cancellation rules cannot stand in for checking the
+        # current owner. Only foreign_wake_resolution supplies that proof.
+        return {'state':'unresolved','reason':'unverified_owner_handoff',
+                'message':'Paperclip selected an unstarted follow-up for another agent; the current owner’s execution and outstanding gates still require verification.'}
     if failed and not active_recovery(recovery) and issue.get('status')=='done' and not open_dependencies(issue):
         end=timestamp(run.get('finishedAt'));closed=timestamp(issue.get('completedAt'))
         later=next((r for r in runs if r.get('status')=='succeeded' and end is not None
