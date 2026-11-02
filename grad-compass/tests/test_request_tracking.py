@@ -265,6 +265,27 @@ class TrackingTests(unittest.TestCase):
         self.assertEqual(row['status'],'blocked');self.assertTrue(row['needs_attention'])
         self.assertIn('missing license record',row['next_action']);self.assertEqual(self.d.creates,1)
 
+    def test_active_coordinator_is_selected_after_preparer_hands_back(self):
+        coordinator={'id':str(uuid4()),'identifier':'TEST-2','companyId':self.d.company,'parentId':self.root['id'],'title':'Validate and deliver','status':'in_progress','updatedAt':env.now()}
+        preparer={'id':str(uuid4()),'identifier':'TEST-3','companyId':self.d.company,'parentId':coordinator['id'],'title':'Prepared inputs awaiting receipt','status':'blocked','updatedAt':env.now()}
+        self.root.update(status='blocked',blockedBy=[coordinator]);self.execution['execution']['phase']='completed'
+        url='/api/companies/'+self.d.company+'/issues?descendantOf='+self.root['id']+'&limit=17'
+        self.d.routes[url]=[coordinator,preparer]
+        self.routes(coordinator,{'runId':str(uuid4()),'agentId':self.d.dave,'execution':{'phase':'working'}})
+        self.routes(preparer,{'runId':str(uuid4()),'agentId':str(uuid4()),'execution':{'phase':'completed'}})
+        self.tracker.refresh();row=self.row()
+        self.assertEqual(row['tracking']['latest']['step']['id'],coordinator['id'])
+        self.assertEqual(row['status'],'active');self.assertIsNone(row['notice']);self.assertFalse(row['needs_attention'])
+        self.assertEqual(self.row(RequestTracker(LocalWorkspace(self.w.directory)))['stage'],coordinator['title'])
+        # Real failures and unanswered gates must remain visible even while
+        # another member of the team is working.
+        self.routes(preparer,{'runId':str(uuid4()),'agentId':str(uuid4()),'execution':{'phase':'failed','cause':'provider_quota'}})
+        self.tracker.refresh();self.assertEqual(self.row()['tracking']['latest']['step']['id'],preparer['id'])
+        self.assertEqual(self.row()['label'],'Paused — provider usage limit')
+        self.routes(preparer,{'runId':str(uuid4()),'agentId':str(uuid4()),'execution':{'phase':'waiting_for_answer'}})
+        self.tracker.refresh();self.assertEqual(self.row()['tracking']['latest']['step']['id'],preparer['id'])
+        self.assertTrue(self.row()['needs_attention']);self.assertEqual((self.d.creates,self.d.posts),(1,1))
+
     def test_failed_accepted_retry_does_not_duplicate_or_touch_another_execution(self):
         other=self.d.prepare(countries=['DNK','GBR'],scope='country_conditions',bounds={'institutions':0,'programs':0})
         accepted_other=self.d.confirm(other);before=deepcopy(accepted_other)

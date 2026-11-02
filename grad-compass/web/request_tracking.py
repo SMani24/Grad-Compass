@@ -102,9 +102,11 @@ def inspect(client,entry,connection):
     def rank(item):
         issue,projection,execution,recovery=item
         stopped=execution.get('phase') in ('failed','recovery_needed') and not closed_cancellation({**issue,'blockedBy':[]},execution,recovery)
-        # A parent awaiting its children is not the current work stage. Follow
-        # the terminal dependency even while it runs, retaining failure priority.
-        return (stopped,active_recovery(recovery),depth[issue['id']],issue.get('status')=='blocked',execution.get('phase') in ('working','running','executing'))
+        # After preparation hands back to delivery, the deeper preparer can be
+        # idle while its coordinator actively validates. Keep actual stops and
+        # decision gates first, then select real work before an idle deeper wait.
+        return (stopped,active_recovery(recovery),execution.get('phase')=='waiting_for_answer',
+                execution.get('phase') in ('working','running','executing'),depth[issue['id']],issue.get('status')=='blocked')
     issue,projection,execution,recovery=max(observations,key=rank)
     run_id=projection.get('runId');run={};failure=None;run_history=[]
     if run_id:

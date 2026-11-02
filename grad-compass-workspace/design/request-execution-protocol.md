@@ -74,6 +74,38 @@ Requests distinguishes that wait from human-only gates, unreadable/unknown gates
 actual execution failures and prolonged lack of progress. This changes no review,
 human approval, release or execution permission; only the displayed work state.
 
+## Verified same-task handoffs
+
+APP-032: Russia preparation finished but its readiness comment did not resume a
+self-blocked delivery coordinator whose execution projection still selected an
+older cancelled run. Resuming only the researcher was insufficient. A successful
+same-task continuation with structured `resume: true` started the coordinator,
+which validated the prepared inputs, published the existing result and verified
+actual automatic receipt before routing independent review. No research was repeated.
+
+For each prepared-input handoff, the responsible coordinator must inspect the
+target's current assignment, questions, dependencies, recovery and live execution.
+If a stopped or self-blocked existing target is permitted to continue, use its
+supported same-task structured resume input with deterministic identity and verify
+both input receipt and the native run claim/current execution. A comment or a
+successful earlier run alone is not proof that the next stage started. Reconcile
+an uncertain acknowledgement before resending; never interrupt an active run or
+blindly retry a denied transition. A genuine human, review, release, provider or
+dependency gate remains in force and must yield its exact error/owner/action.
+
+Preparation closure must not be a prerequisite for a coordinator's receipt when
+the preparer is waiting for that receipt. Keep independent review, release and
+final publication as distinct actual transitions. Dave owns continuation routing;
+Marry owns exact validation/publication/consumer-receipt evidence. Codex owns app
+display and future generated handoff wording. The app adds no background agent
+invocation and does not manufacture completion or acceptance.
+
+The displayed stage prefers a genuinely working coordinator/reviewer over an
+idle deeper preparer. Actual failed/recovery states and unanswered decision gates
+retain priority. A normal team wait is not a new failure; prior attempts remain
+in history. Verify automatic receipt and the next claimed stage, then final
+publication and request completion before claiming end-to-end recovery.
+
 ## Private files and exact bindings
 
 `web/asset_jobs.py` defines `grad-compass-asset-job-1`. The helper finalizes
