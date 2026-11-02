@@ -151,6 +151,8 @@ class InboxServer(ThreadingHTTPServer):
                 with self.profiles.request_context() if self.profiles else nullcontext():
                     workspace=self.profiles.workspace if self.profiles else self.workspace
                 RequestTracker(workspace).refresh()
+                from web.execution_recovery import ExecutionRecovery
+                ExecutionRecovery(workspace).check()
             except (ValueError,OSError,sqlite3.Error):pass
             if self._inbox_stop.wait(60):return
 

@@ -213,6 +213,10 @@ class RequestTracker:
         rows=[];by_request={e['request']['id']:e for e in entries if e.get('request')}
         from web.asset_jobs import summaries
         assets=summaries(self.workspace)
+        from web.execution_recovery import records
+        recovery_error=[]
+        try:recoveries=list(records(self.workspace)['events'].values())
+        except (OSError,ValueError):recoveries=[];recovery_error=[{'file':'Automatic recovery','error':'Recovery history cannot be read. Saved requests and original research are retained; technical reconciliation is required.'}]
         for summary in research['requests']:
             detail=self.workspace.research.request(summary['request_id']);request=detail['request'];identity=request['request_id'];entry=by_request.get(identity)
             prepared={r['metadata']['country_code']:r for r in reversed(reports) if r['metadata']['request']['id']==identity and r['model']['kind']=='prepared_report'}
@@ -225,6 +229,7 @@ class RequestTracker:
                 'dispatch_history':entry.get('attempt_history',[]) if entry else [],
                 'results_count':len(detail['results']),'reports':report_states,'delivery_errors':[e for e in errors if e.get('request_id')==identity] if receiver else track.get('delivery_errors',[])}
             row['asset_jobs']=[a for a in assets if a['request_id']==identity]
+            row['automatic_recovery']=[e for e in recoveries if e['request_id']==identity]
             dates=[request['created_at'],*[x['envelope'].get('issued_at') or x['envelope'].get('created_at') or request['created_at'] for x in detail['results']]]
             if detail.get('acknowledgement'):dates.append(detail['acknowledgement'].get('acknowledged_at') or request['created_at'])
             row['local_updated_at']=max(dates)
@@ -241,7 +246,7 @@ class RequestTracker:
             rows.append(self.describe({'id':'draft:'+entry['id'],'request_id':None,'dispatch_id':entry['id'],'dispatch_status':entry['status'],'dispatch_updated_at':entry.get('updated_at') or entry['created_at'],'countries':entry['payload']['countries'],'scope':entry['payload']['scope'],'intake':entry['payload']['preferences'].get('intake'),'created_at':entry['created_at'],'task':None,'tracking':{},'reports':[],'results_count':0,'delivery_errors':[]}))
         rows.sort(key=lambda r:r['created_at'],reverse=True)
         asset_errors=[{'file':'Asset job '+a.get('file','unknown'),'error':a['error']['message']} for a in assets if not a.get('request_id') and a.get('error')]
-        return {'requests':rows,'attention_count':sum(r['needs_attention'] for r in rows),'unassociated_delivery_errors':[e for e in errors if not e.get('request_id')]+asset_errors,'checked_at':env.now()}
+        return {'requests':rows,'attention_count':sum(r['needs_attention'] for r in rows),'unassociated_delivery_errors':[e for e in errors if not e.get('request_id')]+asset_errors+recovery_error,'checked_at':env.now()}
     def describe(self,row):
         latest=row['tracking'].get('latest',{});execution=latest.get('execution',{});phase=execution.get('phase');dispatch=row['dispatch_status']
         work=latest.get('current_work',{});resolved=work.get('state')=='resolved'

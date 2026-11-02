@@ -14,8 +14,10 @@ class DispatchTests(unittest.TestCase):
     def setUp(self):
         self.f=fixtures.LocalTests();self.f.setUp();self.addCleanup(self.f.doCleanups)
         self.w=self.f.workspace;self.tasks={};self.routes={};self.gets=[];self.creates=0;self.posts=0;self.online=True;self.lose_ack=False;self.guard=threading.Lock()
-        self.company=str(uuid4());self.dave=str(uuid4());root=self.f.root/'approved';root.mkdir()
+        self.probes=0;self.probe={'status':'pass','checks':[{'code':'codex_hello_probe_passed','level':'info'}]}
+        self.company=str(uuid4());self.dave=str(uuid4());root=self.f.root/'approved';root.mkdir(mode=0o700)
         content=b'{"invented":"no applicant data"}';(root/'profile.json').write_bytes(content);(root/'COMPLETE').write_text('complete\n')
+        (root/'profile.json').chmod(0o600);(root/'COMPLETE').chmod(0o600)
         atomic_json(root/'receipt.json',{'profile_id':str(uuid4()),'revision_id':str(uuid4()),'sha256':hashlib.sha256(content).hexdigest(),'receipt_id':str(uuid4()),'approved_at':'2026-10-25T00:00:00Z','decision':'accepted','actor_type':'human','reliable_for_discovery':True})
         owner=self
         class Handler(BaseHTTPRequestHandler):
@@ -29,6 +31,8 @@ class DispatchTests(unittest.TestCase):
                 return self.reply(list(owner.tasks.values()) if '/issues?' in self.path else {'id':owner.company})
             def do_POST(self):
                 value=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                if self.path.endswith('/test-environment'):
+                    owner.probes+=1;return self.reply(owner.probe)
                 with owner.guard:
                     owner.posts+=1;key=value['idempotencyKey']
                     if key not in owner.tasks:
@@ -90,6 +94,46 @@ class DispatchTests(unittest.TestCase):
         e=self.prepare();root=Path(config(self.w)['approved_profile_directory']);v=json.loads((root/'receipt.json').read_text());v['decision']='rejected';atomic_json(root/'receipt.json',v)
         row=self.confirm(e);self.assertEqual(row['status'],'pending');self.assertEqual(self.posts,0)
 
+    def test_storage_defect_after_confirmation_blocks_dispatch_without_losing_request(self):
+        e=self.prepare();root=Path(config(self.w)['approved_profile_directory'])
+        historical=root/'old-review.md';historical.write_text('Invented historical review');historical.chmod(0o664)
+        before=historical.read_bytes();row=self.confirm(e)
+        self.assertEqual(row['status'],'pending');self.assertEqual(self.posts,0)
+        self.assertIn('permissions need owner-local maintenance',row['error'])
+        self.assertEqual(historical.read_bytes(),before);self.assertEqual(historical.stat().st_mode & 0o777,0o664)
+        self.assertIn('permissions',self.service.snapshot()['error'])
+        # Owner maintenance, not an automatic permission workaround or new request.
+        historical.chmod(0o600)
+        replay=Dispatch(LocalWorkspace(self.w.directory)).retry(e['id'])
+        self.assertEqual(replay['request'],row['request']);self.assertEqual(replay['status'],'accepted');self.assertEqual(self.creates,1)
+
+    def enable_runtime_preflight(self):
+        path=self.w.directory/'paperclip-connection.local.json';value=json.loads(path.read_text());value['runtime_preflight']=True;atomic_json(path,value)
+        self.routes['/api/agents/'+self.dave]={'id':self.dave,'companyId':self.company,'adapterType':'codex_local','adapterConfig':{'model':'invented-fixture-model'}}
+
+    def test_incompatible_runtime_is_detected_before_acceptance_and_recovers_same_request(self):
+        self.enable_runtime_preflight();e=self.prepare()
+        self.probe={'status':'fail','checks':[{'code':'codex_cli_version_incompatible','level':'error','detail':'Private diagnostics must stay private'}]}
+        row=self.confirm(e);self.assertEqual(row['status'],'pending');self.assertEqual((self.posts,self.creates),(0,0));self.assertIn('incompatible Codex CLI',row['error'])
+        self.assertNotIn('Private diagnostics',row['error'])
+        self.probe={'status':'pass','checks':[{'code':'codex_hello_probe_passed','level':'info'}]}
+        recovered=self.service.retry(e['id']);self.assertEqual(recovered['status'],'accepted');self.assertEqual(recovered['request'],row['request']);self.assertEqual(self.creates,1)
+
+    def test_lost_ack_reconciliation_does_not_probe_or_resubmit_accepted_work(self):
+        self.enable_runtime_preflight();e=self.prepare();self.lose_ack=True;first=self.confirm(e)
+        self.assertEqual(first['status'],'uncertain');self.assertEqual(self.probes,1)
+        self.probe={'status':'fail','checks':[]}
+        recovered=Dispatch(LocalWorkspace(self.w.directory)).retry(e['id'])
+        self.assertEqual(recovered['status'],'accepted');self.assertEqual((self.creates,self.posts,self.probes),(1,1,1))
+
+    def test_unverified_or_malformed_probe_never_dispatches_or_leaks_its_body(self):
+        self.enable_runtime_preflight();e=self.prepare()
+        for value in [{'status':'warn','checks':[{'code':'ai_connection_pool_task_test_required','level':'warn'}]},
+            {'status':'pass','checks':[{'code':'codex_hello_probe_passed','level':'info'},{'level':'error','detail':'Private secret'}]},
+            {'status':'pass','checks':'malformed'}]:
+            self.probe=value;row=self.confirm(e)
+            self.assertEqual(row['status'],'pending');self.assertEqual(self.creates,0);self.assertNotIn('Private secret',row['error'])
+
     def test_independent_processes_share_one_durable_dispatch(self):
         self.online=False;e=self.prepare();self.confirm(e);self.online=True
         code="import json,sys;from web.local import LocalWorkspace;from web.dispatch import Dispatch;r=Dispatch(LocalWorkspace(sys.argv[1])).retry(sys.argv[2]);print(json.dumps({'status':r['status'],'task':r['task']['id']}))"
@@ -122,3 +166,15 @@ class DispatchTests(unittest.TestCase):
     def test_confirmation_binds_the_company_and_agent_destination(self):
         e=self.prepare();path=self.w.directory/'paperclip-connection.local.json';value=json.loads(path.read_text());value['company_id']=str(uuid4());atomic_json(path,value)
         result=self.confirm(e);self.assertEqual(result['status'],'pending');self.assertIn('destination changed',result['error']);self.assertEqual(self.posts,0)
+
+    def test_separate_approved_reference_does_not_rewrite_the_immutable_request(self):
+        e=self.prepare();accepted=self.confirm(e)
+        request=self.w.research.request(accepted['request']['id'])['request']
+        self.assertIsNone(request['profile_reference'])
+        task=next(iter(self.tasks.values()))
+        binding=json.loads(next(line.removeprefix('Grad-Compass binding ') for line in task['description'].splitlines() if line.startswith('Grad-Compass binding ')))
+        self.assertEqual(binding['profile'],e['profile_reference'])
+        self.assertEqual(binding['request']['sha256'],request['digest'])
+        self.assertIn('do not rewrite it',task['description'])
+        self.assertEqual(Dispatch(LocalWorkspace(self.w.directory)).retry(e['id'])['request'],accepted['request'])
+        self.assertEqual(self.w.research.request(accepted['request']['id'])['request'],request)

@@ -1,5 +1,5 @@
 "use strict";
-/* Read-only progress refresh is automatic; execution recovery is always explicit. */
+/* Progress refresh is read-only; the local worker handles bounded controller-loss recovery. */
 (() => {
   const get=id=>document.getElementById(id),dialog=get('requests-dialog');
   const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
@@ -50,6 +50,8 @@
       const stage=row.stage.startsWith('Grad Compass:')?'Country report coordination':row.stage.replace(/^([A-Z]{3}):/,(_,code)=>country(code)+':');
       card.append(node('p','Current step: '+stage));
       if(row.notice)card.append(node('p',row.notice,'request-persistent-notice'));
+      const recovery=row.automatic_recovery?.find(e=>e.run_id===row.tracking.latest?.run?.runId);
+      if(recovery && ['failed','blocked'].includes(row.status))card.append(node('p','Automatic recovery: '+recovery.message,'request-connection-notice'));
       if(row.tracking.connection_error)card.append(node('p',row.tracking.connection_error+' Last successful status check: '+date(row.last_success_at)+'. This is not a new confirmed research failure.','request-connection-notice'));
       card.append(node('p',row.work_saved));
       card.append(node('p','Last status check: '+date(row.last_checked_at)+' · Last reported activity: '+date(row.last_activity_at),'tracked-request-dates'));
@@ -109,7 +111,7 @@
         }
       }
       card.append(actions);
-      const technical=node('details');technical.dataset.details=row.id+':technical';technical.open=opened.has(technical.dataset.details);technical.append(node('summary','Task, attempts and technical details'),node('pre',JSON.stringify({request_id:row.request_id,dispatch_id:row.dispatch_id,dispatch_status:row.dispatch_status,dispatch_attempts:row.dispatch_history,execution:row.tracking.latest,observations:row.tracking.history,delivery_errors:row.delivery_errors,asset_jobs:row.asset_jobs},null,2)));card.append(technical);
+      const technical=node('details');technical.dataset.details=row.id+':technical';technical.open=opened.has(technical.dataset.details);technical.append(node('summary','Task, attempts and technical details'),node('pre',JSON.stringify({request_id:row.request_id,dispatch_id:row.dispatch_id,dispatch_status:row.dispatch_status,dispatch_attempts:row.dispatch_history,execution:row.tracking.latest,observations:row.tracking.history,delivery_errors:row.delivery_errors,asset_jobs:row.asset_jobs,automatic_recovery:row.automatic_recovery},null,2)));card.append(technical);
       fragment.append(card);
     }
     if(!rows.length)fragment.append(node('p','No requests match this filter. All requests includes dispatched and completed work.'));

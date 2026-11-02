@@ -5,6 +5,12 @@ asset operation; it does not grant an agent broader network or filesystem access
 Codex owns the app/service/helper; Marry owns producer compatibility/submission;
 Ali owns research and asset provenance; Alex reviews; Dave coordinates and releases.
 
+APP-030 adds the [local runtime reliability rules](local-runtime-reliability.md):
+one native supervised controller on the app's existing port, pinned execution
+environment, restrictive private-output umask, read-only storage preflight and
+the supported saved-agent model probe before new task creation. Existing accepted
+task recovery and receipt remain separate from new dispatch and factual review.
+
 ## Normal sequence
 
 1. The owner explicitly confirms one bounded request in the app. The accepted

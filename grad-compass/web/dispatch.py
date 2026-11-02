@@ -17,6 +17,7 @@ import urllib.request
 from uuid import uuid4
 from web.local import regular,atomic_json
 from web import research_envelopes as env
+from web.storage_health import inspect_private_store,StorageHealthError
 
 VERSION='grad-compass-dispatch-1'
 RETENTION_SECONDS=7*86400
@@ -53,6 +54,7 @@ def profile_reference(connection):
     if not connection:return None
     root=Path(connection.get('approved_profile_directory',''))
     if not root.is_absolute() or any(p.is_symlink() for p in (root,*root.parents)):raise ValueError('Approved profile reference is unavailable')
+    inspect_private_store(root)
     receipt=env.loads(regular(root/'receipt.json').read_bytes())
     if regular(root/'COMPLETE').read_text().strip()!='complete' or receipt.get('decision')!='accepted' or receipt.get('actor_type')!='human' or receipt.get('reliable_for_discovery') is not True:raise ValueError('The profile has no verified human approval/completion receipt')
     digest=hashlib.sha256(regular(root/'profile.json').read_bytes()).hexdigest()
@@ -63,7 +65,7 @@ def profile_reference(connection):
 
 class Paperclip:
     def __init__(self,connection):self.connection=connection
-    def call(self,path,data=None):
+    def call(self,path,data=None,timeout=12):
         headers={'Content-Type':'application/json'}
         token=os.environ.get('GRAD_COMPASS_PAPERCLIP_TOKEN')
         if token:headers['Authorization']='Bearer '+token
@@ -71,11 +73,33 @@ class Paperclip:
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self,*args,**kwargs):return None
         req=urllib.request.Request(self.connection['url'].rstrip('/')+'/api'+path,data=json.dumps(data).encode() if data is not None else None,headers=headers)
-        with urllib.request.build_opener(NoRedirect).open(req,timeout=12) as response:
+        with urllib.request.build_opener(NoRedirect).open(req,timeout=timeout) as response:
             raw=response.read(4_000_001)
             if len(raw)>4_000_000:raise ValueError('Paperclip response exceeds the local limit')
             return env.loads(raw)
     def available(self):return self.call('/companies/'+self.connection['company_id'])
+    def preflight(self,agent_id=None):
+        # Before dispatch or bounded administrative continuation. Accepted-task
+        # receipt reconciliation needs no inference probe or replacement task.
+        if self.connection.get('runtime_preflight') is not True:return
+        target=env.identifier(agent_id or self.connection['dave_id'])
+        agent=self.call('/agents/'+target)
+        if (not isinstance(agent,dict) or agent.get('id')!=target or agent.get('companyId')!=self.connection['company_id']
+            or agent.get('adapterType')!='codex_local'):
+            raise ValueError('The configured research runtime cannot be verified. Saved request retained; no new task was sent.')
+        payload={'agentId':agent['id'],'adapterConfig':agent.get('adapterConfig',{})}
+        binding=(agent.get('runtimeConfig') or {}).get('aiConnection')
+        if binding:payload['aiConnection']=binding
+        probe=self.call('/companies/'+self.connection['company_id']+'/adapters/codex_local/test-environment',payload,timeout=55)
+        if not isinstance(probe,dict):raise ValueError('The research runtime returned an invalid readiness check. Saved request retained; no new task was sent.')
+        checks=probe.get('checks',[])
+        if not isinstance(checks,list) or any(not isinstance(c,dict) for c in checks):
+            raise ValueError('The research runtime returned an invalid readiness check. Saved request retained; no new task was sent.')
+        if any(c.get('code')=='codex_cli_version_incompatible' for c in checks):
+            raise ValueError('The research runtime uses an incompatible Codex CLI. Repair the existing Paperclip runtime, then retry this saved request. No new task was sent.')
+        if (probe.get('status') not in ('pass','warn') or any(c.get('level')=='error' for c in checks)
+            or not any(c.get('code')=='codex_hello_probe_passed' for c in checks)):
+            raise ValueError('The configured research model/account did not pass its readiness check. Inspect that agent’s saved environment test in Paperclip, then retry this saved request. No new task was sent.')
     def create(self,payload):return self.call('/companies/'+self.connection['company_id']+'/issues',payload)
     def reconcile(self,marker):
         values=self.call('/companies/'+self.connection['company_id']+'/issues?q='+quote(marker))
@@ -96,6 +120,7 @@ class Dispatch:
     def settings(self):
         try:
             connection=config(self.workspace);return {'configured':connection is not None,'profile_reference':profile_reference(connection),'destination':{'company_id':connection['company_id'],'dave_id':connection['dave_id']} if connection else None,'error':None}
+        except StorageHealthError as error:return {'configured':False,'profile_reference':None,'destination':None,'error':str(error)}
         except (ValueError,OSError):return {'configured':False,'profile_reference':None,'destination':None,'error':'Approved profile or connection needs technical attention; pending requests are retained'}
     def snapshot(self):
         with lock(self.workspace):return {**self.settings(),'entries':self.read()['entries']}
@@ -172,10 +197,12 @@ class Dispatch:
                 if not task:
                     if entry.get('first_attempt_at') and self.clock()-entry['first_attempt_at']>=RETENTION_SECONDS:
                         raise ValueError('Earlier delivery is uncertain beyond Paperclip’s seven-day deduplication window. Reconciliation found no task; no duplicate dispatch will be attempted')
+                    client.preflight()
                     export=self.workspace.research.export(current['request_id'])
                     entry['first_attempt_at']=entry.get('first_attempt_at',self.clock());entry['attempts']+=1;entry['status']='dispatching';entry['error']=None;entry['updated_at']=env.now();self.event(entry,'send_attempt',attempt=entry['attempts']);self.write(state)
                     payload={'title':'Grad Compass: '+', '.join(current['countries'])+' · '+current['request_id'],
-                        'description':marker+'\n'+binding_line+'\n\n'+export['prompt']+'\n\nExplicitly confirmed app dispatch. Approved profile reference (no content): '+json.dumps(reference,sort_keys=True),
+                        'description':marker+'\n'+binding_line+'\n\n'+export['prompt']+'\n\nExplicitly confirmed app dispatch. Approved profile reference (no content): '+json.dumps(reference,sort_keys=True)
+                            +'\nThe separately confirmed profile reference is bound in the exact Grad-Compass binding line above. The immutable request payload may have null profile_reference/context; do not rewrite it, fabricate a sibling reference, or infer approval from those fields. Verify the separately bound approved reference through the existing guarded profile/receipt/approval workflow. A genuine mismatch remains a blocker.',
                         'assigneeAgentId':connection['dave_id'],'status':'todo','priority':'medium','idempotencyKey':entry['dispatch_key'],'allowDuplicate':True}
                     task=client.create(payload)
                 if task.get('companyId')!=connection['company_id'] or task.get('assigneeAgentId')!=connection['dave_id'] or not self.matches(task,marker,binding):
@@ -185,7 +212,7 @@ class Dispatch:
             except (ValueError,OSError,TimeoutError) as error:
                 # No credential, remote body or URL appears in logs/UI errors.
                 entry['status']='uncertain' if entry['attempts'] else 'pending'
-                entry['error']=str(error) if isinstance(error,ValueError) else 'Paperclip did not confirm delivery. Your request is saved; explicitly retry to reconcile without duplicates'
+                entry['error']=str(error) if isinstance(error,ValueError) else ('Paperclip did not confirm delivery. Your request is saved; explicitly retry to reconcile without duplicates' if entry['attempts'] else 'Paperclip could not finish its connection or readiness check. Your request is saved; no task was sent. Review and retry this pending request.')
                 entry['updated_at']=env.now()
                 self.event(entry,entry['status'],error=entry['error'])
                 self.write(state)

@@ -18,6 +18,10 @@ The existing Personal profile uses Git-excluded `grad-compass-workspace/runtime/
 
 The existing Python environment and Qt libraries have been verified. For a fresh checkout, create `grad-compass/envGradCompass/` and install `grad-compass/requirements.txt`. Desktop rendering needs a graphical session and the Linux Qt platform libraries. The HTTP layer uses Python's standard library; exchange validation uses jsonschema.
 
+The configured Paperclip instance uses its native supervised user service and starts at login. Use `grad-compass/scripts/paperclip_runtime.py service status --json` to check it, or `service restart --json` for a supported hot restart. Do not start another foreground instance on the same data. New Main-Apply dispatches check private-storage health and the configured Dave runtime before creating a task; failed checks retain the saved request for review/retry. Existing accepted requests keep their task identities. See [local runtime and recovery](../grad-compass-workspace/design/local-runtime-reliability.md) for setup boundaries and diagnostics.
+
+Planned service restarts drain active work. While the app is open, its local worker can continue an accepted task after a verified controller-loss interruption, with durable receipts and strict retry limits. Pending work is reevaluated on reopening. Main-Apply opts in for future interruptions; historical failures are preserved. Provider limits, failed research/review, unresolved decisions and changed bindings require their existing owner/action. Automatic continuation never creates another request or infers approval.
+
 ## Save and explore
 
 Countries is the initial exploration mode in the normal app. A country polygon/card opens its details and frames the country. **Select countries** enables independent multi-selection without changing the filter, inspector or map framing. Purple dashed highlights distinguish selected countries from the blue active country. **Save selected**, **Clear**, **Done**, and a searchable keyboard-accessible country list remain available; panning and zooming work throughout.

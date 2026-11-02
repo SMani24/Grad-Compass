@@ -37,6 +37,7 @@
   }
   get('dispatch-confirm').addEventListener('click',async()=>{
     if(busy || !current)return;busy=true;get('dispatch-confirm').disabled=true;get('dispatch-confirm-cancel').disabled=true;
+    get('dispatch-confirm-status').textContent='Saving your request and checking the local research runtime… This can take a moment. Existing accepted work will be reconciled before any resend.';
     try{const result=await post('/api/dispatch/confirm',{id:current.id,confirmation_digest:current.confirmation_digest});get('dispatch-confirm-dialog').close();get('request-dialog').close();get('pending-requests-dialog').close();await refresh();await window.GradCompassResearch.openRequests(result.request.id);document.getElementById('research-message').textContent=result.status==='accepted'?'Dave task '+result.task.identifier+' received. Research acknowledgement and findings will arrive separately.':result.error+' Open Pending requests to review, edit or explicitly retry.';}
     catch(error){get('dispatch-confirm-status').textContent=error.message;}
     finally{busy=false;get('dispatch-confirm').disabled=false;get('dispatch-confirm-cancel').disabled=false;}
