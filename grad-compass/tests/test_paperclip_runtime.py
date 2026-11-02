@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from uuid import uuid4
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('paperclip_runtime', Path(__file__).resolve().parents[1]/'scripts/paperclip_runtime.py')
@@ -26,6 +27,7 @@ class RuntimeTests(unittest.TestCase):
         patch.object(runtime.os,'umask').start()
         self.exec=patch.object(runtime.os,'execve').start()
         self.socket=patch.object(runtime.socket,'socket').start()
+        self.control=patch.object(runtime,'read_control',return_value=[]).start()
     def save(self):self.settings.write_text(json.dumps(self.value))
     def invoke(self,args):
         with patch.object(runtime.sys,'argv',['paperclip_runtime.py',*args]):return runtime.main()
@@ -44,6 +46,15 @@ class RuntimeTests(unittest.TestCase):
     def test_planned_restart_drains_legacy_executions(self):
         self.invoke(['service','restart','--json'])
         self.assertEqual(self.exec.call_args.args[1][-4:],['service','restart','--json','--wait'])
+    def test_planned_restart_refuses_active_or_unverifiable_executions(self):
+        for answers in [[{'id':str(uuid4())}],{}]:
+            self.control.side_effect=[answers,[{'id':str(uuid4()),'status':'running'}]]
+            self.assertEqual(self.invoke(['service','restart','--json']),1)
+        self.exec.assert_not_called()
+    def test_idle_check_covers_every_company_before_restart(self):
+        self.control.side_effect=[[{'id':str(uuid4())},{'id':str(uuid4())}],[],[{'status':'queued'}]]
+        self.assertEqual(self.invoke(['service','restart']),1)
+        self.assertEqual(self.control.call_count,3);self.exec.assert_not_called()
     def test_run_pins_port_config_node_path_and_private_umask(self):
         self.invoke(['run','--instance','default'])
         _,args,environment=self.exec.call_args.args

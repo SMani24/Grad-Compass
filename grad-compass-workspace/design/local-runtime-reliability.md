@@ -15,7 +15,10 @@ grad-compass/scripts/paperclip_runtime.py service logs --lines 80
 grad-compass/scripts/paperclip_runtime.py service restart --json
 ```
 
-The wrapper adds native `--wait` to planned restarts, draining active executions.
+The wrapper refuses planned restarts while any company has queued/running work,
+or when that state cannot be verified. On an idle instance it also adds native
+`--wait` for orderly finalization. Native draining settles/interrupts legacy work;
+it does not promise natural completion of every active execution.
 Actual testing showed non-draining restart orphaned this installation's legacy
 executions despite a healthy server and empty native lost-run list. Do not infer
 legacy adoption from service health or test it repeatedly on real research.

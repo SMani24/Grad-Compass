@@ -10,10 +10,41 @@ from pathlib import Path
 import socket
 import stat
 import sys
+import urllib.request
+from uuid import UUID
 
 SETTINGS = Path(__file__).resolve().parents[2] / 'grad-compass-workspace/runtime/paperclip-service/launch.local.json'
 RUNTIME_ENVIRONMENT = frozenset(('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
     'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy', 'CODEX_INTERNAL_ORIGINATOR_OVERRIDE'))
+
+
+def read_control(port, path):
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *args, **kwargs):return None
+    headers={}
+    token=os.environ.get('GRAD_COMPASS_PAPERCLIP_TOKEN')
+    if token:headers['Authorization']='Bearer '+token
+    request=urllib.request.Request('http://127.0.0.1:'+str(port)+'/api'+path,headers=headers)
+    opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect)
+    try:
+        with opener.open(request,timeout=5) as response:raw=response.read(4_000_001)
+        if len(raw)>4_000_000:raise ValueError('Oversized control response')
+        return json.loads(raw)
+    except (OSError,ValueError):
+        raise ValueError('Cannot verify idle Paperclip execution state. Inspect service status and existing work before maintenance; no restart was performed.') from None
+
+
+def assert_idle(port):
+    if type(port) is not int or not 1024<=port<=65535:raise ValueError('Invalid pinned controller port; no restart was performed.')
+    companies=read_control(port,'/companies')
+    if not isinstance(companies,list) or len(companies)>64:
+        raise ValueError('Cannot verify idle Paperclip execution state; no restart was performed.')
+    for company in companies:
+        if not isinstance(company,dict):raise ValueError('Invalid controller state; no restart was performed.')
+        identity=str(UUID(str(company.get('id',''))))
+        live=read_control(port,'/companies/'+identity+'/live-runs')
+        if not isinstance(live,list):raise ValueError('Cannot verify active executions; no restart was performed.')
+        if live:raise ValueError('Research work is still active. No restart was performed. Let existing work finish, then retry planned maintenance.')
 
 
 def main():
@@ -31,10 +62,11 @@ def main():
         args = sys.argv[1:]
         if not args:
             raise ValueError('Specify a native Paperclip command, for example service status --json')
-        if args[:2] == ['service', 'restart'] and '--wait' not in args:
+        if args[:2] == ['service', 'restart']:
+            assert_idle(settings['port'])
             # Legacy task executions were actually orphaned by non-draining
             # native restarts. Do not assume native-session adoption covers them.
-            args += ['--wait']
+            if '--wait' not in args:args += ['--wait']
         if args[0] == 'run':
             if any(a in ('--force', '--repair', '--config', '-c', '--data-dir', '-d') or a.startswith(('--config=', '--data-dir=')) for a in args):
                 raise ValueError('The service uses its pinned configuration without automatic repairs')
