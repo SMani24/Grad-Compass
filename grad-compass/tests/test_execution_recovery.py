@@ -38,6 +38,7 @@ class RecoveryTests(unittest.TestCase):
                 if owner.native_fail:raise ValueError('Runtime probe failed with private detail')
             def call(self,path,data=None):
                 if not owner.online:raise OSError('Invented offline control plane')
+                if '/issues?descendantOf=' in path:return []
                 if path.endswith('/interactions'):return deepcopy(owner.questions)
                 if path.endswith('/live-runs'):return deepcopy(owner.live)
                 if path.endswith('/comments') and data is not None:

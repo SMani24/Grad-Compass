@@ -4,7 +4,8 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from web.storage_health import inspect_private_store, StorageHealthError, OWNED
+from web.storage_health import inspect_private_store, inspect_report_output, StorageHealthError, OWNED
+from web.local import private_directory
 
 
 class StorageHealthTests(unittest.TestCase):
@@ -51,6 +52,38 @@ class StorageHealthTests(unittest.TestCase):
     def test_adjacent_cv_policy_is_not_silently_redefined(self):
         cv=self.root/'cv';cv.mkdir(mode=0o755);(cv/'invented-public-template').write_text('Synthetic')
         self.assertEqual(inspect_private_store(self.profile)['state'],'ready')
+
+    def test_nested_private_directories_do_not_inherit_desktop_umask(self):
+        original=os.umask(0o002)
+        try:
+            target=self.root/'output/reports/TEST/deliveries/package/assets'
+            private_directory(target)
+        finally:os.umask(original)
+        for path in (self.root/'output',*(p for p in target.parents if p.is_relative_to(self.root/'output')),target):
+            self.assertEqual(path.stat().st_mode & 0o777,0o700)
+        before=target.stat();private_directory(target)
+        self.assertEqual(target.stat().st_mtime_ns,before.st_mtime_ns)
+
+    def test_output_preflight_does_not_read_or_repair_historical_reports(self):
+        root=private_directory(self.root/'output');reports=root/'reports';reports.mkdir(mode=0o700)
+        old=reports/'old.md';old.write_text('Synthetic retained edition');old.chmod(0o400)
+        reports.chmod(0o775);before=old.stat()
+        with patch.object(Path,'read_bytes',side_effect=AssertionError('Opened retained content')):
+            with self.assertRaisesRegex(StorageHealthError,'report output permissions'):
+                inspect_report_output(root)
+        self.assertEqual(reports.stat().st_mode & 0o777,0o775)
+        reports.chmod(0o700)
+        self.assertEqual(inspect_report_output(root)['state'],'ready')
+        self.assertEqual((old.stat().st_mtime_ns,old.stat().st_mode),(before.st_mtime_ns,before.st_mode))
+
+    def test_output_links_acl_and_missing_directory_fail_closed(self):
+        root=private_directory(self.root/'output');reports=root/'reports'
+        with self.assertRaisesRegex(StorageHealthError,'cannot be checked'):inspect_report_output(root)
+        reports.symlink_to(self.root/'reviews')
+        with self.assertRaisesRegex(StorageHealthError,'link'):inspect_report_output(root)
+        reports.unlink();reports.mkdir(mode=0o700)
+        with patch('web.storage_health.os.listxattr',return_value=['system.posix_acl_default']):
+            with self.assertRaisesRegex(StorageHealthError,'additional access'):inspect_report_output(root)
 
     def test_unavailable_store_and_unreadable_subtrees_fail_closed(self):
         with self.assertRaisesRegex(StorageHealthError,'unavailable'):

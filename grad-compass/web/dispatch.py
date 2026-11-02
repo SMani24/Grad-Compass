@@ -17,7 +17,7 @@ import urllib.request
 from uuid import uuid4
 from web.local import regular,atomic_json
 from web import research_envelopes as env
-from web.storage_health import inspect_private_store,StorageHealthError
+from web.storage_health import inspect_private_store,inspect_report_output,StorageHealthError
 
 VERSION='grad-compass-dispatch-1'
 RETENTION_SECONDS=7*86400
@@ -119,6 +119,7 @@ class Dispatch:
     def event(entry,action,**details):entry.setdefault('attempt_history',[]).append({'at':env.now(),'action':action,**details})
     def settings(self):
         try:
+            inspect_report_output(self.workspace.directory)
             connection=config(self.workspace);return {'configured':connection is not None,'profile_reference':profile_reference(connection),'destination':{'company_id':connection['company_id'],'dave_id':connection['dave_id']} if connection else None,'error':None}
         except StorageHealthError as error:return {'configured':False,'profile_reference':None,'destination':None,'error':str(error)}
         except (ValueError,OSError):return {'configured':False,'profile_reference':None,'destination':None,'error':'Approved profile or connection needs technical attention; pending requests are retained'}
@@ -197,6 +198,7 @@ class Dispatch:
                 if not task:
                     if entry.get('first_attempt_at') and self.clock()-entry['first_attempt_at']>=RETENTION_SECONDS:
                         raise ValueError('Earlier delivery is uncertain beyond Paperclip’s seven-day deduplication window. Reconciliation found no task; no duplicate dispatch will be attempted')
+                    inspect_report_output(self.workspace.directory)
                     client.preflight()
                     export=self.workspace.research.export(current['request_id'])
                     entry['first_attempt_at']=entry.get('first_attempt_at',self.clock());entry['attempts']+=1;entry['status']='dispatching';entry['error']=None;entry['updated_at']=env.now();self.event(entry,'send_attempt',attempt=entry['attempts']);self.write(state)

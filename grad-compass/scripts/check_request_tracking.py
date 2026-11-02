@@ -29,6 +29,7 @@ def main():
                 body=json.dumps(value).encode();self.send_response(status);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
             def do_GET(self):
                 if not fake['online']:return self.reply({'error':'Invented offline state'},503)
+                if '/issues?descendantOf=' in self.path:return self.reply([])
                 if '/companies/' in self.path:return self.reply(list(fake['tasks'].values()) if '/issues?' in self.path else {'id':fake['company']})
                 task=next(iter(fake['tasks'].values()));root='/api/issues/'+task['id'];execution={'runId':fake['run'],'agentId':fake['agent'],'execution':{'phase':fake['phase'],'label':fake['phase'],'lastConfirmedActivityAt':fake['updated'],'attempt':3 if fake['phase']=='failed' else 1,'maxAttempts':3,'permittedActions':['inspect_run']},'recoveryAction':{'id':fake['run'],'kind':'stranded_assigned_issue','ownerType':'board','nextAction':'Repair the fixture runtime, then explicitly recover this same task.'} if fake['phase']=='failed' else None}
                 if self.path==root:return self.reply({**task,'updatedAt':fake['updated'],'blockedBy':[],'status':{'failed':'blocked','running':'in_progress','completed':'done'}[fake['phase']]})

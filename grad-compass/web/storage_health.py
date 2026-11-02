@@ -14,6 +14,25 @@ class StorageHealthError(ValueError):
     pass
 
 
+def inspect_report_output(workspace):
+    """Read-only check of app-owned producer output roots, not legacy contents."""
+    root=Path(workspace)
+    try:
+        for path in (root,root/'reports'):
+            if any(p.is_symlink() for p in (path,*path.parents)):
+                raise StorageHealthError('Private report output contains a link. Technical security review is required before dispatch.')
+            info=path.lstat()
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.getuid():
+                raise StorageHealthError('Private report output has an unexpected owner or type. Technical security review is required before dispatch.')
+            if any(name.startswith('system.posix_acl_') for name in os.listxattr(path,follow_symlinks=False)):
+                raise StorageHealthError('Private report output has additional access grants. Technical security review is required before dispatch.')
+            if stat.S_IMODE(info.st_mode)!=0o700:
+                raise StorageHealthError('Private report output permissions need owner-local maintenance before dispatch (0700 required). Your saved request is retained; no new task was sent.')
+        return {'state':'ready'}
+    except OSError:
+        raise StorageHealthError('Private report output cannot be checked. Restore its existing local directory before retrying this saved request.') from None
+
+
 def inspect_private_store(profile):
     profile = Path(profile)
     root = profile.parent.parent if profile.parent.name == 'frozen' else profile

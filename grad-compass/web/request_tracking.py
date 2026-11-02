@@ -43,7 +43,7 @@ def issue_link(connection,issue):
 
 
 def inspect(client,entry,connection):
-    """Only follow explicit dependency identities within the bound task/company."""
+    """Follow explicit dependencies and verified descendants of the bound task."""
     root=client.issue(entry['task']['id'])
     binding={'request':entry['request'],'profile':entry['profile_reference'],'destination':entry['destination']}
     if (not isinstance(root,dict) or root.get('id')!=entry['task']['id'] or root.get('companyId')!=connection['company_id'] or root.get('assigneeAgentId')!=entry['destination']['dave_id']
@@ -57,6 +57,27 @@ def inspect(client,entry,connection):
             if not isinstance(item,dict):raise ValueError('Paperclip task dependency identity is missing')
             env.identifier(item.get('id'));candidates.setdefault(item['id'],item)
             depth[item['id']]=max(depth.get(item['id'],0),1 if item is blocker else 2)
+    # A coordinator can be blocked on a technical decision while an independent
+    # research child has failed. Dependencies alone hide that stopped execution.
+    children=client.call('/companies/'+connection['company_id']+'/issues?descendantOf='+root['id']+'&limit=17')
+    if not isinstance(children,list) or len(children)>16:
+        raise ValueError('Research child-step status needs review in Paperclip. The last known state is retained.')
+    descendants={}
+    for child in children:
+        if not isinstance(child,dict) or child.get('companyId')!=connection['company_id']:
+            raise ValueError('Research child-step identity does not match the saved request')
+        identity=env.identifier(child.get('id'));env.identifier(child.get('parentId'))
+        if identity==root['id'] or identity in descendants:
+            raise ValueError('Research child-step ancestry is ambiguous')
+        descendants[identity]=child
+    for identity,child in descendants.items():
+        seen={identity};parent=child['parentId'];level=1
+        while parent!=root['id']:
+            if parent in seen or parent not in descendants:
+                raise ValueError('Research child-step is not bound to the saved request')
+            seen.add(parent);parent=descendants[parent]['parentId'];level+=1
+        if child.get('status') not in ('done','cancelled') or active_recovery(child.get('activeRecoveryAction')) or child.get('scheduledRetry'):
+            candidates[identity]=child;depth[identity]=max(depth.get(identity,0),level)
     if len(candidates)>16:raise ValueError('Task dependency graph needs review in Paperclip')
     observations=[];unavailable_steps=[];diagnostic_notes=[]
     for identity,summary in candidates.items():
@@ -69,6 +90,8 @@ def inspect(client,entry,connection):
         except (OSError,ValueError,KeyError,TypeError):
             if identity==root['id']:raise
             unavailable_steps.append(identity);continue
+        if identity in descendants and issue.get('parentId')!=descendants[identity]['parentId']:
+            raise ValueError('Research child-step changed its request association during refresh')
         if not isinstance(projection,dict):raise ValueError('Paperclip execution status has an unsupported shape')
         execution=projection.get('execution') or {}
         if not isinstance(execution,dict):raise ValueError('Paperclip execution status has an unsupported shape')

@@ -24,7 +24,15 @@ def private_directory(path):
     path=Path(path)
     if any(p.is_symlink() for p in (path,*path.parents)):
         raise ValueError('Local storage cannot use symbolic links')
-    path.mkdir(parents=True,exist_ok=True,mode=0o700)
+    # Path.mkdir(parents=True) applies mode only to the leaf. Under a normal
+    # desktop umask it leaves intermediate report directories group-writable.
+    missing=[];parent=path
+    while not parent.exists():
+        missing.append(parent);parent=parent.parent
+    for parent in reversed(missing):
+        parent.mkdir(exist_ok=True,mode=0o700)
+        if parent.is_symlink() or parent.stat().st_uid != os.getuid():
+            raise ValueError('Local storage must use directories owned by this user')
     if path.stat().st_uid != os.getuid(): raise ValueError('Local storage must belong to this user')
     path.chmod(0o700)
     return path
@@ -70,6 +78,10 @@ class LocalWorkspace(DemoWorkspace):
         with closing(self.writer()) as db,db:
             db.execute('CREATE TABLE IF NOT EXISTS removed_institutions(institution_id TEXT PRIMARY KEY,name TEXT NOT NULL,removed_at TEXT NOT NULL)')
         private_directory(self.directory/'inbox');private_directory(self.directory/'batches')
+        # Establish future producer output before dispatch, without silently
+        # repairing existing legacy output permissions when opening the app.
+        reports=self.directory/'reports'
+        if not reports.exists() and not reports.is_symlink():private_directory(reports)
         if previous: self._preserve_previous(Path(previous))
 
     def connect(self):

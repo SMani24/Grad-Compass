@@ -63,6 +63,44 @@ class TrackingTests(unittest.TestCase):
         self.d.routes['/api/issues/'+child['id']+'/runs'].insert(0,{'runId':execution['runId'],'contextIssueId':self.root['id'],'agentId':execution['agentId'],'status':'succeeded'})
         self.tracker.refresh();r=self.row();self.assertEqual(r['status'],'failed');self.assertEqual(r['tracking']['latest']['step']['id'],child['id']);self.assertEqual(r['tracking']['latest']['run']['status'],'failed')
         self.assertTrue(r['recovery_url'].endswith('/TEST/issues/TEST-2'));self.assertTrue(r['task_url'].endswith('/TEST/issues/TEST-1'))
+
+    def test_independent_nested_child_quota_is_visible_while_coordinator_is_blocked(self):
+        coordinator={'id':str(uuid4()),'identifier':'TEST-2','companyId':self.d.company,'parentId':self.root['id'],'title':'Coordinate delivery','status':'blocked','updatedAt':env.now()}
+        child={'id':str(uuid4()),'identifier':'TEST-3','companyId':self.d.company,'parentId':coordinator['id'],'title':'Research country','status':'in_progress','updatedAt':env.now()}
+        self.root['blockedBy']=[coordinator];self.root['status']='blocked'
+        self.routes(coordinator,{'runId':str(uuid4()),'agentId':self.d.dave,'execution':{'phase':'completed'}})
+        execution={'runId':str(uuid4()),'agentId':str(uuid4()),'execution':{'phase':'failed','cause':'provider_quota','attempt':3,'maxAttempts':3}}
+        self.routes(child,execution)
+        url='/api/companies/'+self.d.company+'/issues?descendantOf='+self.root['id']+'&limit=17'
+        self.d.routes[url]=[child,coordinator]
+        self.tracker.refresh();r=self.row()
+        self.assertEqual(r['status'],'blocked');self.assertTrue(r['needs_attention'])
+        self.assertEqual(r['tracking']['latest']['step']['id'],child['id'])
+        self.assertEqual(r['tracking']['latest']['execution']['cause'],'provider_quota')
+        self.assertEqual(r['label'],'Paused — provider usage limit');self.assertIn('provider permits',r['next_action'])
+        reopened=RequestTracker(LocalWorkspace(self.w.directory));self.assertEqual(self.row(reopened)['status'],'blocked')
+        self.assertEqual((self.d.creates,self.d.posts),(1,1))
+        # Failed child ancestry response must retain, not clear, the known stop.
+        child['parentId']=str(uuid4());self.tracker.refresh();r=self.row()
+        self.assertEqual(r['status'],'blocked');self.assertTrue(r['tracking']['connection_error'])
+        self.assertEqual((self.d.creates,self.d.posts),(1,1))
+
+    def test_foreign_duplicate_and_oversized_descendant_lists_are_not_trusted(self):
+        self.tracker.refresh()
+        url='/api/companies/'+self.d.company+'/issues?descendantOf='+self.root['id']+'&limit=17'
+        child={'id':str(uuid4()),'companyId':str(uuid4()),'parentId':self.root['id']}
+        for values in ([child],[{**child,'companyId':self.d.company}]*2,[child]*17,{'items':[]}):
+            self.d.routes[url]=values;self.tracker.refresh()
+            self.assertTrue(self.row()['tracking']['connection_error'])
+            self.assertNotEqual(self.row()['status'],'failed')
+        first={**child,'companyId':self.d.company,'status':'in_progress'}
+        second={**first,'id':str(uuid4()),'parentId':first['id']};first['parentId']=second['id']
+        self.d.routes[url]=[first,second];self.tracker.refresh()
+        self.assertTrue(self.row()['tracking']['connection_error'])
+        first['parentId']=self.root['id'];self.d.routes[url]=[deepcopy(first)]
+        self.routes(first,{'runId':str(uuid4()),'agentId':self.d.dave,'execution':{'phase':'running'}})
+        first['parentId']=str(uuid4())  # Reparented after the descendant listing.
+        self.tracker.refresh();self.assertIn('association',self.row()['tracking']['connection_error'])
     def test_repeated_reads_delayed_updates_and_done_without_report_never_fabricate_completion(self):
         self.tracker.refresh();self.tracker.refresh();self.assertEqual(len(self.row()['tracking']['history']),1)
         later=RequestTracker(self.w,clock=lambda:time.time()+86400);r=self.row(later);self.assertTrue(r['delayed']);self.assertNotEqual(r['status'],'failed')

@@ -65,6 +65,20 @@ review/retry that same saved request after maintenance. An unavailable reference
 at initial confirmation still requires reviewing a new draft revision with its
 actual approved reference; no approval is inferred from repairing storage.
 
+APP-031: preflight also checks the app profile and its `reports` output root for
+owner-only directory access (0700), correct ownership and absence of links/ACLs.
+Checking only the frozen profile store missed a legacy 0775 app output root.
+The check reads no report contents and performs no repair. An absent report root
+is created privately when initializing an app workspace; an existing root is
+preserved until an authorized local maintenance action. A retained accepted-task
+receipt still reconciles without another output/model check or duplicate dispatch.
+
+`web/local.py:private_directory` creates each missing intermediate directory with
+explicit 0700. Python's `mkdir(parents=True, mode=0700)` only applies that mode to
+the final directory, so it was insufficient under an ordinary desktop umask.
+Existing historical descendant modes and immutable content are not swept or
+rewritten. Producer private writers continue to validate their actual destination.
+
 An uncertain earlier dispatch reconciles the exact accepted task first. Recovering
 that receipt does not require another model probe or resend. The existing
 company/idempotency transaction, private durable outbox, seven-day uncertainty
@@ -88,6 +102,19 @@ progress transition. After successful repair, the verifier records actual readin
 and the question's requester resolves/withdraws a satisfied gate through supported
 controls. Never fabricate an owner answer, release or factual acceptance. Agent
 run success can mean a blocker was documented, not that the request was fulfilled.
+
+Managed photograph tasks must be direct children of the accepted request root,
+with their existing goal and research assignee. The delivery coordinator remains
+responsible for enqueue/packaging but must not be a completion prerequisite of its
+own photograph input. State this relationship in the initial assignment rather
+than requiring a later routing decision. No worker access rule is relaxed.
+
+Request tracking reads the supported bounded `descendantOf` task listing as well
+as dependencies. It validates same-company identities and the full explicit
+parent chain before following each open child. This exposes an independent
+research child's quota failure even while the coordinator waits on another gate.
+Malformed, foreign, cyclic, oversized or unavailable child listings retain the
+last known observation; they do not clear a failure or initiate execution.
 
 ## Boundaries and acceptance
 

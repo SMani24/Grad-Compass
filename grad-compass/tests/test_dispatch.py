@@ -28,6 +28,7 @@ class DispatchTests(unittest.TestCase):
                 owner.gets.append(self.path)
                 if not owner.online:return self.reply({'error':'offline'},503)
                 if self.path in owner.routes:return self.reply(owner.routes[self.path])
+                if '/issues?descendantOf=' in self.path:return self.reply([])
                 return self.reply(list(owner.tasks.values()) if '/issues?' in self.path else {'id':owner.company})
             def do_POST(self):
                 value=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
@@ -106,6 +107,27 @@ class DispatchTests(unittest.TestCase):
         historical.chmod(0o600)
         replay=Dispatch(LocalWorkspace(self.w.directory)).retry(e['id'])
         self.assertEqual(replay['request'],row['request']);self.assertEqual(replay['status'],'accepted');self.assertEqual(self.creates,1)
+
+    def test_report_root_defect_is_pending_then_retries_same_request_after_maintenance(self):
+        e=self.prepare();root=self.w.directory/'reports';root.chmod(0o775)
+        row=self.confirm(e)
+        self.assertEqual(row['status'],'pending');self.assertEqual((self.posts,self.probes),(0,0))
+        self.assertIn('report output permissions',row['error'])
+        self.assertEqual(root.stat().st_mode & 0o777,0o775)
+        # Restart may create absent output, but never silently repairs legacy roots.
+        reopened=LocalWorkspace(self.w.directory)
+        self.assertEqual(root.stat().st_mode & 0o777,0o775)
+        root.chmod(0o700)
+        retried=Dispatch(reopened).retry(e['id'])
+        self.assertEqual(retried['request'],row['request']);self.assertEqual(retried['status'],'accepted')
+        self.assertEqual(self.creates,1)
+
+    def test_uncertain_acceptance_reconciles_even_if_output_later_needs_maintenance(self):
+        e=self.prepare();self.lose_ack=True;row=self.confirm(e)
+        self.assertEqual(row['status'],'uncertain');(self.w.directory/'reports').chmod(0o775)
+        reconciled=Dispatch(LocalWorkspace(self.w.directory)).retry(e['id'])
+        self.assertEqual(reconciled['status'],'accepted');self.assertEqual(reconciled['request'],row['request'])
+        self.assertEqual((self.posts,self.creates),(1,1))
 
     def enable_runtime_preflight(self):
         path=self.w.directory/'paperclip-connection.local.json';value=json.loads(path.read_text());value['runtime_preflight']=True;atomic_json(path,value)
