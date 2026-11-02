@@ -129,6 +129,17 @@ Reconciliation of that notification never marks an open request root complete,
 even when reports are already available; tracked fulfilment still requires the
 root's actual completed state.
 
+For corrected editions within the same accepted request, prefer a permitted
+follow-up on the existing independent-review task. Inspect authority, current
+questions/dependencies/recovery and live runs, use the supported explicit
+resume/reopen when allowed, update the visible review scope and verify the new
+reviewer run claim. Each revision needs its own exact-bound review identity;
+earlier adverse verdicts, files and annotations remain immutable. This is not
+task creation and grants no new permissions. If creation or follow-up is denied,
+preserve the denial; do not switch APIs or change trust settings to bypass it.
+A requester may withdraw a creation-capability question only when an actually
+permitted existing-task route makes it obsolete, without inventing an owner answer.
+
 ## Private files and exact bindings
 
 `web/asset_jobs.py` defines `grad-compass-asset-job-1`. The helper finalizes
